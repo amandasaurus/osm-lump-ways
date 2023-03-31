@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Amanda McCann <amanda@technomancy.org>"]
 license = "AGPL-3.0+"
-repository = "https://github.com/amandasaurus/osm-name-group"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+repository = "https://github.com/amandasaurus/osm-lump-ways"
+description = "Group OpenStreetMap lines based on graph topology and OSM tags"
+keywords = ["openstreetmap", "osm", "topology"]
 
 [dependencies]
 anyhow = "1.0.66"

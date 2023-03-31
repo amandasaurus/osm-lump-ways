@@ -31,6 +31,8 @@ OSM linear features (eg roads, rivers, walls) are stored as [way object](https:/
 # Full Options
 
 
+Run with `--help` to see all options.
+
 
 # Copyright & Licence
 
