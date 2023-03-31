@@ -11,7 +11,7 @@ pub struct NodeIdWayIds {
 
 impl NodeIdWayIds {
     pub fn new() -> Self {
-        NodeIdWayIds{
+        NodeIdWayIds {
             singles: HashMap::new(),
             multiples: HashMap::new(),
         }
@@ -32,7 +32,6 @@ impl NodeIdWayIds {
         } else {
             self.singles.insert(nid, wid);
         }
-
     }
 
     pub fn contains_nid(&self, nid: &i64) -> bool {
@@ -42,7 +41,7 @@ impl NodeIdWayIds {
         self.singles.len() + self.multiples.len()
     }
 
-    pub fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item=&i64> + 'a> {
+    pub fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = &i64> + 'a> {
         if let Some(wid) = self.singles.get(nid) {
             Box::new(std::iter::once(wid))
         } else if let Some(wids) = self.multiples.get(nid) {
@@ -51,5 +50,4 @@ impl NodeIdWayIds {
             Box::new(std::iter::empty())
         }
     }
-
 }

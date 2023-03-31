@@ -91,11 +91,11 @@ pub(crate) struct Args {
     #[arg(long)]
     pub only_these_way_groups: Vec<i64>,
 
-    /// 
-    #[arg(long, value_name="SECONDS" )]
+    ///
+    #[arg(long, value_name = "SECONDS")]
     pub timeout_dist_to_longer_s: Option<f32>,
 
     /// Don't include all way ids
-    #[arg(long, default_value="false")]
+    #[arg(long, default_value = "false")]
     pub no_incl_wayids: bool,
 }

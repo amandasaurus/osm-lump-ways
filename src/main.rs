@@ -2,6 +2,7 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use dashmap::DashMap;
+use get_size::GetSize;
 use indicatif::{ProgressBar, ProgressStyle};
 #[allow(unused_imports)]
 use log::{debug, error, info, log_enabled, trace, warn, Level};
@@ -14,13 +15,12 @@ use regex::Regex;
 use serde_json::json;
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap, HashSet};
+use std::io::prelude::*;
+use std::io::Write;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
-use std::io::prelude::*;
-use std::io::Write;
-use get_size::GetSize;
 //use get_size_derive::*;
 use num_format::{Locale, ToFormattedString};
 
@@ -87,7 +87,6 @@ fn main() -> Result<()> {
     //let mut nodeid_wayids: HashMap<i64, HashSet<i64>> = HashMap::new();
     let mut nodeid_wayids = nodeid_wayids::NodeIdWayIds::new();
     let nodeid_wayids = Arc::new(Mutex::new(nodeid_wayids));
-    
 
     let style = ProgressStyle::with_template(
         "[{elapsed_precise}] {percent}% done. eta {eta:>4} {bar:10.cyan/blue} {pos:>7}/{len:7} {per_sec:>12} {msg}",
@@ -159,12 +158,13 @@ fn main() -> Result<()> {
         );
     obj_reader.finish();
     ways_added.finish();
-    let nodeid_wayids = Arc::try_unwrap(nodeid_wayids).unwrap().into_inner().unwrap();
-
+    let nodeid_wayids = Arc::try_unwrap(nodeid_wayids)
+        .unwrap()
+        .into_inner()
+        .unwrap();
 
     let mut nodeid_pos = Arc::try_unwrap(nodeid_pos).unwrap();
     let mut group_wayid_nodes = Arc::try_unwrap(group_wayid_nodes).unwrap();
-
 
     let mut nodeid_pos_hm = HashMap::new();
     if args.read_nodes_first {
@@ -216,9 +216,16 @@ fn main() -> Result<()> {
 
     nodeid_pos_hm.shrink_to_fit();
     let nodeid_pos = nodeid_pos_hm;
-    info!("Size of node pos: {} bytes", nodeid_pos.get_size().to_formatted_string(&Locale::en));
+    info!(
+        "Size of node pos: {} bytes",
+        nodeid_pos.get_size().to_formatted_string(&Locale::en)
+    );
 
-    info!("Size of nodeid_wayids: {} = {} bytes", nodeid_wayids.get_size(), nodeid_wayids.get_size().to_formatted_string(&Locale::en));
+    info!(
+        "Size of nodeid_wayids: {} = {} bytes",
+        nodeid_wayids.get_size(),
+        nodeid_wayids.get_size().to_formatted_string(&Locale::en)
+    );
 
     info!(
         "Starting the breathfirst search. There are {} groups",
@@ -582,7 +589,10 @@ impl TagGrouper {
 }
 
 /// Write a geojson featurecollection, but manually construct it
-fn write_geojson_features_directly(features: &[(serde_json::Value, Vec<Vec<(f64, f64)>>)], mut f: &mut impl Write) -> Result<()> {
+fn write_geojson_features_directly(
+    features: &[(serde_json::Value, Vec<Vec<(f64, f64)>>)],
+    mut f: &mut impl Write,
+) -> Result<()> {
     f.write_all(b"{\"type\":\"FeatureCollection\", \"features\": [\n")?;
     write_geojson_feature_directly(&mut f, &features[0]);
     for feature in &features[1..] {
@@ -593,7 +603,10 @@ fn write_geojson_features_directly(features: &[(serde_json::Value, Vec<Vec<(f64,
     Ok(())
 }
 
-fn write_geojson_feature_directly(mut f: &mut impl Write, feature: &(serde_json::Value, Vec<Vec<(f64, f64)>>)) -> Result<()> {
+fn write_geojson_feature_directly(
+    mut f: &mut impl Write,
+    feature: &(serde_json::Value, Vec<Vec<(f64, f64)>>),
+) -> Result<()> {
     f.write_all(b"{\"properties\":")?;
     serde_json::to_writer(&mut f, &feature.0)?;
     f.write_all(b", \"geometry\": {\"type\":\"MultiLineString\", \"coordinates\": ")?;

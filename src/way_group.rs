@@ -72,7 +72,7 @@ impl WayGroup {
         self.nodeids.par_iter().map(|nids| nids.len()).sum()
     }
 
-    pub fn nodeids_iter(&self) -> impl rayon::prelude::ParallelIterator<Item=&i64> + '_ {
+    pub fn nodeids_iter(&self) -> impl rayon::prelude::ParallelIterator<Item = &i64> + '_ {
         self.nodeids.par_iter().flat_map(|nids| nids.par_iter())
     }
 
@@ -109,7 +109,10 @@ impl WayGroup {
         }
 
         // Attempted shortcut. If they share a nodeid, then shortest distance is 0
-        if self.nodeids_iter().any(|n1| other.nodeids_iter().any(|n2| n1 == n2)) {
+        if self
+            .nodeids_iter()
+            .any(|n1| other.nodeids_iter().any(|n2| n1 == n2))
+        {
             return Some(0.);
         }
 
