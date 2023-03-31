@@ -37,6 +37,11 @@ be mapped as many different ways. `osm-lump-ways` will assemble them all togethe
 
 # Full Options
 
+Run with `--help` to see all options.
+
+# Examples of usage
+
+* TBC
 
 
 # Copyright & Licence
