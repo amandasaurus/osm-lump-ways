@@ -1,0 +1,9 @@
+/*.geojson
+/*.mbtiles
+/*.pmtiles
+/*.osm.pbf
+/*.qgz
+/blog-posts/*
+/target
+/water
+/heaptrack.*
