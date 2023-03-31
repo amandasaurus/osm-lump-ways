@@ -41,8 +41,8 @@ Run with `--help` to see all options.
 
 # Examples of usage
 
-* TBC
-
+* [`osm-river-basins`](https://github.com/amandasaurus/osm-river-basins)
+* Your project here!
 
 # Copyright & Licence
 
