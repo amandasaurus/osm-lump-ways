@@ -413,7 +413,7 @@ fn main() -> Result<()> {
         }
     })
     .update(|(filename, way_groups)| {
-        let max_timeout_s = args.timeout_dist_to_longer_s.unwrap_or(2.);
+        let max_timeout_s = args.timeout_dist_to_longer_s.unwrap_or(0.);
         if max_timeout_s == 0. {
             trace!("timeout_dist_to_longer_s is 0, so skipping this");
             return;
@@ -517,6 +517,7 @@ fn main() -> Result<()> {
         let features = way_groups.into_par_iter().map(|mut w| {
             let mut properties = json!({
                 "root_wayid": w.root_wayid,
+                "root_wayid_120": w.root_wayid  % 120,
             });
             if let Some(l) = w.length_m {
                 properties["length_m"] = w.length_m.into();
