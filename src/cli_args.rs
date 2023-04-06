@@ -98,4 +98,10 @@ pub(crate) struct Args {
     /// Don't include all way ids
     #[arg(long, default_value = "false")]
     pub no_incl_wayids: bool,
+
+
+    /// Rather than save one MultiLineString per group, save it as many smaller linestrings,
+    /// duplication of properties etc
+    #[arg(long, default_value = "false")]
+    pub save_as_linestrings: bool,
 }

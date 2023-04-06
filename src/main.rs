@@ -538,7 +538,7 @@ fn main() -> Result<()> {
         match std::fs::File::create(&filename) {
             Ok(f) => {
                 let mut f = std::io::BufWriter::new(f);
-                write_geojson_features_directly(&features, &mut f)
+                write_geojson_features_directly(&features, &mut f, args.save_as_linestrings)
                     .with_context(|| {
                         format!(
                             "Writing {} features to filename {:?}",
@@ -592,12 +592,13 @@ impl TagGrouper {
 fn write_geojson_features_directly(
     features: &[(serde_json::Value, Vec<Vec<(f64, f64)>>)],
     mut f: &mut impl Write,
+    save_as_linestrings: bool,
 ) -> Result<()> {
     f.write_all(b"{\"type\":\"FeatureCollection\", \"features\": [\n")?;
-    write_geojson_feature_directly(&mut f, &features[0]);
+    write_geojson_feature_directly(&mut f, &features[0], save_as_linestrings);
     for feature in &features[1..] {
         f.write_all(b",\n")?;
-        write_geojson_feature_directly(&mut f, &feature)?;
+        write_geojson_feature_directly(&mut f, &feature, save_as_linestrings)?;
     }
     f.write_all(b"\n]}")?;
     Ok(())
@@ -606,25 +607,47 @@ fn write_geojson_features_directly(
 fn write_geojson_feature_directly(
     mut f: &mut impl Write,
     feature: &(serde_json::Value, Vec<Vec<(f64, f64)>>),
+    save_as_linestrings: bool,
 ) -> Result<()> {
-    f.write_all(b"{\"properties\":")?;
-    serde_json::to_writer(&mut f, &feature.0)?;
-    f.write_all(b", \"geometry\": {\"type\":\"MultiLineString\", \"coordinates\": ")?;
-    f.write_all(b"[")?;
-    for (i, linestring) in feature.1.iter().enumerate() {
-        if i != 0 {
-            f.write_all(b",")?;
+    if save_as_linestrings {
+        for (k, linestring) in feature.1.iter().enumerate() {
+            if k != 0 {
+                f.write_all(b",\n")?;
+            }
+            f.write_all(b"{\"properties\":")?;
+            serde_json::to_writer(&mut f, &feature.0)?;
+            f.write_all(b", \"geometry\": {\"type\":\"LineString\", \"coordinates\": ")?;
+            f.write_all(b"[")?;
+            for (j, coords) in linestring.iter().enumerate() {
+                if j != 0 {
+                    f.write_all(b",")?;
+                }
+                write!(f, "[{}, {}]", coords.0, coords.1)?;
+            }
+            f.write_all(b"]")?;
+            f.write_all(b"}, \"type\": \"Feature\"}")?;
         }
+    } else {
+        f.write_all(b"{\"properties\":")?;
+        serde_json::to_writer(&mut f, &feature.0)?;
+        f.write_all(b", \"geometry\": {\"type\":\"MultiLineString\", \"coordinates\": ")?;
         f.write_all(b"[")?;
-        for (j, coords) in linestring.iter().enumerate() {
-            if j != 0 {
+        for (i, linestring) in feature.1.iter().enumerate() {
+            if i != 0 {
                 f.write_all(b",")?;
             }
-            write!(f, "[{}, {}]", coords.0, coords.1)?;
+            f.write_all(b"[")?;
+            for (j, coords) in linestring.iter().enumerate() {
+                if j != 0 {
+                    f.write_all(b",")?;
+                }
+                write!(f, "[{}, {}]", coords.0, coords.1)?;
+            }
+            f.write_all(b"]")?;
         }
         f.write_all(b"]")?;
+        f.write_all(b"}, \"type\": \"Feature\"}")?;
     }
-    f.write_all(b"]")?;
-    f.write_all(b"}, \"type\": \"Feature\"}")?;
+
     Ok(())
 }
