@@ -521,7 +521,7 @@ fn main() -> Result<()> {
             if let Some(l) = w.length_m {
                 properties["length_m"] = w.length_m.into();
             }
-            if !args.no_incl_wayids {
+            if args.incl_wayids {
                 properties["all_wayids"] = w.way_ids.into();
             }
 
