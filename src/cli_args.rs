@@ -96,7 +96,7 @@ pub(crate) struct Args {
     pub timeout_dist_to_longer_s: Option<f32>,
 
     /// include all way ids
-    #[arg(long, action=clap::ArgAction::SetTrue, default_value = "true")]
+    #[arg(long, action=clap::ArgAction::SetTrue, default_value = "false")]
     pub incl_wayids: bool,
 
 
