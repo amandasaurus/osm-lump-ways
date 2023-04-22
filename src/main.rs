@@ -166,6 +166,11 @@ fn main() -> Result<()> {
     let mut nodeid_pos = Arc::try_unwrap(nodeid_pos).unwrap();
     let mut group_wayid_nodes = Arc::try_unwrap(group_wayid_nodes).unwrap();
 
+    if group_wayid_nodes.is_empty() {
+        info!("No ways in the file matched your filters. Nothing to do");
+        return Ok(());
+    }
+
     let mut nodeid_pos_hm = HashMap::new();
     if args.read_nodes_first {
         info!("Removing unneeded node positions...");
