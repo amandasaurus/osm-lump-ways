@@ -3,6 +3,7 @@ use regex::Regex;
 #[derive(Debug, Clone)]
 pub enum TagFilter {
     HasK(String),
+    NotHasK(String),
     KV(String, String),
     KinV(String, Vec<String>),
     KneV(String, String),
@@ -13,6 +14,7 @@ impl ToString for TagFilter {
     fn to_string(&self) -> String {
         match self {
             TagFilter::HasK(k) => format!("{}", k),
+            TagFilter::NotHasK(k) => format!("∄{}", k),
             TagFilter::KV(k, v) => format!("{}={}", k, v),
             TagFilter::KinV(k, vs) => format!("{}={}", k, vs.join(",").to_string()),
             TagFilter::KneV(k, v) => format!("{}≠{}", k, v),
@@ -24,7 +26,7 @@ impl ToString for TagFilter {
 
 impl PartialEq for TagFilter {
     fn eq(&self, other: &TagFilter) -> bool {
-        self.to_string() == other.to_string()
+        format!("{:?}", self) == format!("{:?}", other)
     }
 }
 
@@ -32,6 +34,7 @@ impl TagFilter {
     pub fn filter(&self, o: &impl osmio::OSMObjBase) -> bool {
         match self {
             TagFilter::HasK(k) => o.has_tag(k),
+            TagFilter::NotHasK(k) => !o.has_tag(k),
             TagFilter::KV(k, v) => o.tag(k) == Some(v),
             TagFilter::KneV(k, v) => o.tag(k).map_or(true, |v2| v != v2),
             TagFilter::KinV(k, vs) => vs.iter().any(|v| o.tag(k).map_or(false, |v2| v == v2)),
@@ -58,6 +61,8 @@ impl std::str::FromStr for TagFilter {
         } else if s.contains('≠') {
             let s = s.splitn(2, '≠').collect::<Vec<_>>();
             Ok(TagFilter::KneV(s[0].to_string(), s[1].to_string()))
+        } else if s.starts_with('∄') {
+            Ok(TagFilter::NotHasK(s.chars().skip(1).collect::<String>()))
         } else {
             Ok(TagFilter::HasK(s.to_string()))
         }
@@ -93,6 +98,10 @@ mod tests {
         assert_eq!(
             "highway~motorway".parse::<TagFilter>().unwrap(),
             TagFilter::KreV("highway".to_string(), Regex::new("motorway").unwrap())
+        );
+        assert_eq!(
+            "∄name".parse::<TagFilter>().unwrap(),
+            TagFilter::NotHasK("name".to_string())
         );
     }
 }
