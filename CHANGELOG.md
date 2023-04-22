@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.0 ( 2023-04-22 )
 
  * New option to split into linestrings
  * wayids not included by default
