@@ -72,9 +72,6 @@ fn main() -> Result<()> {
     info!(
         "Tag filter(s) in operation: {:?}",
         args.tag_filter
-            .iter()
-            .map(|tf| tf.to_string())
-            .collect::<Vec<_>>()
     );
     info!("Tag grouping(s) in operation: {:?}", args.tag_group_k);
 
