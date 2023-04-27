@@ -42,6 +42,7 @@ Run with `--help` to see all options.
 # Examples of usage
 
 * [`osm-river-basins`](https://github.com/amandasaurus/osm-river-basins)
+* [Longest O'Connell Street in Ireland](https://en.osm.town/@amapanda/110270516183776589)
 * Your project here!
 
 # Copyright & Licence
