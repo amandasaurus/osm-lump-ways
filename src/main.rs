@@ -326,7 +326,7 @@ fn main() -> Result<()> {
                     paths
                 }
                 Err(e) => {
-                    error!("Problem with wg:{}: {}. You probably don't have enough memory. You can rerun just this failing subset by passing --only-these-way-groups {} as a CLI arg", way_group.root_wayid, e, way_group.root_wayid);
+                    error!("Problem with wg:{}: {}. You probably don't have enough memory. You can rerun just this failing subset by passing --only-these-way-groups {} as a CLI arg. Error: {:?}", way_group.root_wayid, e, way_group.root_wayid, e);
                     // Hack to ensure nothing is run later
                     vec![]
                 }
