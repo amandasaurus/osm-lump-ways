@@ -232,12 +232,17 @@ fn main() -> Result<()> {
         nodeid_wayids.get_size().to_formatted_string(&Locale::en)
     );
 
+    info!("All data has been loaded. Started processing...");
     info!(
         "Starting the breathfirst search. There are {} groups",
         group_wayid_nodes.len()
     );
     let grouping = ProgressBar::new(group_wayid_nodes.iter().map(|(_group, wayid_nodes)| wayid_nodes.len()).sum::<usize>() as u64)
         .with_message("Grouping all ways")
+        .with_style(style.clone());
+
+    let splitter = ProgressBar::new(0)
+        .with_message("Splitting ways into lines")
         .with_style(style.clone());
 
     let results_filename_way_groups = group_wayid_nodes.into_par_iter()
@@ -289,9 +294,11 @@ fn main() -> Result<()> {
             group
         );
         grouping.finish();
+        splitter.set_length(way_groups.len() as u64);
         way_groups.into_par_iter()
     })
     // ↑ The breath first search is done
+
     // ↓ now do other processing on the groups
     .filter(|way_group| {
         if args.only_these_way_groups.is_empty() {
@@ -309,6 +316,9 @@ fn main() -> Result<()> {
         way_group.calculate_length();
     })
     // apply min length filter
+    // This is before any possible splitting. If an unsplitted way_group has total len ≤ the min
+    // len, then splitting won't make it be included.
+    // This reduces the amount of splitting we have to do.
     .filter(|way_group|
         match args.min_length_m {
             None => true,
@@ -325,6 +335,7 @@ fn main() -> Result<()> {
             debug!("splitting the groups into single paths with FW algorithm...");
             let paths = match fw::into_fw_segments(&way_group, &nodeid_pos, args.min_length_m, args.only_longest_n_splitted_paths) {
                 Ok(paths) => {
+                    splitter.inc(1);
                     debug!("Have generated {} paths from wg:{}", paths.len(), way_group.root_wayid);
                     paths
                 }
