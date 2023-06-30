@@ -33,11 +33,18 @@ pub(crate) struct Args {
     ///
     /// Can be specified many times. All values ANDed together. (i.e. way must match all)
     /// Example
-    ///   • "-f key"  way has this tag
-    ///   • "-f key=value"  way has this key and this value
-    ///   • "-f key≠value"  way either doesn't have this key, or if it does, it's not equal to value
-    ///   • "-f key=value1,value2,…"  way has this key and the value is one of these
-    ///   • "-f key~regex"  way has this key and the value matches this regex.
+    ///   • `-f key` / `-f ∃key`  way has this tag
+    ///   • `-f ∄key`  way does not has this tag
+    ///   • `-f key=value`  way has this key and this value
+    ///   • `-f key≠value`  way either doesn't have this key, or if it does, it's not equal to value
+    ///   • `-f key=value1,value2,…` / -f `key∈value1,value2,…`  way has this key and the value is one of these
+    ///   • `-f key≠value1,value2,…` / -f `key∉value1,value2,…`  way either doesn't have this key,
+    ///      or if it does, it's not one of these values
+    ///   • `-f key~regex` way has this key and the value matches this regex.
+    ///     Regexes are case sensitive. Add `(?i)` at start of regex to switch to case insensitive
+    ///     (e.g. `-f name~(?i).* street`)
+    ///     Regexes match the whole value, `-f name~[Ss]treet` will match `Street`, but not `Main
+    ///     Street North` nor `Main Street`. Use `-f name~.*[Ss]treet.*` to match all.
     #[arg(short = 'f', long = "tag-filter", value_name = "FILTER")]
     pub tag_filter: Vec<tagfilter::TagFilter>,
 
