@@ -22,6 +22,7 @@ use std::thread;
 use std::time::Instant;
 //use get_size_derive::*;
 use num_format::{Locale, ToFormattedString};
+use clap_verbosity_flag::{Verbosity, InfoLevel};
 
 mod cli_args;
 mod haversine;
@@ -34,14 +35,18 @@ use way_group::WayGroup;
 mod nodeid_wayids;
 
 fn main() -> Result<()> {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     let args = cli_args::Args::parse();
+    env_logger::Builder::from_env(env_logger::Env::default()).filter_level(args.verbose.log_level_filter()).init();
     let mut reader = read_progress::BufReaderWithSize::from_path(&args.input_filename)?;
     let mut reader = osmio::pbf::PBFReader::new(reader);
 
     if args.split_files_by_group && !args.output_filename.contains("%s") {
         error!("No %s found in output filename ({})", args.output_filename);
         anyhow::bail!("No %s found in output filename ({})", args.output_filename);
+    }
+
+    if !args.output_filename.ends_with(".geojson") {
+        warn!("Output filename {} doesn't end with .geojson. This programme only created GeoJSON files", args.output_filename);
     }
 
     if args.split_files_by_group && args.tag_group_k.is_empty() {
