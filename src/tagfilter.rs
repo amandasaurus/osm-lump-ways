@@ -6,6 +6,7 @@ pub enum TagFilter {
     NotHasK(String),
     KV(String, String),
     KinV(String, Vec<String>),
+    KnotInV(String, Vec<String>),
     KneV(String, String),
     KreV(String, Regex),
 }
@@ -17,9 +18,9 @@ impl ToString for TagFilter {
             TagFilter::NotHasK(k) => format!("∄{}", k),
             TagFilter::KV(k, v) => format!("{}={}", k, v),
             TagFilter::KinV(k, vs) => format!("{}={}", k, vs.join(",").to_string()),
+            TagFilter::KnotInV(k, vs) => format!("{}≠{}", k, vs.join(",").to_string()),
             TagFilter::KneV(k, v) => format!("{}≠{}", k, v),
             TagFilter::KreV(k, r) => format!("{}~{}", k, r),
-            _ => todo!(),
         }
     }
 }
@@ -38,6 +39,7 @@ impl TagFilter {
             TagFilter::KV(k, v) => o.tag(k) == Some(v),
             TagFilter::KneV(k, v) => o.tag(k).map_or(true, |v2| v != v2),
             TagFilter::KinV(k, vs) => vs.iter().any(|v| o.tag(k).map_or(false, |v2| v == v2)),
+            TagFilter::KnotInV(k, vs) => o.tag(k).map_or(true, |tag_value| vs.iter().all(|v| v != tag_value)),
             TagFilter::KreV(k, r) => o.tag(k).map_or(false, |v| r.is_match(v)),
         }
     }
@@ -60,7 +62,12 @@ impl std::str::FromStr for TagFilter {
             Ok(TagFilter::KreV(s[0].to_string(), Regex::new(s[1]).unwrap()))
         } else if s.contains('≠') {
             let s = s.splitn(2, '≠').collect::<Vec<_>>();
-            Ok(TagFilter::KneV(s[0].to_string(), s[1].to_string()))
+            if s[1].contains(',') {
+                let vs = s[1].split(',').map(String::from).collect::<Vec<_>>();
+                Ok(TagFilter::KnotInV(s[0].to_string(), vs))
+            } else {
+                Ok(TagFilter::KneV(s[0].to_string(), s[1].to_string()))
+            }
         } else if s.starts_with('∄') {
             Ok(TagFilter::NotHasK(s.chars().skip(1).collect::<String>()))
         } else {
@@ -93,6 +100,10 @@ mod tests {
                 "highway".to_string(),
                 vec!["motorway".to_string(), "primary".to_string()]
             )
+        );
+        assert_eq!(
+            "highway≠motorway,primary".parse::<TagFilter>().unwrap(),
+            TagFilter::KnotInV("highway".to_string(), vec!["motorway".to_string(), "primary".to_string()])
         );
 
         assert_eq!(
