@@ -5,6 +5,9 @@
 ## v0.3.0 (2023-06-19)
 
  * New tag filter: `k≠v1,v2,…` / `k∉v1,v2,…` to exclude many values
+ * OR'ing filters together now possible with `∨` (`U+2228 LOGICAL OR`):
+   i.e. `-f highway -f ∃surface∨∃lanes` means “any ways with a `highway` tag
+   _and_ either there is a `surface` tag _or_ a `lanes` tag.
  * Tag filter synonyms: `-f ∃k`, `-f ∄k`
  * Internal code refactoring
  * Add `-v`/`--verbose`/`-q`/`--quiet` options to help with output
