@@ -99,7 +99,6 @@ pub(crate) struct Args {
     #[arg(long, action=clap::ArgAction::SetTrue, default_value = "false")]
     pub incl_wayids: bool,
 
-
     /// Rather than save one MultiLineString per group, save it as many smaller linestrings,
     /// duplication of properties etc
     #[arg(long, default_value = "false")]

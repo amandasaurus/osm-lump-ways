@@ -1,7 +1,6 @@
 #![allow(warnings)]
 use anyhow::{Context, Result};
 use clap::Parser;
-use dashmap::DashMap;
 use get_size::GetSize;
 use indicatif::{ProgressBar, ProgressStyle};
 #[allow(unused_imports)]
@@ -69,17 +68,16 @@ fn main() -> Result<()> {
     }
 
     info!("Starting to read {:?}", &args.input_filename);
-    info!(
-        "Tag filter(s) in operation: {:?}",
-        args.tag_filter
-    );
+    info!("Tag filter(s) in operation: {:?}", args.tag_filter);
     info!("Tag grouping(s) in operation: {:?}", args.tag_group_k);
 
     /// For each group, a hashmap of wayid:nodes in that way
-    let mut group_wayid_nodes: Arc<DashMap<Vec<Option<String>>, HashMap<i64, Vec<i64>>>> =
-        Arc::new(DashMap::new());
+    let mut group_wayid_nodes: HashMap<Vec<Option<String>>, HashMap<i64, Vec<i64>>> =
+        HashMap::new();
+    let mut group_wayid_nodes = Arc::new(Mutex::new(group_wayid_nodes));
 
-    let mut nodeid_pos: Arc<DashMap<i64, (f64, f64)>> = Arc::new(DashMap::new());
+    let mut nodeid_pos: HashMap<i64, (f64, f64)> = HashMap::new();
+    let mut nodeid_pos = Arc::new(Mutex::new(nodeid_pos));
     /// nodeid:the ways that contain that node
     //let mut nodeid_wayids: HashMap<i64, HashSet<i64>> = HashMap::new();
     let mut nodeid_wayids = nodeid_wayids::NodeIdWayIds::new();
@@ -121,7 +119,7 @@ fn main() -> Result<()> {
                     ArcOSMObj::Node(n) => {
                         if args.read_nodes_first {
                             let ll = n.lat_lon_f64().unwrap();
-                            nodeid_pos.insert(n.id(), (ll.1, ll.0));
+                            nodeid_pos.lock().unwrap().insert(n.id(), (ll.1, ll.0));
                         }
                     }
                     ArcOSMObj::Way(w) => {
@@ -142,6 +140,8 @@ fn main() -> Result<()> {
                             nodeid_wayids.lock().unwrap().insert(*nid, w.id());
                         }
                         group_wayid_nodes
+                            .lock()
+                            .unwrap()
                             .entry(group)
                             .or_default()
                             .insert(w.id(), w.nodes().to_owned());
@@ -160,8 +160,11 @@ fn main() -> Result<()> {
         .into_inner()
         .unwrap();
 
-    let mut nodeid_pos = Arc::try_unwrap(nodeid_pos).unwrap();
-    let mut group_wayid_nodes = Arc::try_unwrap(group_wayid_nodes).unwrap();
+    let mut nodeid_pos = Arc::try_unwrap(nodeid_pos).unwrap().into_inner().unwrap();
+    let mut group_wayid_nodes = Arc::try_unwrap(group_wayid_nodes)
+        .unwrap()
+        .into_inner()
+        .unwrap();
 
     if group_wayid_nodes.is_empty() {
         info!("No ways in the file matched your filters. Nothing to do");
