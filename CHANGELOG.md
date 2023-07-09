@@ -2,7 +2,8 @@
 
 ## Unreleased
 
- * New tag filter: `k≠v1,v2,…` to exclude many values
+ * New tag filter: `k≠v1,v2,…` / `k∉v1,v2,…` to exclude many values
+ * Tag filter synonyms: `-f ∃k`, `-f ∄k`
  * Internal code refactoring
  * Add `-v`/`--verbose`/`-q`/`--quiet` options to help with output
 
