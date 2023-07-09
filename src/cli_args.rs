@@ -45,6 +45,7 @@ pub(crate) struct Args {
     ///     (e.g. `-f name~(?i).* street`)
     ///     Regexes match the whole value, `-f name~[Ss]treet` will match `Street`, but not `Main
     ///     Street North` nor `Main Street`. Use `-f name~.*[Ss]treet.*` to match all.
+    ///   • `-f F1∨F2∨F3…` logical OR of the other tag filters F1, F2, …
     #[arg(short = 'f', long = "tag-filter", value_name = "FILTER")]
     pub tag_filter: Vec<tagfilter::TagFilter>,
 

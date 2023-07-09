@@ -9,6 +9,7 @@ pub enum TagFilter {
     KnotInV(String, Vec<String>),
     KneV(String, String),
     KreV(String, Regex),
+    Or(Vec<TagFilter>),
 }
 
 impl ToString for TagFilter {
@@ -21,6 +22,7 @@ impl ToString for TagFilter {
             TagFilter::KinV(k, vs) => format!("{}∈{}", k, vs.join(",").to_string()),
             TagFilter::KnotInV(k, vs) => format!("{}∉{}", k, vs.join(",").to_string()),
             TagFilter::KreV(k, r) => format!("{}~{}", k, r),
+            TagFilter::Or(tfs) => tfs.iter().map(|tf| tf.to_string()).collect::<Vec<_>>().join("∨"),
         }
     }
 }
@@ -41,6 +43,7 @@ impl TagFilter {
             TagFilter::KinV(k, vs) => vs.iter().any(|v| o.tag(k).map_or(false, |v2| v == v2)),
             TagFilter::KnotInV(k, vs) => o.tag(k).map_or(true, |tag_value| vs.iter().all(|v| v != tag_value)),
             TagFilter::KreV(k, r) => o.tag(k).map_or(false, |v| r.is_match(v)),
+            TagFilter::Or(tfs) => tfs.iter().any(|tf| tf.filter(o)),
         }
     }
 }
@@ -49,7 +52,11 @@ impl std::str::FromStr for TagFilter {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.contains('=') {
+        let s = s.trim();
+        if s.contains('∨') {
+            let tfs = s.split('∨').map(|tf| tf.parse::<TagFilter>()).collect::<Result<Vec<_>, _>>()?;
+            Ok(TagFilter::Or(tfs))
+        } else if s.contains('=') {
             let s = s.splitn(2, '=').collect::<Vec<_>>();
             if s[1].contains(',') {
                 let vs = s[1].split(',').map(String::from).collect::<Vec<_>>();
@@ -80,6 +87,8 @@ impl std::str::FromStr for TagFilter {
             Ok(TagFilter::HasK(s.chars().skip(1).collect::<String>()))
         } else if s.starts_with('∄') {
             Ok(TagFilter::NotHasK(s.chars().skip(1).collect::<String>()))
+        } else if s.is_empty() {
+            Err("An empty string is not a valid tag filter".to_string())
         } else {
             Ok(TagFilter::HasK(s.to_string()))
         }
@@ -90,11 +99,22 @@ impl std::str::FromStr for TagFilter {
 mod tests {
     use super::*;
     #[test]
-    fn test1() {
+    fn parse() {
         assert_eq!(
             "name".parse::<TagFilter>().unwrap(),
             TagFilter::HasK("name".to_string())
         );
+        assert_eq!(
+            " name".parse::<TagFilter>().unwrap(),
+            TagFilter::HasK("name".to_string())
+        );
+        assert_eq!(
+            " name   \t".parse::<TagFilter>().unwrap(),
+            TagFilter::HasK("name".to_string())
+        );
+
+        assert!( "".parse::<TagFilter>().is_err());
+
         assert_eq!(
             "∃name".parse::<TagFilter>().unwrap(),
             TagFilter::HasK("name".to_string())
@@ -141,6 +161,11 @@ mod tests {
         assert_eq!(
             "∄name".parse::<TagFilter>().unwrap(),
             TagFilter::NotHasK("name".to_string())
+        );
+
+        assert_eq!(
+            "name∨highway".parse::<TagFilter>().unwrap(),
+            TagFilter::Or(vec![TagFilter::HasK("name".to_string()), TagFilter::HasK("highway".to_string())])
         );
     }
 }
