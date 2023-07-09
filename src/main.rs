@@ -236,14 +236,13 @@ fn main() -> Result<()> {
         "Starting the breathfirst search. There are {} groups",
         group_wayid_nodes.len()
     );
-    let grouping = ProgressBar::new(group_wayid_nodes.len() as u64)
+    let grouping = ProgressBar::new(group_wayid_nodes.iter().map(|(_group, wayid_nodes)| wayid_nodes.len()).sum::<usize>() as u64)
         .with_message("Grouping all ways")
         .with_style(style.clone());
 
     let results_filename_way_groups = group_wayid_nodes.into_par_iter()
     .flat_map(|(group, wayid_nodes)| {
         // Actually do the breath first search
-        grouping.inc(1);
 
         let mut unprocessed_wayids: BTreeSet<&i64> = wayid_nodes.keys().collect();
         let mut this_group_wayids = Vec::new();
@@ -251,6 +250,7 @@ fn main() -> Result<()> {
         let mut way_groups = Vec::new();
         debug!("grouping all the ways for group: {:?}", group);
         while let Some(root_wayid) = unprocessed_wayids.pop_first() {
+            grouping.inc(1);
             this_group_wayids.push(root_wayid);
 
             let mut this_group = WayGroup::new(*root_wayid, group.to_owned());
