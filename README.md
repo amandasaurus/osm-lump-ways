@@ -1,5 +1,8 @@
 # `osm-lump-ways` group OSM ways based on topology & shared tags
 
+![Crates.io](https://img.shields.io/crates/d/osm-lump-ways)
+
+
 > Answer questions about OSM data like:
 >
 > * “What's the longest Main Street?”
