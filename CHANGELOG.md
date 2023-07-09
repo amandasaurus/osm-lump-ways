@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.3.0 (2023-06-19)
+
  * New tag filter: `k≠v1,v2,…` / `k∉v1,v2,…` to exclude many values
  * Tag filter synonyms: `-f ∃k`, `-f ∄k`
  * Internal code refactoring
