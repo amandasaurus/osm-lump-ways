@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+ * New tag filter: `k≠v1,v2,…` to exclude many values
+
 ## v0.2.0 ( 2023-04-22 )
 
  * New option to split into linestrings
