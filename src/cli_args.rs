@@ -1,5 +1,6 @@
 use clap::Parser;
 use std::path::PathBuf;
+use clap_verbosity_flag::Verbosity;
 
 use crate::tagfilter;
 use crate::TagGrouper;
@@ -103,4 +104,7 @@ pub(crate) struct Args {
     /// duplication of properties etc
     #[arg(long, default_value = "false")]
     pub save_as_linestrings: bool,
+
+    #[command(flatten)]
+    pub verbose: Verbosity<clap_verbosity_flag::InfoLevel>,
 }
