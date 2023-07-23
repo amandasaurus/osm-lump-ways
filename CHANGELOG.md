@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## v0.3.0 (2023-06-30)
+## v0.3.0 (2023-07-23)
 
  * New tag filter: `k≠v1,v2,…` / `k∉v1,v2,…` to exclude many values
  * OR'ing filters together now possible with `∨` (`U+2228 LOGICAL OR`):
