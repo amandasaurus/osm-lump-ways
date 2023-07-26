@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Minor console output tweaks
+
 ## v0.3.0 (2023-07-23)
 
  * New tag filter: `k≠v1,v2,…` / `k∉v1,v2,…` to exclude many values

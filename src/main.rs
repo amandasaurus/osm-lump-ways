@@ -89,7 +89,7 @@ fn main() -> Result<()> {
     let nodeid_wayids = Arc::new(Mutex::new(nodeid_wayids));
 
     let style = ProgressStyle::with_template(
-        "[{elapsed_precise}] {percent}% done. eta {eta:>4} {bar:10.cyan/blue} {pos:>7}/{len:7} {per_sec:>12} {msg}",
+        "[{elapsed_precise}] {percent:>3}% done. eta {eta:>4} {bar:10.cyan/blue} {pos:>7}/{len:7} {per_sec:>12} {msg}",
     )
     .unwrap();
     let input_spinners = indicatif::MultiProgress::new();
@@ -103,7 +103,7 @@ fn main() -> Result<()> {
     );
     let ways_added = input_spinners.add(
         ProgressBar::new_spinner().with_style(
-            ProgressStyle::with_template("{human_pos} ways collected so far for later processing")
+            ProgressStyle::with_template("           {human_pos} ways collected so far for later processing")
                 .unwrap(),
         ),
     );
@@ -226,12 +226,12 @@ fn main() -> Result<()> {
 
     nodeid_pos_hm.shrink_to_fit();
     let nodeid_pos = nodeid_pos_hm;
-    info!(
+    debug!(
         "Size of node pos: {} bytes",
         nodeid_pos.get_size().to_formatted_string(&Locale::en)
     );
 
-    info!(
+    debug!(
         "Size of nodeid_wayids: {} = {} bytes",
         nodeid_wayids.get_size(),
         nodeid_wayids.get_size().to_formatted_string(&Locale::en)
