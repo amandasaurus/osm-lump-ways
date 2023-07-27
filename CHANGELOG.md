@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Output geojson now includes `num_ways` & `num_nodes`. Both integers saying
+  how many OSM ways & nodes are in this group
 * Minor console output tweaks
 
 ## v0.3.0 (2023-07-23)

@@ -389,6 +389,8 @@ fn main() -> Result<()> {
         way_group.extra_json_props["length_m_int"] = way_group.length_m.map(|l| l.round() as i64).into();
         way_group.extra_json_props["length_km"] = way_group.length_m.map(|l| l/1000.).into();
         way_group.extra_json_props["length_km_int"] = way_group.length_m.map(|l| l/1000.).map(|l| l.round() as i64).into();
+        way_group.extra_json_props["num_ways"] = way_group.way_ids.len().into();
+        way_group.extra_json_props["num_nodes"] = way_group.num_nodeids().into();
         if args.split_into_single_paths {
             let line = &way_group.coords.as_ref().unwrap()[0];
             let dist = haversine_m(line[0].0, line[0].1, line.last().unwrap().0, line.last().unwrap().1);
