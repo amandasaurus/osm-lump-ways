@@ -105,7 +105,7 @@ pub(crate) struct Args {
     pub timeout_dist_to_longer_s: Option<f32>,
 
     /// include all way ids
-    #[arg(long, action=clap::ArgAction::SetTrue, default_value = "false")]
+    #[arg(long, action=clap::ArgAction::SetTrue, default_value = "false", aliases=["incl-way-ids", "include-wayids", "include-way-ids"])]
     pub incl_wayids: bool,
 
     /// Rather than save one MultiLineString per group, save it as many smaller linestrings,
