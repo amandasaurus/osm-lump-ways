@@ -49,6 +49,19 @@ Run with `--help` to see all options.
 * [Road most split in UK&Irl](https://en.osm.town/@amapanda/110762435236476901)
 * Your project here!
 
+# Todos
+
+This software isn't finished, here's what I'd like to add. Feel free to send a patch.
+
+* The `--split-into-way` uses Floyd–Warshall algorithm to calculate all pairs
+  shortest path. It's incredibly slow on large numbers of points, e.g. >10k. It
+  also single threaded. This should be replaces with something like multiple
+  runs of Dijkstra's Algorithm to speed it up.
+* All tags need to be specified in advance to join on. Perhaps add something to
+  match all possible tags? (inspired by [this
+  q](https://en.osm.town/@grischard/110763741292331075)}
+
+
 # Copyright & Licence
 
 Copyright 2023, GNU Affero General Public Licence (AGPL) v3 or later. See [LICENCE](./LICENCE).
