@@ -11,6 +11,7 @@
 > * “Are these rivers connected?”
 > * “What's the river drainage basins?”
 
+
 # Usage
 
 Generate river drainage basins
@@ -29,6 +30,7 @@ To find long streets and assemble them into connected (Multi)LineStrings:
 
 	cargo install osm-lump-ways
 
+
 # Background
 
 OSM linear features (eg roads, rivers, walls) are stored as [way
@@ -36,11 +38,10 @@ object](https://wiki.openstreetmap.org/wiki/Way). The [OSM tagging
 model](https://wiki.openstreetmap.org/wiki/Tags) often requires one feature to
 be mapped as many different ways. `osm-lump-ways` will assemble them all together.
 
-
-
 # Full Options
 
 Run with `--help` to see all options.
+
 
 # Examples of usage
 
@@ -48,6 +49,7 @@ Run with `--help` to see all options.
 * [Longest O'Connell Street in Ireland](https://en.osm.town/@amapanda/110270516183776589)
 * [Road most split in UK&Irl](https://en.osm.town/@amapanda/110762435236476901)
 * Your project here!
+
 
 # Todos
 
@@ -64,10 +66,15 @@ This software isn't finished, here's what I'd like to add. Feel free to send a p
   the same” might do it)
 
 
+# External Mentions
+
+*TBC*
+
+
 # Copyright & Licence
 
-Copyright 2023, GNU Affero General Public Licence (AGPL) v3 or later. See [LICENCE](./LICENCE).
-Source code is on [Github (`osm-lump-ways`)](https://github.com/amandasaurus/osm-lump-ways).
+Copyright 2023, MIT/Apache2.0. Source code is on [Github
+(`osm-lump-ways`)](https://github.com/amandasaurus/osm-lump-ways).
 
 The output data file(s) are a Derived Database of the OpenStreetMap database,
 and hence under the [ODbL 1.0](https://opendatacommons.org/licenses/odbl/)
