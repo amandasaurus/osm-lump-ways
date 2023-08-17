@@ -1,11 +1,12 @@
 # Changelog
 
-## Unreleased
+## v0.4.0 (2023-08-17)
 
 * Output geojson now includes `num_ways` & `num_nodes`. Both integers saying
   how many OSM ways & nodes are in this group
 * Some command line --flag aliases
 * Minor console output tweaks, and dependency updates
+* Relicence to MIT/Apache2.0
 
 ## v0.3.0 (2023-07-23)
 
