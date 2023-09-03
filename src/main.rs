@@ -227,7 +227,8 @@ fn main() -> Result<()> {
     nodeid_pos_hm.shrink_to_fit();
     let nodeid_pos = nodeid_pos_hm;
     debug!(
-        "Size of node pos: {} bytes",
+        "Size of node pos: {} = {} bytes",
+        nodeid_pos.get_size(),
         nodeid_pos.get_size().to_formatted_string(&Locale::en)
     );
 
