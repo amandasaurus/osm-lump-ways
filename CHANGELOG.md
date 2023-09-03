@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* Internal refactoring to reduce required memory usage
+
 ## v0.4.0 (2023-08-17)
 
 * Output geojson now includes `num_ways` & `num_nodes`. Both integers saying
