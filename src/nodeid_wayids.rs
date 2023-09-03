@@ -6,7 +6,6 @@ use super::*;
 pub struct NodeIdWayIds {
     singles: HashMap<i64, i64>,
     multiples: HashMap<i64, Vec<i64>>,
-    //inner: HashMap<i64, HashSet<i64>>,
 }
 
 impl NodeIdWayIds {
