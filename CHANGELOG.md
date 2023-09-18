@@ -3,7 +3,8 @@
 ## Unreleased
 
 * Internal refactoring to reduce required memory usage
-* New tag filter: `-f ~k` to filter on keys which match a regex
+* New tag filter: `-f ~k` to filter on keys which match a regex (and `-f ∄~k`
+  for “does not contain a key that matches this regex”)
 
 ## v0.4.0 (2023-08-17)
 

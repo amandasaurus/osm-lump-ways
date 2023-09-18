@@ -5,6 +5,7 @@ pub enum TagFilter {
     HasK(String),
     HasReK(Regex),
     NotHasK(String),
+    NotHasReK(Regex),
     KV(String, String),
     KinV(String, Vec<String>),
     KnotInV(String, Vec<String>),
@@ -19,6 +20,7 @@ impl ToString for TagFilter {
             TagFilter::HasK(k) => format!("∃{}", k),
             TagFilter::HasReK(k) => format!("∃~{}", k),
             TagFilter::NotHasK(k) => format!("∄{}", k),
+            TagFilter::NotHasReK(k) => format!("∄~{}", k),
             TagFilter::KV(k, v) => format!("{}={}", k, v),
             TagFilter::KneV(k, v) => format!("{}≠{}", k, v),
             TagFilter::KinV(k, vs) => format!("{}∈{}", k, vs.join(",").to_string()),
@@ -45,6 +47,7 @@ impl TagFilter {
             TagFilter::HasK(k) => o.has_tag(k),
             TagFilter::HasReK(kre) => o.tags().any(|(k, _v)| kre.is_match(k)),
             TagFilter::NotHasK(k) => !o.has_tag(k),
+            TagFilter::NotHasReK(kre) => !o.tags().any(|(k, _v)| kre.is_match(k)),
             TagFilter::KV(k, v) => o.tag(k) == Some(v),
             TagFilter::KneV(k, v) => o.tag(k).map_or(true, |v2| v != v2),
             TagFilter::KinV(k, vs) => vs.iter().any(|v| o.tag(k).map_or(false, |v2| v == v2)),
@@ -92,18 +95,19 @@ impl std::str::FromStr for TagFilter {
             let s = s.splitn(2, '∉').collect::<Vec<_>>();
             let vs = s[1].split(',').map(String::from).collect::<Vec<_>>();
             Ok(TagFilter::KnotInV(s[0].to_string(), vs))
-        } else if s.starts_with('~') {
-            let regex = s.strip_prefix('~').unwrap();
+        } else if let Some(regex) = s.strip_prefix("~") {
             let regex = Regex::new(regex).map_err(|_| "Invalid regex")?;
             Ok(TagFilter::HasReK(regex))
-        } else if s.starts_with("∃~") {
-            let regex = s.strip_prefix("∃~").unwrap();
+        } else if let Some(regex) = s.strip_prefix("∃~") {
             let regex = Regex::new(regex).map_err(|_| "Invalid regex")?;
             Ok(TagFilter::HasReK(regex))
-        } else if s.starts_with('∃') {
-            Ok(TagFilter::HasK(s.chars().skip(1).collect::<String>()))
-        } else if s.starts_with('∄') {
-            Ok(TagFilter::NotHasK(s.chars().skip(1).collect::<String>()))
+        } else if let Some(regex) = s.strip_prefix("∄~") {
+            let regex = Regex::new(regex).map_err(|_| "Invalid regex")?;
+            Ok(TagFilter::NotHasReK(regex))
+        } else if let Some(key) = s.strip_prefix("∃") {
+            Ok(TagFilter::HasK(key.to_string()))
+        } else if let Some(key) = s.strip_prefix("∄") {
+            Ok(TagFilter::NotHasK(key.to_string()))
         } else if s.contains('~') {
             let s = s.splitn(2, '~').collect::<Vec<_>>();
             Ok(TagFilter::KreV(s[0].to_string(), Regex::new(s[1]).unwrap()))
@@ -141,6 +145,7 @@ mod tests {
 
     test_parse!(parse_regex1, "~name:.*", TagFilter::HasReK(Regex::new("name:.*").unwrap()));
     test_parse!(parse_regex2, "∃~name:.*", TagFilter::HasReK(Regex::new("name:.*").unwrap()));
+    test_parse!(parse_regex_not2, "∄~name:.*", TagFilter::NotHasReK(Regex::new("name:.*").unwrap()));
 
     #[test]
     fn parse() {
