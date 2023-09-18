@@ -14,7 +14,7 @@ fn min_max<T: PartialOrd>(a: T, b: T) -> (T, T) {
 
 pub(crate) fn into_fw_segments(
     wg: &WayGroup,
-    nodeid_pos: &HashMap<i64, (f64, f64)>,
+    nodeid_pos: &NodeIdPosition,
     min_length_m: Option<f64>,
     only_longest_n_splitted_paths: Option<usize>,
 ) -> Result<Vec<Vec<i64>>> {
@@ -36,8 +36,8 @@ pub(crate) fn into_fw_segments(
             })
             .map(|raw_edge| {
                 // get local id for the node ids
-                let p1 = nodeid_pos[&raw_edge[0]];
-                let p2 = nodeid_pos[&raw_edge[1]];
+                let p1 = nodeid_pos.get(&raw_edge[0]).unwrap();
+                let p2 = nodeid_pos.get(&raw_edge[1]).unwrap();
                 let dist = haversine_m(p1.1, p1.0, p2.1, p2.0);
 
                 (min_max(raw_edge[0], raw_edge[1]), dist)

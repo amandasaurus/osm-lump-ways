@@ -44,7 +44,7 @@ impl WayGroup {
         )
     }
 
-    pub fn set_coords(&mut self, nodeid_pos: &HashMap<i64, (f64, f64)>) {
+    pub fn set_coords(&mut self, nodeid_pos: &NodeIdPosition) {
         if self.coords.is_some() {
             return;
         }

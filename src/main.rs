@@ -32,6 +32,8 @@ mod fw;
 mod graph;
 mod way_group;
 use way_group::WayGroup;
+mod nodeid_position;
+use nodeid_position::NodeIdPosition;
 mod nodeid_wayids;
 
 fn main() -> Result<()> {
@@ -82,7 +84,7 @@ fn main() -> Result<()> {
         HashMap::new();
     let mut group_wayid_nodes = Arc::new(Mutex::new(group_wayid_nodes));
 
-    let mut nodeid_pos: HashMap<i64, (f64, f64)> = HashMap::new();
+    let mut nodeid_pos = NodeIdPosition::new();
     let mut nodeid_pos = Arc::new(Mutex::new(nodeid_pos));
     /// nodeid:the ways that contain that node
     //let mut nodeid_wayids: HashMap<i64, HashSet<i64>> = HashMap::new();
@@ -180,26 +182,15 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let mut nodeid_pos_hm = HashMap::new();
     if args.read_nodes_first {
         info!("Removing unneeded node positions...");
-        // free up memory we don't need by deleting node positions we don't need
         let old_total = nodeid_pos.len();
-        nodeid_pos_hm = nodeid_pos
-            .into_par_iter()
-            .filter_map(|(nid, pos)| {
-                if nodeid_wayids.contains_nid(&nid) {
-                    Some((nid, pos))
-                } else {
-                    None
-                }
-            })
-            .collect();
-        nodeid_pos_hm.shrink_to_fit();
+        nodeid_pos.retain_by_key(|nid| nodeid_wayids.contains_nid(nid));
+        nodeid_pos.shrink_to_fit();
         info!(
             "Removed {} unneeded node positions, only keeping the {} we need",
-            (old_total - nodeid_pos_hm.len()),
-            nodeid_pos_hm.len()
+            (old_total - nodeid_pos.len()),
+            nodeid_pos.len()
         );
     } else {
         debug!("Re-reading file to read all nodes");
@@ -210,10 +201,11 @@ fn main() -> Result<()> {
             setting_node_pos.set_draw_target(ProgressDrawTarget::hidden());
         }
         let mut reader = osmio::read_pbf(&args.input_filename)?;
-        nodeid_pos_hm = reader
+        nodeid_pos.reserve(nodeid_wayids.len());
+        nodeid_pos.extend(
+            reader
             .objects()
             .take_while(|o| o.is_node())
-            .par_bridge()
             .filter_map(|o| {
                 if let Some(n) = o.into_node() {
                     if nodeid_wayids.contains_nid(&n.id()) {
@@ -227,12 +219,11 @@ fn main() -> Result<()> {
                     None
                 }
             })
-            .collect();
+            );
         setting_node_pos.finish();
     }
 
-    nodeid_pos_hm.shrink_to_fit();
-    let nodeid_pos = nodeid_pos_hm;
+    let nodeid_pos = nodeid_pos;
     debug!(
         "Size of node pos: {} = {} bytes",
         nodeid_pos.get_size(),
