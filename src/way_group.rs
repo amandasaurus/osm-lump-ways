@@ -1,5 +1,5 @@
 use super::*;
-use rayon::prelude::*;
+
 
 #[derive(Debug, Clone)]
 pub struct WayGroup {
@@ -21,7 +21,7 @@ impl WayGroup {
             length_m: None,
             coords: None,
             extra_json_props: serde_json::from_str("{}").unwrap(),
-            group: group,
+            group,
         }
     }
 
@@ -94,6 +94,7 @@ impl WayGroup {
             )
         }
     }
+    #[allow(unused)]
     pub fn recalculate_root_id(&mut self) {
         self.root_wayid = *self
             .nodeids
@@ -131,7 +132,7 @@ impl WayGroup {
                     .map(move |c2| (c1, c2))
             })
             .map(|(c1, c2)| haversine_m(c1.0, c1.1, c2.0, c2.1))
-            .min_by(|d1, d2| d1.total_cmp(&d2))
+            .min_by(|d1, d2| d1.total_cmp(d2))
     }
 }
 

@@ -1,5 +1,5 @@
 use super::*;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap};
 
 #[derive(Debug, GetSize)]
 pub struct NodeIdPosition {
@@ -11,9 +11,6 @@ impl NodeIdPosition {
         NodeIdPosition {
             inner: BTreeMap::new(),
         }
-    }
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self::new()
     }
 
     pub fn insert(&mut self, node_id: i64, pos: (f64, f64)) {
@@ -37,7 +34,7 @@ impl NodeIdPosition {
 
     // Not available for BTreeMap
     pub fn shrink_to_fit(&mut self) {}
-    pub fn reserve(&mut self, addition: usize) {}
+    pub fn reserve(&mut self, _addition: usize) {}
 
     pub fn detailed_size(&self) -> String {
         let mut output = String::new();
@@ -63,7 +60,7 @@ impl Extend<(i64, (f64, f64))> for NodeIdPosition {
         for el in iter {
             self.insert(
                 el.0,
-                ((el.1 .0.try_into().unwrap(), el.1 .1.try_into().unwrap())),
+                (el.1 .0.try_into().unwrap(), el.1 .1.try_into().unwrap()),
             );
         }
     }

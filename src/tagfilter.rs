@@ -23,8 +23,8 @@ impl ToString for TagFilter {
             TagFilter::NotHasReK(k) => format!("∄~{}", k),
             TagFilter::KV(k, v) => format!("{}={}", k, v),
             TagFilter::KneV(k, v) => format!("{}≠{}", k, v),
-            TagFilter::KinV(k, vs) => format!("{}∈{}", k, vs.join(",").to_string()),
-            TagFilter::KnotInV(k, vs) => format!("{}∉{}", k, vs.join(",").to_string()),
+            TagFilter::KinV(k, vs) => format!("{}∈{}", k, vs.join(",")),
+            TagFilter::KnotInV(k, vs) => format!("{}∉{}", k, vs.join(",")),
             TagFilter::KreV(k, r) => format!("{}~{}", k, r),
             TagFilter::Or(tfs) => tfs
                 .iter()
@@ -95,7 +95,7 @@ impl std::str::FromStr for TagFilter {
             let s = s.splitn(2, '∉').collect::<Vec<_>>();
             let vs = s[1].split(',').map(String::from).collect::<Vec<_>>();
             Ok(TagFilter::KnotInV(s[0].to_string(), vs))
-        } else if let Some(regex) = s.strip_prefix("~") {
+        } else if let Some(regex) = s.strip_prefix('~') {
             let regex = Regex::new(regex).map_err(|_| "Invalid regex")?;
             Ok(TagFilter::HasReK(regex))
         } else if let Some(regex) = s.strip_prefix("∃~") {
@@ -104,9 +104,9 @@ impl std::str::FromStr for TagFilter {
         } else if let Some(regex) = s.strip_prefix("∄~") {
             let regex = Regex::new(regex).map_err(|_| "Invalid regex")?;
             Ok(TagFilter::NotHasReK(regex))
-        } else if let Some(key) = s.strip_prefix("∃") {
+        } else if let Some(key) = s.strip_prefix('∃') {
             Ok(TagFilter::HasK(key.to_string()))
-        } else if let Some(key) = s.strip_prefix("∄") {
+        } else if let Some(key) = s.strip_prefix('∄') {
             Ok(TagFilter::NotHasK(key.to_string()))
         } else if s.contains('~') {
             let s = s.splitn(2, '~').collect::<Vec<_>>();

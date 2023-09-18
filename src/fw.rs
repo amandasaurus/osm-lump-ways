@@ -5,7 +5,7 @@ use graph::{DirectedGraph, UndirectedGraph};
 use std::iter;
 
 fn min_max<T: PartialOrd>(a: T, b: T) -> (T, T) {
-    if (a < b) {
+    if a < b {
         (a, b)
     } else {
         (b, a)
@@ -46,8 +46,8 @@ pub(crate) fn into_fw_segments(
 
     let mut nodeids: Vec<i64> = Vec::with_capacity(orig_edges.len());
 
-    for paths_generated_so_far in (0..only_longest_n_splitted_paths.unwrap_or(1_000_000)) {
-        if orig_edges.len() == 0 {
+    for paths_generated_so_far in 0..only_longest_n_splitted_paths.unwrap_or(1_000_000) {
+        if orig_edges.is_empty() {
             debug!(
                 "wg:{} step:{} Graph is empty, so finished",
                 wg.root_wayid, paths_generated_so_far
@@ -70,7 +70,7 @@ pub(crate) fn into_fw_segments(
             nodeids.len(),
             orig_edges.len()
         );
-        /// N×N array with Option(Distance)
+        // N×N array with Option(Distance)
         // Rather than using Option<f32>, we're (ab)using f32:NAN instead of None
         // nan → there is no edge here.
         let mut edges = UndirectedGraph::new(nodeids.len(), f32::NAN)
@@ -116,7 +116,7 @@ pub(crate) fn into_fw_segments(
         let longest = fw_result_dist
             .values()
             .filter(|x| !x.2.is_infinite())
-            .max_by(|a, b| a.2.total_cmp(&b.2))
+            .max_by(|a, b| a.2.total_cmp(b.2))
             .expect("No max");
         if let Some(min_length_m) = min_length_m {
             if (*longest.2 as f64) < min_length_m {
@@ -192,7 +192,7 @@ pub(crate) fn into_fw_segments(
         wg.root_wayid,
         results.len()
     );
-    return Ok(results);
+    Ok(results)
 }
 
 fn fw(edges: &UndirectedGraph<f32>) -> (DirectedGraph<f32>, DirectedGraph<Option<usize>>) {
@@ -209,7 +209,7 @@ fn fw(edges: &UndirectedGraph<f32>) -> (DirectedGraph<f32>, DirectedGraph<Option
         //nexts.set(j, i, Some(i));
     }
 
-    for i in (0..size) {
+    for i in 0..size {
         distance.set(i, i, 0.);
         nexts.set(i, i, Some(i));
     }
@@ -217,9 +217,9 @@ fn fw(edges: &UndirectedGraph<f32>) -> (DirectedGraph<f32>, DirectedGraph<Option
         "Next (inside FW):\n{}",
         nexts.pretty_print(&|el| el.map_or_else(|| "-".to_string(), |e| e.to_string()))
     );
-    for k in (0..size) {
-        for i in (0..size) {
-            for j in (0..size) {
+    for k in 0..size {
+        for i in 0..size {
+            for j in 0..size {
                 if *distance.get(i, j) > distance.get(i, k) + distance.get(k, j) {
                     distance.set(i, j, distance.get(i, k) + distance.get(k, j));
                     nexts.set(i, j, nexts.get(i, k).to_owned());

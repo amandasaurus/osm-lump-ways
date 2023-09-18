@@ -1,6 +1,6 @@
 use super::*;
 use anyhow::{Context, Result};
-use rayon::prelude::*;
+
 
 pub(crate) struct UndirectedGraph<T>
 where
@@ -25,7 +25,7 @@ where
                 total = (size * size)
             )
         })?;
-        for _ in (0..(size * size)) {
+        for _ in 0..(size * size) {
             data.push(initial.clone());
         }
         //dbg!("after graph alloc size", size);
@@ -36,6 +36,7 @@ where
         self.size
     }
 
+    #[allow(unused)]
     pub fn get(&self, i: usize, j: usize) -> &T {
         if i < j {
             &self.data[i * self.size + j]
@@ -43,6 +44,7 @@ where
             &self.data[j * self.size + i]
         }
     }
+    #[allow(unused)]
     pub fn get_mut(&mut self, i: usize, j: usize) -> &mut T {
         if i < j {
             &mut self.data[i * self.size + j]
@@ -50,6 +52,7 @@ where
             &mut self.data[j * self.size + i]
         }
     }
+    #[allow(unused)]
     pub fn set_single(&mut self, i: usize, j: usize, val: T) {
         self.data[i * self.size + j] = val.clone();
     }
@@ -111,6 +114,7 @@ where
         }
     }
 
+    #[allow(unused)]
     pub fn len(&self) -> usize {
         self.size
     }
@@ -118,6 +122,7 @@ where
     pub fn get(&self, i: usize, j: usize) -> &T {
         &self.data[i * self.size + j]
     }
+    #[allow(unused)]
     pub fn get_mut(&mut self, i: usize, j: usize) -> &mut T {
         &mut self.data[i * self.size + j]
     }

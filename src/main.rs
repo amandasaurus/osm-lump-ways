@@ -8,18 +8,17 @@ use osmio::obj_types::ArcOSMObj;
 use osmio::prelude::*;
 use osmio::OSMObjBase;
 use rayon::prelude::*;
-use regex::Regex;
+
 use serde_json::json;
 use std::cmp::Ordering;
-use std::collections::{BTreeSet, HashMap, HashSet};
-use std::io::prelude::*;
+use std::collections::{BTreeSet, HashMap};
 use std::io::Write;
-use std::sync::mpsc::channel;
+
 use std::sync::{Arc, Mutex};
-use std::thread;
+
 use std::time::Instant;
 //use get_size_derive::*;
-use clap_verbosity_flag::{InfoLevel, Verbosity};
+
 use num_format::{Locale, ToFormattedString};
 
 mod cli_args;
@@ -33,7 +32,6 @@ use way_group::WayGroup;
 mod nodeid_position;
 use nodeid_position::NodeIdPosition;
 mod nodeid_wayids;
-use nodeid_wayids::{NodeIdWayIds, NodeIdWayIdsMultiMap};
 
 fn main() -> Result<()> {
     let args = cli_args::Args::parse();
@@ -41,7 +39,7 @@ fn main() -> Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default())
         .filter_level(args.verbose.log_level_filter())
         .init();
-    let mut reader = read_progress::BufReaderWithSize::from_path(&args.input_filename)?;
+    let reader = read_progress::BufReaderWithSize::from_path(&args.input_filename)?;
     let mut reader = osmio::pbf::PBFReader::new(reader);
 
     if args.split_files_by_group && !args.output_filename.contains("%s") {
@@ -80,16 +78,16 @@ fn main() -> Result<()> {
     info!("Tag filter(s) in operation: {:?}", args.tag_filter);
     info!("Tag grouping(s) in operation: {:?}", args.tag_group_k);
 
-    /// For each group, a hashmap of wayid:nodes in that way
-    let mut group_wayid_nodes: HashMap<Vec<Option<String>>, HashMap<i64, Vec<i64>>> =
+    // For each group, a hashmap of wayid:nodes in that way
+    let group_wayid_nodes: HashMap<Vec<Option<String>>, HashMap<i64, Vec<i64>>> =
         HashMap::new();
-    let mut group_wayid_nodes = Arc::new(Mutex::new(group_wayid_nodes));
+    let group_wayid_nodes = Arc::new(Mutex::new(group_wayid_nodes));
 
-    let mut nodeid_pos = NodeIdPosition::new();
-    let mut nodeid_pos = Arc::new(Mutex::new(nodeid_pos));
-    /// nodeid:the ways that contain that node
+    let nodeid_pos = NodeIdPosition::new();
+    let nodeid_pos = Arc::new(Mutex::new(nodeid_pos));
+    // nodeid:the ways that contain that node
     //let mut nodeid_wayids: HashMap<i64, HashSet<i64>> = HashMap::new();
-    let mut nodeid_wayids = nodeid_wayids::default();
+    let nodeid_wayids = nodeid_wayids::default();
     let nodeid_wayids = Arc::new(Mutex::new(nodeid_wayids));
 
     let style = ProgressStyle::with_template(
@@ -162,7 +160,6 @@ fn main() -> Result<()> {
                         ways_added.inc(1);
                     }
                     ArcOSMObj::Relation(_r) => {
-                        return;
                     }
                 }
             },
@@ -175,7 +172,7 @@ fn main() -> Result<()> {
         .unwrap();
 
     let mut nodeid_pos = Arc::try_unwrap(nodeid_pos).unwrap().into_inner().unwrap();
-    let mut group_wayid_nodes = Arc::try_unwrap(group_wayid_nodes)
+    let group_wayid_nodes = Arc::try_unwrap(group_wayid_nodes)
         .unwrap()
         .into_inner()
         .unwrap();
@@ -245,9 +242,7 @@ fn main() -> Result<()> {
         group_wayid_nodes.len()
     );
     let grouping = ProgressBar::new(
-        group_wayid_nodes
-            .iter()
-            .map(|(_group, wayid_nodes)| wayid_nodes.len())
+        group_wayid_nodes.values().map(|wayid_nodes| wayid_nodes.len())
             .sum::<usize>() as u64,
     )
     .with_message("Grouping all ways")
@@ -263,7 +258,7 @@ fn main() -> Result<()> {
         splitter.set_draw_target(ProgressDrawTarget::hidden());
     }
 
-    let results_filename_way_groups = group_wayid_nodes.into_par_iter()
+    group_wayid_nodes.into_par_iter()
     .flat_map(|(group, wayid_nodes)| {
         // Actually do the breath first search
 
@@ -290,7 +285,7 @@ fn main() -> Result<()> {
                 );
 
                 this_group.way_ids.push(*wid);
-                this_group.nodeids.push(wayid_nodes[&wid].clone());
+                this_group.nodeids.push(wayid_nodes[wid].clone());
 
                 // find all other ways
                 for other_wayid in wayid_nodes[wid]
@@ -396,7 +391,7 @@ fn main() -> Result<()> {
     .update(|way_group| {
         trace!("Preparing extra json properties");
         for (i, group) in way_group.group.iter().enumerate() {
-            way_group.extra_json_props[format!("tag_group_{}", i)] = group.as_ref().map(|s| s.clone()).into();
+            way_group.extra_json_props[format!("tag_group_{}", i)] = group.as_ref().cloned().into();
         }
         way_group.extra_json_props["tag_groups"] = way_group.group.clone().into();
         way_group.extra_json_props["length_m_int"] = way_group.length_m.map(|l| l.round() as i64).into();
@@ -418,7 +413,7 @@ fn main() -> Result<()> {
     // Group into files
     .fold(
         || HashMap::new() as HashMap<String, Vec<WayGroup>>,
-        |mut files, (way_group)| {
+        |mut files, way_group| {
             trace!("Grouping all data into files");
             files.entry(way_group.filename(&args.output_filename, args.split_files_by_group))
                 .or_default()
@@ -426,7 +421,7 @@ fn main() -> Result<()> {
             files
     })
     // We might have many hashmaps now, group down to one
-    .reduce(|| HashMap::new(),
+    .reduce(HashMap::new,
             |mut acc, curr| {
                 trace!("Merging files down again");
                 for (filename, wgs) in curr.into_iter() {
@@ -437,18 +432,18 @@ fn main() -> Result<()> {
     )
     .into_par_iter()
 
-    .update(|(filename, way_groups)| {
+    .update(|(_filename, way_groups)| {
         debug!("sorting ways by length & truncating");
         // in calc dist to longer, we need this sorted too
         way_groups.par_sort_by(|a, b| a.length_m.unwrap().total_cmp(&b.length_m.unwrap()).reverse());
     })
-    .update(|(filename, way_groups)| {
+    .update(|(_filename, way_groups)| {
         if let Some(limit) = args.only_longest_n_per_file {
             debug!("Truncating files by longest");
             way_groups.truncate(limit);
         }
     })
-    .update(|(filename, way_groups)| {
+    .update(|(_filename, way_groups)| {
         let max_timeout_s = args.timeout_dist_to_longer_s.unwrap_or(0.);
         if max_timeout_s == 0. {
             trace!("timeout_dist_to_longer_s is 0, so skipping this");
@@ -463,7 +458,7 @@ fn main() -> Result<()> {
         // dist to larger
         let longers = way_groups.par_iter().enumerate()
             .map(|(i, wg)| {
-                if ((Instant::now() - started_processing).as_secs_f32() > max_timeout_s) {
+                if (Instant::now() - started_processing).as_secs_f32() > max_timeout_s {
                     info!("Timeout calculating distance to nearer!");
                     return None;
                 }
@@ -475,14 +470,14 @@ fn main() -> Result<()> {
 
                     // Calc distance
                     .map(|wg2| wg.distance_m(wg2).unwrap() )
-                    .min_by(|d1, d2| d1.total_cmp(&d2));
+                    .min_by(|d1, d2| d1.total_cmp(d2));
 
                 nearest_longer
             })
             .collect::<Vec<_>>();
         prog.finish();
 
-        if ((Instant::now() - started_processing).as_secs_f32() > 2.) {
+        if (Instant::now() - started_processing).as_secs_f32() > 2. {
             // hack to discover if we timed out or not
             // set all to null
             way_groups.par_iter_mut().update(|wg| {
@@ -491,12 +486,12 @@ fn main() -> Result<()> {
         } else {
             // set the longer distance
             way_groups.par_iter_mut().zip(longers)
-                .for_each(|(mut wg, longer)| {
+                .for_each(|(wg, longer)| {
                     wg.extra_json_props["dist_to_longer_m"] = longer.into();
                 });
         }
     })
-    .update(|(filename, way_groups)| {
+    .update(|(_filename, way_groups)| {
         let mut feature_ranks = Vec::with_capacity(way_groups.len());
 
         // calc longest lengths
@@ -507,7 +502,7 @@ fn main() -> Result<()> {
         // sort by longest first
         feature_ranks.par_sort_unstable_by(|a, b| a.0.total_cmp(&b.0).reverse());
         // update feature_ranks to store the local rank
-        feature_ranks.par_iter_mut().enumerate().for_each(|(rank, (_len, idx, new_rank))| {
+        feature_ranks.par_iter_mut().enumerate().for_each(|(rank, (_len, _idx, new_rank))| {
             *new_rank = rank;
         });
         // sort back by way_groups idx
@@ -532,7 +527,7 @@ fn main() -> Result<()> {
             // sort by longest first
             feature_ranks.par_sort_unstable_by(|a, b| a.0.total_cmp(&b.0).reverse());
             // update feature_ranks to store the local rank
-            feature_ranks.par_iter_mut().enumerate().update(|(rank, (_len, idx, mut new_rank))| {
+            feature_ranks.par_iter_mut().enumerate().update(|(rank, (_len, _idx, mut new_rank))| {
                 new_rank = *rank;
             });
             // sort back by way_groups idx
@@ -555,14 +550,14 @@ fn main() -> Result<()> {
                 "root_wayid": w.root_wayid,
                 "root_wayid_120": w.root_wayid  % 120,
             });
-            if let Some(l) = w.length_m {
+            if let Some(_l) = w.length_m {
                 properties["length_m"] = w.length_m.into();
             }
             if args.incl_wayids {
                 properties["all_wayids"] = w.way_ids.into();
             }
 
-            properties.as_object_mut().unwrap().append(&mut w.extra_json_props.as_object_mut().unwrap());
+            properties.as_object_mut().unwrap().append(w.extra_json_props.as_object_mut().unwrap());
 
             (properties, w.coords.unwrap())
             }).collect::<Vec<_>>();
@@ -632,10 +627,10 @@ fn write_geojson_features_directly(
     save_as_linestrings: bool,
 ) -> Result<()> {
     f.write_all(b"{\"type\":\"FeatureCollection\", \"features\": [\n")?;
-    write_geojson_feature_directly(&mut f, &features[0], save_as_linestrings);
+    write_geojson_feature_directly(&mut f, &features[0], save_as_linestrings)?;
     for feature in &features[1..] {
         f.write_all(b",\n")?;
-        write_geojson_feature_directly(&mut f, &feature, save_as_linestrings)?;
+        write_geojson_feature_directly(&mut f, feature, save_as_linestrings)?;
     }
     f.write_all(b"\n]}")?;
     Ok(())
