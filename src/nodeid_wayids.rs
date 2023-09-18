@@ -2,6 +2,7 @@
 //! Most nodes are in only 1 way. This struct uses much less memory by taking advantage of that.
 //! A small amount of nodes are in exactly 2 nodes (This saves about 10% space)
 use super::*;
+use std::collections::{HashMap, BTreeMap};
 use std::fmt::Debug;
 
 pub(crate) trait NodeIdWayIds: Debug+Send+Sync {
@@ -27,22 +28,22 @@ pub(crate) fn default() -> Box<dyn NodeIdWayIds> {
 #[derive(Debug, GetSize)]
 pub struct NodeIdWayIdsMultiMap {
     /// A node which is in exactly 1 way. Store the way id that it's in
-    singles: HashMap<i64, i64>,
+    singles: BTreeMap<i64, i64>,
 
     /// Node which is in exactly 2 ways.
-    doubles: HashMap<i64, (i64, i64)>,
+    doubles: BTreeMap<i64, (i64, i64)>,
 
     /// A node which is in many ways, Store the ways that it's in
-    multiples: HashMap<i64, Vec<i64>>,
+    multiples: BTreeMap<i64, Vec<i64>>,
 }
 
 
 impl NodeIdWayIds for NodeIdWayIdsMultiMap {
     fn new() -> Self {
         NodeIdWayIdsMultiMap {
-            singles: HashMap::new(),
-            doubles: HashMap::new(),
-            multiples: HashMap::new(),
+            singles: BTreeMap::new(),
+            doubles: BTreeMap::new(),
+            multiples: BTreeMap::new(),
         }
     }
 
