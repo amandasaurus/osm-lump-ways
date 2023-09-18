@@ -101,7 +101,7 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
 
     fn detailed_size(&self) -> String {
         let mut output = String::new();
-        output.push_str(&format!("Size of nodeid_wayids: {} = {} bytes\n", self.get_size(), self.get_size().to_formatted_string(&Locale::en)));
+        output.push_str(&format!("Size of nodeid_wayids: {} = {} bytes num_nodes: {} = {}\n", self.get_size(), self.get_size().to_formatted_string(&Locale::en), self.len(), self.len().to_formatted_string(&Locale::en)));
         output.push_str(&format!("Size of nodeid_wayids.singles: {} = {} bytes, {} nodes\n",
                                  self.singles.get_size(),
                                  self.singles.get_size().to_formatted_string(&Locale::en),
