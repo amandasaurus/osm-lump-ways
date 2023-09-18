@@ -2,7 +2,7 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use get_size::GetSize;
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{ProgressBar, ProgressStyle, ProgressDrawTarget};
 #[allow(unused_imports)]
 use log::{debug, error, info, log_enabled, trace, warn, Level};
 use osmio::obj_types::ArcOSMObj;
@@ -36,6 +36,7 @@ mod nodeid_wayids;
 
 fn main() -> Result<()> {
     let args = cli_args::Args::parse();
+    let show_progress_bars = args.verbose.log_level_filter() >= log::Level::Info;
     env_logger::Builder::from_env(env_logger::Env::default()).filter_level(args.verbose.log_level_filter()).init();
     let mut reader = read_progress::BufReaderWithSize::from_path(&args.input_filename)?;
     let mut reader = osmio::pbf::PBFReader::new(reader);
@@ -93,6 +94,9 @@ fn main() -> Result<()> {
     )
     .unwrap();
     let input_spinners = indicatif::MultiProgress::new();
+    if !show_progress_bars {
+        input_spinners.set_draw_target(ProgressDrawTarget::hidden());
+    }
     let obj_reader = input_spinners.add(
         ProgressBar::new_spinner().with_style(
             ProgressStyle::with_template(
@@ -202,6 +206,9 @@ fn main() -> Result<()> {
         let setting_node_pos = ProgressBar::new(nodeid_wayids.len() as u64)
             .with_message("Re-reading file to save node locations")
             .with_style(style.clone());
+        if !show_progress_bars {
+            setting_node_pos.set_draw_target(ProgressDrawTarget::hidden());
+        }
         let mut reader = osmio::read_pbf(&args.input_filename)?;
         nodeid_pos_hm = reader
             .objects()
@@ -246,10 +253,16 @@ fn main() -> Result<()> {
     let grouping = ProgressBar::new(group_wayid_nodes.iter().map(|(_group, wayid_nodes)| wayid_nodes.len()).sum::<usize>() as u64)
         .with_message("Grouping all ways")
         .with_style(style.clone());
+    if !show_progress_bars {
+        grouping.set_draw_target(ProgressDrawTarget::hidden());
+    }
 
     let splitter = ProgressBar::new(0)
         .with_message("Splitting ways into lines")
         .with_style(style.clone());
+    if !show_progress_bars {
+        splitter.set_draw_target(ProgressDrawTarget::hidden());
+    }
 
     let results_filename_way_groups = group_wayid_nodes.into_par_iter()
     .flat_map(|(group, wayid_nodes)| {
