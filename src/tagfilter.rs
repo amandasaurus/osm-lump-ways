@@ -3,6 +3,7 @@ use regex::Regex;
 #[derive(Debug, Clone)]
 pub enum TagFilter {
     HasK(String),
+    HasReK(Regex),
     NotHasK(String),
     KV(String, String),
     KinV(String, Vec<String>),
@@ -16,6 +17,7 @@ impl ToString for TagFilter {
     fn to_string(&self) -> String {
         match self {
             TagFilter::HasK(k) => format!("∃{}", k),
+            TagFilter::HasReK(k) => format!("∃~{}", k),
             TagFilter::NotHasK(k) => format!("∄{}", k),
             TagFilter::KV(k, v) => format!("{}={}", k, v),
             TagFilter::KneV(k, v) => format!("{}≠{}", k, v),
@@ -41,6 +43,7 @@ impl TagFilter {
     pub fn filter(&self, o: &impl osmio::OSMObjBase) -> bool {
         match self {
             TagFilter::HasK(k) => o.has_tag(k),
+            TagFilter::HasReK(kre) => o.tags().any(|(k, _v)| kre.is_match(k)),
             TagFilter::NotHasK(k) => !o.has_tag(k),
             TagFilter::KV(k, v) => o.tag(k) == Some(v),
             TagFilter::KneV(k, v) => o.tag(k).map_or(true, |v2| v != v2),
@@ -77,9 +80,6 @@ impl std::str::FromStr for TagFilter {
             let s = s.splitn(2, '∈').collect::<Vec<_>>();
             let vs = s[1].split(',').map(String::from).collect::<Vec<_>>();
             Ok(TagFilter::KinV(s[0].to_string(), vs))
-        } else if s.contains('~') {
-            let s = s.splitn(2, '~').collect::<Vec<_>>();
-            Ok(TagFilter::KreV(s[0].to_string(), Regex::new(s[1]).unwrap()))
         } else if s.contains('≠') {
             let s = s.splitn(2, '≠').collect::<Vec<_>>();
             if s[1].contains(',') {
@@ -92,10 +92,21 @@ impl std::str::FromStr for TagFilter {
             let s = s.splitn(2, '∉').collect::<Vec<_>>();
             let vs = s[1].split(',').map(String::from).collect::<Vec<_>>();
             Ok(TagFilter::KnotInV(s[0].to_string(), vs))
+        } else if s.starts_with('~') {
+            let regex = s.strip_prefix('~').unwrap();
+            let regex = Regex::new(regex).map_err(|_| "Invalid regex")?;
+            Ok(TagFilter::HasReK(regex))
+        } else if s.starts_with("∃~") {
+            let regex = s.strip_prefix("∃~").unwrap();
+            let regex = Regex::new(regex).map_err(|_| "Invalid regex")?;
+            Ok(TagFilter::HasReK(regex))
         } else if s.starts_with('∃') {
             Ok(TagFilter::HasK(s.chars().skip(1).collect::<String>()))
         } else if s.starts_with('∄') {
             Ok(TagFilter::NotHasK(s.chars().skip(1).collect::<String>()))
+        } else if s.contains('~') {
+            let s = s.splitn(2, '~').collect::<Vec<_>>();
+            Ok(TagFilter::KreV(s[0].to_string(), Regex::new(s[1]).unwrap()))
         } else if s.is_empty() {
             Err("An empty string is not a valid tag filter".to_string())
         } else {
@@ -128,6 +139,8 @@ mod tests {
     test_parse!(parse3, "highway≠motorway", TagFilter::KneV("highway".to_string(), "motorway".to_string()));
     test_parse!(parse4, "highway=motorway,primary", TagFilter::KinV( "highway".to_string(), vec!["motorway".to_string(), "primary".to_string()]) );
 
+    test_parse!(parse_regex1, "~name:.*", TagFilter::HasReK(Regex::new("name:.*").unwrap()));
+    test_parse!(parse_regex2, "∃~name:.*", TagFilter::HasReK(Regex::new("name:.*").unwrap()));
 
     #[test]
     fn parse() {

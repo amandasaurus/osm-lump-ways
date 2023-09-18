@@ -34,7 +34,8 @@ pub(crate) struct Args {
     /// Can be specified many times. All values ANDed together. (i.e. way must match all)
     /// Example
     ///   • `-f key` / `-f ∃key`  way has this tag
-    ///   • `-f ∄key`  way does not has this tag
+    ///   • `-f ~key_regex` / `-f ∃~key_regex`  There is a key, which matches this regex
+    ///   • `-f ∄key`  way does not has this key
     ///   • `-f key=value`  way has this key and this value
     ///   • `-f key≠value`  way either doesn't have this key, or if it does, it's not equal to value
     ///   • `-f key=value1,value2,…` / -f `key∈value1,value2,…`  way has this key and the value is one of these
