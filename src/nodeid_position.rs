@@ -1,5 +1,5 @@
 use super::*;
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{BTreeMap, HashMap};
 
 #[derive(Debug, GetSize)]
 pub struct NodeIdPosition {
@@ -8,7 +8,9 @@ pub struct NodeIdPosition {
 
 impl NodeIdPosition {
     pub fn new() -> Self {
-        NodeIdPosition{ inner: BTreeMap::new() }
+        NodeIdPosition {
+            inner: BTreeMap::new(),
+        }
     }
     pub fn with_capacity(capacity: usize) -> Self {
         Self::new()
@@ -29,8 +31,7 @@ impl NodeIdPosition {
         self.inner.len()
     }
 
-    pub fn retain_by_key(&mut self, mut f: impl FnMut(&i64) -> bool )
-    {
+    pub fn retain_by_key(&mut self, mut f: impl FnMut(&i64) -> bool) {
         self.inner.retain(|k, _v| f(k));
     }
 
@@ -40,15 +41,17 @@ impl NodeIdPosition {
 
     pub fn detailed_size(&self) -> String {
         let mut output = String::new();
-        output.push_str(&format!("Size of nodeid:pos: {} = {} bytes\n", self.get_size(), self.get_size().to_formatted_string(&Locale::en)));
+        output.push_str(&format!(
+            "Size of nodeid:pos: {} = {} bytes\n",
+            self.get_size(),
+            self.get_size().to_formatted_string(&Locale::en)
+        ));
         output
     }
-
-
 }
 
 impl FromIterator<(i64, (f64, f64))> for NodeIdPosition {
-    fn from_iter<I: IntoIterator<Item=(i64, (f64, f64))>>(iter: I) -> Self {
+    fn from_iter<I: IntoIterator<Item = (i64, (f64, f64))>>(iter: I) -> Self {
         let mut np = NodeIdPosition::new();
         np.extend(iter);
         np
@@ -56,9 +59,12 @@ impl FromIterator<(i64, (f64, f64))> for NodeIdPosition {
 }
 
 impl Extend<(i64, (f64, f64))> for NodeIdPosition {
-    fn extend<I: IntoIterator<Item=(i64, (f64, f64))>>(&mut self, iter: I) {
+    fn extend<I: IntoIterator<Item = (i64, (f64, f64))>>(&mut self, iter: I) {
         for el in iter {
-            self.insert(el.0, ((el.1.0.try_into().unwrap(), el.1.1.try_into().unwrap())));
+            self.insert(
+                el.0,
+                ((el.1 .0.try_into().unwrap(), el.1 .1.try_into().unwrap())),
+            );
         }
     }
 }

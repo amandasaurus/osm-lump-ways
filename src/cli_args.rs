@@ -1,6 +1,6 @@
 use clap::Parser;
-use std::path::PathBuf;
 use clap_verbosity_flag::Verbosity;
+use std::path::PathBuf;
 
 use crate::tagfilter;
 use crate::TagGrouper;

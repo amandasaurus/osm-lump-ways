@@ -22,7 +22,11 @@ impl ToString for TagFilter {
             TagFilter::KinV(k, vs) => format!("{}∈{}", k, vs.join(",").to_string()),
             TagFilter::KnotInV(k, vs) => format!("{}∉{}", k, vs.join(",").to_string()),
             TagFilter::KreV(k, r) => format!("{}~{}", k, r),
-            TagFilter::Or(tfs) => tfs.iter().map(|tf| tf.to_string()).collect::<Vec<_>>().join("∨"),
+            TagFilter::Or(tfs) => tfs
+                .iter()
+                .map(|tf| tf.to_string())
+                .collect::<Vec<_>>()
+                .join("∨"),
         }
     }
 }
@@ -41,7 +45,9 @@ impl TagFilter {
             TagFilter::KV(k, v) => o.tag(k) == Some(v),
             TagFilter::KneV(k, v) => o.tag(k).map_or(true, |v2| v != v2),
             TagFilter::KinV(k, vs) => vs.iter().any(|v| o.tag(k).map_or(false, |v2| v == v2)),
-            TagFilter::KnotInV(k, vs) => o.tag(k).map_or(true, |tag_value| vs.iter().all(|v| v != tag_value)),
+            TagFilter::KnotInV(k, vs) => o
+                .tag(k)
+                .map_or(true, |tag_value| vs.iter().all(|v| v != tag_value)),
             TagFilter::KreV(k, r) => o.tag(k).map_or(false, |v| r.is_match(v)),
             TagFilter::Or(tfs) => tfs.iter().any(|tf| tf.filter(o)),
         }
@@ -54,7 +60,10 @@ impl std::str::FromStr for TagFilter {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = s.trim();
         if s.contains('∨') {
-            let tfs = s.split('∨').map(|tf| tf.parse::<TagFilter>()).collect::<Result<Vec<_>, _>>()?;
+            let tfs = s
+                .split('∨')
+                .map(|tf| tf.parse::<TagFilter>())
+                .collect::<Result<Vec<_>, _>>()?;
             Ok(TagFilter::Or(tfs))
         } else if s.contains('=') {
             let s = s.splitn(2, '=').collect::<Vec<_>>();
@@ -113,7 +122,7 @@ mod tests {
             TagFilter::HasK("name".to_string())
         );
 
-        assert!( "".parse::<TagFilter>().is_err());
+        assert!("".parse::<TagFilter>().is_err());
 
         assert_eq!(
             "∃name".parse::<TagFilter>().unwrap(),
@@ -144,7 +153,10 @@ mod tests {
         );
         assert_eq!(
             "highway≠motorway,primary".parse::<TagFilter>().unwrap(),
-            TagFilter::KnotInV("highway".to_string(), vec!["motorway".to_string(), "primary".to_string()])
+            TagFilter::KnotInV(
+                "highway".to_string(),
+                vec!["motorway".to_string(), "primary".to_string()]
+            )
         );
         assert_eq!(
             "highway∉motorway,primary".parse::<TagFilter>().unwrap(),
@@ -165,7 +177,10 @@ mod tests {
 
         assert_eq!(
             "name∨highway".parse::<TagFilter>().unwrap(),
-            TagFilter::Or(vec![TagFilter::HasK("name".to_string()), TagFilter::HasK("highway".to_string())])
+            TagFilter::Or(vec![
+                TagFilter::HasK("name".to_string()),
+                TagFilter::HasK("highway".to_string())
+            ])
         );
     }
 }

@@ -2,7 +2,7 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use get_size::GetSize;
-use indicatif::{ProgressBar, ProgressStyle, ProgressDrawTarget};
+use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 #[allow(unused_imports)]
 use log::{debug, error, info, log_enabled, trace, warn, Level};
 use osmio::obj_types::ArcOSMObj;
@@ -21,8 +21,8 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
 //use get_size_derive::*;
+use clap_verbosity_flag::{InfoLevel, Verbosity};
 use num_format::{Locale, ToFormattedString};
-use clap_verbosity_flag::{Verbosity, InfoLevel};
 
 mod cli_args;
 mod haversine;
@@ -40,7 +40,9 @@ use nodeid_wayids::{NodeIdWayIds, NodeIdWayIdsMultiMap};
 fn main() -> Result<()> {
     let args = cli_args::Args::parse();
     let show_progress_bars = args.verbose.log_level_filter() >= log::Level::Info;
-    env_logger::Builder::from_env(env_logger::Env::default()).filter_level(args.verbose.log_level_filter()).init();
+    env_logger::Builder::from_env(env_logger::Env::default())
+        .filter_level(args.verbose.log_level_filter())
+        .init();
     let mut reader = read_progress::BufReaderWithSize::from_path(&args.input_filename)?;
     let mut reader = osmio::pbf::PBFReader::new(reader);
 
@@ -110,8 +112,10 @@ fn main() -> Result<()> {
     );
     let ways_added = input_spinners.add(
         ProgressBar::new_spinner().with_style(
-            ProgressStyle::with_template("           {human_pos} ways collected so far for later processing")
-                .unwrap(),
+            ProgressStyle::with_template(
+                "           {human_pos} ways collected so far for later processing",
+            )
+            .unwrap(),
         ),
     );
 
@@ -205,22 +209,22 @@ fn main() -> Result<()> {
         nodeid_pos.reserve(nodeid_wayids.len());
         nodeid_pos.extend(
             reader
-            .objects()
-            .take_while(|o| o.is_node())
-            .filter_map(|o| {
-                if let Some(n) = o.into_node() {
-                    if nodeid_wayids.contains_nid(&n.id()) {
-                        let ll = n.lat_lon_f64().unwrap();
-                        setting_node_pos.inc(1);
-                        Some((n.id(), (ll.1, ll.0)))
+                .objects()
+                .take_while(|o| o.is_node())
+                .filter_map(|o| {
+                    if let Some(n) = o.into_node() {
+                        if nodeid_wayids.contains_nid(&n.id()) {
+                            let ll = n.lat_lon_f64().unwrap();
+                            setting_node_pos.inc(1);
+                            Some((n.id(), (ll.1, ll.0)))
+                        } else {
+                            None
+                        }
                     } else {
                         None
                     }
-                } else {
-                    None
-                }
-            })
-            );
+                }),
+        );
         setting_node_pos.finish();
     }
 
@@ -232,7 +236,9 @@ fn main() -> Result<()> {
     debug!(
         "Size of group_wayid_nodes: {} = {} bytes",
         group_wayid_nodes.get_size(),
-        group_wayid_nodes.get_size().to_formatted_string(&Locale::en)
+        group_wayid_nodes
+            .get_size()
+            .to_formatted_string(&Locale::en)
     );
 
     info!("All data has been loaded. Started processing...");
@@ -240,9 +246,14 @@ fn main() -> Result<()> {
         "Starting the breathfirst search. There are {} groups",
         group_wayid_nodes.len()
     );
-    let grouping = ProgressBar::new(group_wayid_nodes.iter().map(|(_group, wayid_nodes)| wayid_nodes.len()).sum::<usize>() as u64)
-        .with_message("Grouping all ways")
-        .with_style(style.clone());
+    let grouping = ProgressBar::new(
+        group_wayid_nodes
+            .iter()
+            .map(|(_group, wayid_nodes)| wayid_nodes.len())
+            .sum::<usize>() as u64,
+    )
+    .with_message("Grouping all ways")
+    .with_style(style.clone());
     if !show_progress_bars {
         grouping.set_draw_target(ProgressDrawTarget::hidden());
     }

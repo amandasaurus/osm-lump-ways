@@ -2,11 +2,13 @@
 //! Most nodes are in only 1 way. This struct uses much less memory by taking advantage of that.
 //! A small amount of nodes are in exactly 2 nodes (This saves about 10% space)
 use super::*;
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
 
-pub(crate) trait NodeIdWayIds: Debug+Send+Sync {
-    fn new() -> Self where Self: Sized+Send;
+pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
+    fn new() -> Self
+    where
+        Self: Sized + Send;
     fn len(&self) -> usize;
     fn detailed_size(&self) -> String;
 
@@ -37,7 +39,6 @@ pub struct NodeIdWayIdsMultiMap {
     multiples: BTreeMap<i64, Vec<i64>>,
 }
 
-
 impl NodeIdWayIds for NodeIdWayIdsMultiMap {
     fn new() -> Self {
         NodeIdWayIdsMultiMap {
@@ -55,7 +56,8 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
         } else if let Some((existing1, existing2)) = self.doubles.get(&nid) {
             if *existing1 != wid && *existing2 != wid {
                 // upgrade to multiple
-                self.multiples.insert(nid, vec![*existing1, *existing2, wid]);
+                self.multiples
+                    .insert(nid, vec![*existing1, *existing2, wid]);
                 self.doubles.remove(&nid);
                 assert!(!self.singles.contains_key(&nid));
                 assert!(!self.doubles.contains_key(&nid));
@@ -80,7 +82,9 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
     }
 
     fn contains_nid(&self, nid: &i64) -> bool {
-        self.singles.contains_key(nid) || self.doubles.contains_key(nid) || self.multiples.contains_key(nid)
+        self.singles.contains_key(nid)
+            || self.doubles.contains_key(nid)
+            || self.multiples.contains_key(nid)
     }
     /// How many nodes have been saved
     fn len(&self) -> usize {
@@ -101,22 +105,31 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
 
     fn detailed_size(&self) -> String {
         let mut output = String::new();
-        output.push_str(&format!("Size of nodeid_wayids: {} = {} bytes num_nodes: {} = {}\n", self.get_size(), self.get_size().to_formatted_string(&Locale::en), self.len(), self.len().to_formatted_string(&Locale::en)));
-        output.push_str(&format!("Size of nodeid_wayids.singles: {} = {} bytes, {} nodes\n",
-                                 self.singles.get_size(),
-                                 self.singles.get_size().to_formatted_string(&Locale::en),
-                                 self.singles.len().to_formatted_string(&Locale::en)));
-        output.push_str(&format!("Size of nodeid_wayids.doubles: {} = {} bytes, {} nodes\n",
-                                 self.doubles.get_size(),
-                                 self.doubles.get_size().to_formatted_string(&Locale::en),
-                                 self.doubles.len().to_formatted_string(&Locale::en),
-                                 ));
-        output.push_str(&format!("Size of nodeid_wayids.multiples: {} = {} bytes, {} nodes\n",
-                                 self.multiples.get_size(),
-                                 self.multiples.get_size().to_formatted_string(&Locale::en),
-                                 self.multiples.len().to_formatted_string(&Locale::en),
-                                 ));
+        output.push_str(&format!(
+            "Size of nodeid_wayids: {} = {} bytes num_nodes: {} = {}\n",
+            self.get_size(),
+            self.get_size().to_formatted_string(&Locale::en),
+            self.len(),
+            self.len().to_formatted_string(&Locale::en)
+        ));
+        output.push_str(&format!(
+            "Size of nodeid_wayids.singles: {} = {} bytes, {} nodes\n",
+            self.singles.get_size(),
+            self.singles.get_size().to_formatted_string(&Locale::en),
+            self.singles.len().to_formatted_string(&Locale::en)
+        ));
+        output.push_str(&format!(
+            "Size of nodeid_wayids.doubles: {} = {} bytes, {} nodes\n",
+            self.doubles.get_size(),
+            self.doubles.get_size().to_formatted_string(&Locale::en),
+            self.doubles.len().to_formatted_string(&Locale::en),
+        ));
+        output.push_str(&format!(
+            "Size of nodeid_wayids.multiples: {} = {} bytes, {} nodes\n",
+            self.multiples.get_size(),
+            self.multiples.get_size().to_formatted_string(&Locale::en),
+            self.multiples.len().to_formatted_string(&Locale::en),
+        ));
         output
     }
-
 }
