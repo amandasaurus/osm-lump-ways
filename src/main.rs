@@ -308,7 +308,7 @@ fn main() -> Result<()> {
 
             way_groups.push(this_group);
         }
-        debug!(
+        trace!(
             "In total, found {} waygroups for the tag group {:?}",
             way_groups.len().to_formatted_string(&Locale::en),
             group
