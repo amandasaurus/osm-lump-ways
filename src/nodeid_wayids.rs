@@ -4,8 +4,8 @@
 use super::*;
 use std::fmt::Debug;
 
-pub(crate) trait NodeIdWayIds: Debug {
-    fn new() -> Self;
+pub(crate) trait NodeIdWayIds: Debug+Send+Sync {
+    fn new() -> Self where Self: Sized+Send;
     fn len(&self) -> usize;
     fn detailed_size(&self) -> String;
 
@@ -17,6 +17,11 @@ pub(crate) trait NodeIdWayIds: Debug {
 
     /// Return all the ways that this node is in.
     fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = &i64> + 'a>;
+}
+
+/// Some standard struct for doing this.
+pub(crate) fn default() -> Box<dyn NodeIdWayIds> {
+    Box::new(NodeIdWayIdsMultiMap::new())
 }
 
 #[derive(Debug, GetSize)]
