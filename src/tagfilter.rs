@@ -127,25 +127,57 @@ mod tests {
         ( $name:ident, $input:expr, $expected_output:expr ) => {
             #[test]
             fn $name() {
-                assert_eq!(
-                    ($input).parse::<TagFilter>().unwrap(),
-                    $expected_output
-                );
+                assert_eq!(($input).parse::<TagFilter>().unwrap(), $expected_output);
             }
         };
     }
 
     test_parse!(simple1, "name", TagFilter::HasK("name".to_string()));
-    test_parse!(simple_w_space1, " name", TagFilter::HasK("name".to_string()));
-    test_parse!(simple_w_space2, " name  \t", TagFilter::HasK("name".to_string()));
+    test_parse!(
+        simple_w_space1,
+        " name",
+        TagFilter::HasK("name".to_string())
+    );
+    test_parse!(
+        simple_w_space2,
+        " name  \t",
+        TagFilter::HasK("name".to_string())
+    );
     test_parse!(parse1, "∃name", TagFilter::HasK("name".to_string()));
-    test_parse!(parse2, "highway=motorway", TagFilter::KV("highway".to_string(), "motorway".to_string()));
-    test_parse!(parse3, "highway≠motorway", TagFilter::KneV("highway".to_string(), "motorway".to_string()));
-    test_parse!(parse4, "highway=motorway,primary", TagFilter::KinV( "highway".to_string(), vec!["motorway".to_string(), "primary".to_string()]) );
+    test_parse!(
+        parse2,
+        "highway=motorway",
+        TagFilter::KV("highway".to_string(), "motorway".to_string())
+    );
+    test_parse!(
+        parse3,
+        "highway≠motorway",
+        TagFilter::KneV("highway".to_string(), "motorway".to_string())
+    );
+    test_parse!(
+        parse4,
+        "highway=motorway,primary",
+        TagFilter::KinV(
+            "highway".to_string(),
+            vec!["motorway".to_string(), "primary".to_string()]
+        )
+    );
 
-    test_parse!(parse_regex1, "~name:.*", TagFilter::HasReK(Regex::new("name:.*").unwrap()));
-    test_parse!(parse_regex2, "∃~name:.*", TagFilter::HasReK(Regex::new("name:.*").unwrap()));
-    test_parse!(parse_regex_not2, "∄~name:.*", TagFilter::NotHasReK(Regex::new("name:.*").unwrap()));
+    test_parse!(
+        parse_regex1,
+        "~name:.*",
+        TagFilter::HasReK(Regex::new("name:.*").unwrap())
+    );
+    test_parse!(
+        parse_regex2,
+        "∃~name:.*",
+        TagFilter::HasReK(Regex::new("name:.*").unwrap())
+    );
+    test_parse!(
+        parse_regex_not2,
+        "∄~name:.*",
+        TagFilter::NotHasReK(Regex::new("name:.*").unwrap())
+    );
 
     #[test]
     fn parse() {
@@ -188,6 +220,5 @@ mod tests {
                 TagFilter::HasK("highway".to_string())
             ])
         );
-
     }
 }
