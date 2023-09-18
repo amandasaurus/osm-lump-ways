@@ -2,9 +2,25 @@
 //! Most nodes are in only 1 way. This struct uses much less memory by taking advantage of that.
 //! A small amount of nodes are in exactly 2 nodes (This saves about 10% space)
 use super::*;
+use std::fmt::Debug;
+
+pub(crate) trait NodeIdWayIds: Debug {
+    fn new() -> Self;
+    fn len(&self) -> usize;
+    fn detailed_size(&self) -> String;
+
+    /// Record that node id `nid` is in way id `wid`.
+    fn insert(&mut self, nid: i64, wid: i64);
+
+    /// True iff node id `nid` has been seen
+    fn contains_nid(&self, nid: &i64) -> bool;
+
+    /// Return all the ways that this node is in.
+    fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = &i64> + 'a>;
+}
 
 #[derive(Debug, GetSize)]
-pub struct NodeIdWayIds {
+pub struct NodeIdWayIdsMultiMap {
     /// A node which is in exactly 1 way. Store the way id that it's in
     singles: HashMap<i64, i64>,
 
@@ -15,17 +31,17 @@ pub struct NodeIdWayIds {
     multiples: HashMap<i64, Vec<i64>>,
 }
 
-impl NodeIdWayIds {
-    pub fn new() -> Self {
-        NodeIdWayIds {
+
+impl NodeIdWayIds for NodeIdWayIdsMultiMap {
+    fn new() -> Self {
+        NodeIdWayIdsMultiMap {
             singles: HashMap::new(),
             doubles: HashMap::new(),
             multiples: HashMap::new(),
         }
     }
 
-    /// Record that node id `nid` is in way id `wid`.
-    pub fn insert(&mut self, nid: i64, wid: i64) {
+    fn insert(&mut self, nid: i64, wid: i64) {
         if let Some(existing) = self.multiples.get_mut(&nid) {
             existing.push(wid);
             assert!(!self.singles.contains_key(&nid));
@@ -57,17 +73,15 @@ impl NodeIdWayIds {
         }
     }
 
-    /// True iff node id `nid` has been seen
-    pub fn contains_nid(&self, nid: &i64) -> bool {
+    fn contains_nid(&self, nid: &i64) -> bool {
         self.singles.contains_key(nid) || self.doubles.contains_key(nid) || self.multiples.contains_key(nid)
     }
     /// How many nodes have been saved
-    pub fn len(&self) -> usize {
+    fn len(&self) -> usize {
         self.singles.len() + self.doubles.len() + self.multiples.len()
     }
 
-    /// Return all the ways that this node is in.
-    pub fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = &i64> + 'a> {
+    fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = &i64> + 'a> {
         if let Some(wid) = self.singles.get(nid) {
             Box::new(std::iter::once(wid))
         } else if let Some((wid1, wid2)) = self.doubles.get(nid) {
@@ -79,7 +93,7 @@ impl NodeIdWayIds {
         }
     }
 
-    pub fn detailed_size(&self) -> String {
+    fn detailed_size(&self) -> String {
         let mut output = String::new();
         output.push_str(&format!("Size of nodeid_wayids: {} = {} bytes\n", self.get_size(), self.get_size().to_formatted_string(&Locale::en)));
         output.push_str(&format!("Size of nodeid_wayids.singles: {} = {} bytes\n", self.singles.get_size(), self.singles.get_size().to_formatted_string(&Locale::en)));

@@ -35,6 +35,7 @@ use way_group::WayGroup;
 mod nodeid_position;
 use nodeid_position::NodeIdPosition;
 mod nodeid_wayids;
+use nodeid_wayids::{NodeIdWayIds, NodeIdWayIdsMultiMap};
 
 fn main() -> Result<()> {
     let args = cli_args::Args::parse();
@@ -88,7 +89,7 @@ fn main() -> Result<()> {
     let mut nodeid_pos = Arc::new(Mutex::new(nodeid_pos));
     /// nodeid:the ways that contain that node
     //let mut nodeid_wayids: HashMap<i64, HashSet<i64>> = HashMap::new();
-    let mut nodeid_wayids = nodeid_wayids::NodeIdWayIds::new();
+    let mut nodeid_wayids = nodeid_wayids::NodeIdWayIdsMultiMap::new();
     let nodeid_wayids = Arc::new(Mutex::new(nodeid_wayids));
 
     let style = ProgressStyle::with_template(
