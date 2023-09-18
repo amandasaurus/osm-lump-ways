@@ -224,16 +224,14 @@ fn main() -> Result<()> {
     }
 
     let nodeid_pos = nodeid_pos;
-    debug!(
-        "Size of node pos: {} = {} bytes",
-        nodeid_pos.get_size(),
-        nodeid_pos.get_size().to_formatted_string(&Locale::en)
-    );
+    debug!("{}", nodeid_pos.detailed_size());
+
+    debug!("{}", nodeid_wayids.detailed_size());
 
     debug!(
-        "Size of nodeid_wayids: {} = {} bytes",
-        nodeid_wayids.get_size(),
-        nodeid_wayids.get_size().to_formatted_string(&Locale::en)
+        "Size of group_wayid_nodes: {} = {} bytes",
+        group_wayid_nodes.get_size(),
+        group_wayid_nodes.get_size().to_formatted_string(&Locale::en)
     );
 
     info!("All data has been loaded. Started processing...");

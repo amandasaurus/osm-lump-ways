@@ -41,6 +41,13 @@ impl NodeIdPosition {
         self.inner.reserve(addition);
     }
 
+    pub fn detailed_size(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!("Size of nodeid:pos: {} = {} bytes\n", self.get_size(), self.get_size().to_formatted_string(&Locale::en)));
+        output
+    }
+
+
 }
 
 impl FromIterator<(i64, (f64, f64))> for NodeIdPosition {
