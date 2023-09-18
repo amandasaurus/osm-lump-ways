@@ -1,4 +1,3 @@
-#![allow(warnings)]
 use anyhow::{Context, Result};
 use clap::Parser;
 use get_size::GetSize;
@@ -8,7 +7,6 @@ use log::{debug, error, info, log_enabled, trace, warn, Level};
 use osmio::obj_types::ArcOSMObj;
 use osmio::prelude::*;
 use osmio::OSMObjBase;
-#[allow(unused_imports)]
 use rayon::prelude::*;
 use regex::Regex;
 use serde_json::json;
