@@ -261,13 +261,13 @@ fn main() -> Result<()> {
         let mut this_group_wayids = Vec::new();
 
         let mut way_groups = Vec::new();
-        debug!("grouping all the ways for group: {:?}", group);
+        trace!("grouping all the ways for group: {:?}", group);
         while let Some(root_wayid) = unprocessed_wayids.pop_first() {
             grouping.inc(1);
             this_group_wayids.push(root_wayid);
 
             let mut this_group = WayGroup::new(*root_wayid, group.to_owned());
-            debug!(
+            trace!(
                 "root_wayid {:?} (there are {} unprocessed ways left)",
                 root_wayid,
                 unprocessed_wayids.len()
@@ -316,11 +316,11 @@ fn main() -> Result<()> {
         }
     })
     .update(|way_group| {
-        debug!("Saving coordinates for all ways");
+        trace!("Saving coordinates for all ways");
         way_group.set_coords(&nodeid_pos);
     })
     .update(|way_group| {
-        debug!("Calculating all lengths");
+        trace!("Calculating all lengths");
         way_group.calculate_length();
     })
     // apply min length filter
@@ -384,7 +384,7 @@ fn main() -> Result<()> {
         }
     )
     .update(|way_group| {
-        debug!("Preparing extra json properties");
+        trace!("Preparing extra json properties");
         for (i, group) in way_group.group.iter().enumerate() {
             way_group.extra_json_props[format!("tag_group_{}", i)] = group.as_ref().map(|s| s.clone()).into();
         }
@@ -409,7 +409,7 @@ fn main() -> Result<()> {
     .fold(
         || HashMap::new() as HashMap<String, Vec<WayGroup>>,
         |mut files, (way_group)| {
-            debug!("Grouping all data into files");
+            trace!("Grouping all data into files");
             files.entry(way_group.filename(&args.output_filename, args.split_files_by_group))
                 .or_default()
                 .push(way_group);
@@ -418,7 +418,7 @@ fn main() -> Result<()> {
     // We might have many hashmaps now, group down to one
     .reduce(|| HashMap::new(),
             |mut acc, curr| {
-                debug!("Merging files down again");
+                trace!("Merging files down again");
                 for (filename, wgs) in curr.into_iter() {
                     acc.entry(filename).or_default().extend(wgs.into_iter())
                 }
