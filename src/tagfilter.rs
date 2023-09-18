@@ -107,43 +107,31 @@ impl std::str::FromStr for TagFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    macro_rules! test_parse {
+        ( $name:ident, $input:expr, $expected_output:expr ) => {
+            #[test]
+            fn $name() {
+                assert_eq!(
+                    ($input).parse::<TagFilter>().unwrap(),
+                    $expected_output
+                );
+            }
+        };
+    }
+
+    test_parse!(simple1, "name", TagFilter::HasK("name".to_string()));
+    test_parse!(simple_w_space1, " name", TagFilter::HasK("name".to_string()));
+    test_parse!(simple_w_space2, " name  \t", TagFilter::HasK("name".to_string()));
+    test_parse!(parse1, "∃name", TagFilter::HasK("name".to_string()));
+    test_parse!(parse2, "highway=motorway", TagFilter::KV("highway".to_string(), "motorway".to_string()));
+    test_parse!(parse3, "highway≠motorway", TagFilter::KneV("highway".to_string(), "motorway".to_string()));
+    test_parse!(parse4, "highway=motorway,primary", TagFilter::KinV( "highway".to_string(), vec!["motorway".to_string(), "primary".to_string()]) );
+
+
     #[test]
     fn parse() {
-        assert_eq!(
-            "name".parse::<TagFilter>().unwrap(),
-            TagFilter::HasK("name".to_string())
-        );
-        assert_eq!(
-            " name".parse::<TagFilter>().unwrap(),
-            TagFilter::HasK("name".to_string())
-        );
-        assert_eq!(
-            " name   \t".parse::<TagFilter>().unwrap(),
-            TagFilter::HasK("name".to_string())
-        );
-
         assert!("".parse::<TagFilter>().is_err());
-
-        assert_eq!(
-            "∃name".parse::<TagFilter>().unwrap(),
-            TagFilter::HasK("name".to_string())
-        );
-        assert_eq!(
-            "highway=motorway".parse::<TagFilter>().unwrap(),
-            TagFilter::KV("highway".to_string(), "motorway".to_string())
-        );
-        assert_eq!(
-            "highway≠motorway".parse::<TagFilter>().unwrap(),
-            TagFilter::KneV("highway".to_string(), "motorway".to_string())
-        );
-
-        assert_eq!(
-            "highway=motorway,primary".parse::<TagFilter>().unwrap(),
-            TagFilter::KinV(
-                "highway".to_string(),
-                vec!["motorway".to_string(), "primary".to_string()]
-            )
-        );
         assert_eq!(
             "highway∈motorway,primary".parse::<TagFilter>().unwrap(),
             TagFilter::KinV(
@@ -182,5 +170,6 @@ mod tests {
                 TagFilter::HasK("highway".to_string())
             ])
         );
+
     }
 }
