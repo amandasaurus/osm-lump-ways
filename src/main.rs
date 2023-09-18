@@ -298,7 +298,7 @@ fn main() -> Result<()> {
         }
         debug!(
             "In total, found {} waygroups for the tag group {:?}",
-            way_groups.len(),
+            way_groups.len().to_formatted_string(&Locale::en),
             group
         );
         grouping.finish();
@@ -573,7 +573,7 @@ fn main() -> Result<()> {
                             filename
                         )
                     })?;
-                info!("Wrote {} feature(s) to {}", features.len(), filename);
+                info!("Wrote {} feature(s) to {}", features.len().to_formatted_string(&Locale::en), filename);
             }
             Err(e) => {
                 warn!("Couldn't open filename {:?}: {}", filename, e);
