@@ -101,9 +101,20 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
     fn detailed_size(&self) -> String {
         let mut output = String::new();
         output.push_str(&format!("Size of nodeid_wayids: {} = {} bytes\n", self.get_size(), self.get_size().to_formatted_string(&Locale::en)));
-        output.push_str(&format!("Size of nodeid_wayids.singles: {} = {} bytes\n", self.singles.get_size(), self.singles.get_size().to_formatted_string(&Locale::en)));
-        output.push_str(&format!("Size of nodeid_wayids.doubles: {} = {} bytes\n", self.doubles.get_size(), self.doubles.get_size().to_formatted_string(&Locale::en)));
-        output.push_str(&format!("Size of nodeid_wayids.multiples: {} = {} bytes\n", self.multiples.get_size(), self.multiples.get_size().to_formatted_string(&Locale::en)));
+        output.push_str(&format!("Size of nodeid_wayids.singles: {} = {} bytes, {} nodes\n",
+                                 self.singles.get_size(),
+                                 self.singles.get_size().to_formatted_string(&Locale::en),
+                                 self.singles.len().to_formatted_string(&Locale::en)));
+        output.push_str(&format!("Size of nodeid_wayids.doubles: {} = {} bytes, {} nodes\n",
+                                 self.doubles.get_size(),
+                                 self.doubles.get_size().to_formatted_string(&Locale::en),
+                                 self.doubles.len().to_formatted_string(&Locale::en),
+                                 ));
+        output.push_str(&format!("Size of nodeid_wayids.multiples: {} = {} bytes, {} nodes\n",
+                                 self.multiples.get_size(),
+                                 self.multiples.get_size().to_formatted_string(&Locale::en),
+                                 self.multiples.len().to_formatted_string(&Locale::en),
+                                 ));
         output
     }
 
