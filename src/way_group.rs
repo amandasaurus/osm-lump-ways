@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[derive(Debug, Clone)]
 pub struct WayGroup {
     pub root_wayid: i64,

@@ -1,7 +1,6 @@
 use super::*;
 use anyhow::{Context, Result};
 
-
 pub(crate) struct UndirectedGraph<T>
 where
     T: Clone,

@@ -1,5 +1,5 @@
 use super::*;
-use std::collections::{BTreeMap};
+use std::collections::BTreeMap;
 
 #[derive(Debug, GetSize)]
 pub struct NodeIdPosition {

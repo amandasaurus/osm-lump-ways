@@ -2,7 +2,7 @@
 //! Most nodes are in only 1 way. This struct uses much less memory by taking advantage of that.
 //! A small amount of nodes are in exactly 2 nodes (This saves about 10% space)
 use super::*;
-use std::collections::{BTreeMap};
+use std::collections::BTreeMap;
 use std::fmt::Debug;
 
 pub(crate) trait NodeIdWayIds: Debug + Send + Sync {

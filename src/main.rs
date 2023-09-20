@@ -79,8 +79,7 @@ fn main() -> Result<()> {
     info!("Tag grouping(s) in operation: {:?}", args.tag_group_k);
 
     // For each group, a hashmap of wayid:nodes in that way
-    let group_wayid_nodes: HashMap<Vec<Option<String>>, HashMap<i64, Vec<i64>>> =
-        HashMap::new();
+    let group_wayid_nodes: HashMap<Vec<Option<String>>, HashMap<i64, Vec<i64>>> = HashMap::new();
     let group_wayid_nodes = Arc::new(Mutex::new(group_wayid_nodes));
 
     let nodeid_pos = NodeIdPosition::new();
@@ -159,8 +158,7 @@ fn main() -> Result<()> {
                             .insert(w.id(), w.nodes().to_owned());
                         ways_added.inc(1);
                     }
-                    ArcOSMObj::Relation(_r) => {
-                    }
+                    ArcOSMObj::Relation(_r) => {}
                 }
             },
         );
@@ -242,7 +240,9 @@ fn main() -> Result<()> {
         group_wayid_nodes.len()
     );
     let grouping = ProgressBar::new(
-        group_wayid_nodes.values().map(|wayid_nodes| wayid_nodes.len())
+        group_wayid_nodes
+            .values()
+            .map(|wayid_nodes| wayid_nodes.len())
             .sum::<usize>() as u64,
     )
     .with_message("Grouping all ways")
