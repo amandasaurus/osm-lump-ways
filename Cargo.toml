@@ -19,7 +19,7 @@ log = "0.4.17"
 num-format = "0.4.4"
 osmio = "0.8.1"
 rayon = "1.6.1"
-read-progress = { version = "0.3.0" }
+read-progress = "0.5.0"
 regex = "1.7.0"
 serde = "1.0.150"
 serde_json = "1.0.89"

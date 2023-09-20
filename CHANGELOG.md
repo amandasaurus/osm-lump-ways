@@ -3,6 +3,7 @@
 ## Unreleased
 
 * Internal refactoring to reduce required memory usage.
+* Internal refactoring to make later refactoring easier & update dependencies.
 * Reformatting of some output messages to be nicer.
 * New tag filter: `-f ~k` to filter on keys which match a regex (and `-f ∄~k`
   for “does not contain a key that matches this regex”)
