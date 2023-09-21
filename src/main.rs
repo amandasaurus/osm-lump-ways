@@ -35,7 +35,7 @@ mod nodeid_wayids;
 
 fn main() -> Result<()> {
     // Initially show with warn to catch warn's in the clap parsing
-    let logger = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
+    let logger = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
     let args = cli_args::Args::parse();
     let show_progress_bars = args.verbose.log_level_filter() >= log::Level::Info;
 
