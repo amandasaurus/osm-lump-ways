@@ -272,7 +272,7 @@ fn main() -> Result<()> {
         trace!("grouping all the ways for group: {:?}", group);
         while let Some(root_wayid) = unprocessed_wayids.pop_first() {
             grouping.inc(1);
-            this_group_wayids.push(root_wayid);
+            this_group_wayids.push(*root_wayid);
 
             let mut this_group = WayGroup::new(*root_wayid, group.to_owned());
             trace!(
@@ -287,15 +287,15 @@ fn main() -> Result<()> {
                     this_group.way_ids.len()
                 );
 
-                this_group.way_ids.push(*wid);
-                this_group.nodeids.push(wayid_nodes[wid].clone());
+                this_group.way_ids.push(wid);
+                this_group.nodeids.push(wayid_nodes[&wid].clone());
 
                 // find all other ways
-                for other_wayid in wayid_nodes[wid]
+                for other_wayid in wayid_nodes[&wid]
                     .iter()
                     .flat_map(|nid| nodeid_wayids.ways(nid))
                 {
-                    if unprocessed_wayids.remove(other_wayid) {
+                    if unprocessed_wayids.remove(&other_wayid) {
                         trace!("adding other way {}", other_wayid);
                         this_group_wayids.push(other_wayid);
                     }

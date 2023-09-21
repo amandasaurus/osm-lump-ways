@@ -28,7 +28,7 @@ pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
     fn contains_nid(&self, nid: &i64) -> bool;
 
     /// Return all the ways that this node is in.
-    fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = &i64> + 'a>;
+    fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = i64> + 'a>;
 }
 
 /// Some standard struct for doing this.
@@ -100,13 +100,13 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
         self.singles.len() + self.doubles.len() + self.multiples.len()
     }
 
-    fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = &i64> + 'a> {
+    fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = i64> + 'a> {
         if let Some(wid) = self.singles.get(nid) {
-            Box::new(std::iter::once(wid))
+            Box::new(std::iter::once(*wid))
         } else if let Some((wid1, wid2)) = self.doubles.get(nid) {
-            Box::new(std::iter::once(wid1).chain(std::iter::once(wid2)))
+            Box::new(std::iter::once(*wid1).chain(std::iter::once(*wid2)))
         } else if let Some(wids) = self.multiples.get(nid) {
-            Box::new(wids.iter())
+            Box::new(wids.iter().map(|wid| *wid))
         } else {
             Box::new(std::iter::empty())
         }
