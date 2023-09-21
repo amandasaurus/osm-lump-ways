@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* Error messages if you give incorrect options
+
 ## v0.5.0 (2023-09-21)
 
 * Internal refactoring to reduce required memory usage.

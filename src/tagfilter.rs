@@ -115,7 +115,8 @@ impl std::str::FromStr for TagFilter {
             Ok(TagFilter::NotHasK(key.to_string()))
         } else if s.contains('~') {
             let s = s.splitn(2, '~').collect::<Vec<_>>();
-            Ok(TagFilter::KreV(s[0].to_string(), Regex::new(s[1]).unwrap()))
+            let regex = Regex::new(s[1]).map_err(|_| "Invalid regex")?;
+            Ok(TagFilter::KreV(s[0].to_string(), regex))
         } else if s.is_empty() {
             Err("An empty string is not a valid tag filter".to_string())
         } else {
