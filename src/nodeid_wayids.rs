@@ -9,6 +9,8 @@ pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
     fn new() -> Self
     where
         Self: Sized + Send;
+
+    /// Number of nodes stored
     fn len(&self) -> usize;
     fn detailed_size(&self) -> String;
 
