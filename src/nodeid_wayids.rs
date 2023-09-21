@@ -371,15 +371,41 @@ enum NodeIdWayIdsAuto {
 }
 
 impl NodeIdWayIdsAuto {
-    fn new() -> Self
-    {
-        //NodeIdWayIdsAuto::MultiMap(NodeIdWayIdsMultiMap::new())
-        NodeIdWayIdsAuto::BucketMap(NodeIdWayIdsBucketWayIndex::with_bucket(8))
+    fn new() -> Self {
+        NodeIdWayIdsAuto::MultiMap(NodeIdWayIdsMultiMap::new())
+    }
+
+    fn possibly_switch_backend(&mut self) {
+        if let Self::MultiMap(ref mut multi_map) = self {
+            if multi_map.len() > SWITCH_TO_BUCKET {
+                let mut multi_map = std::mem::take(multi_map);
+                let started_conversion = std::time::Instant::now();
+                debug!("There are {} nodes in the nodeid:wayid (> {}). Switching from CPU-faster memory-ineffecient MultiMap, to CPU-slower memory-effecientier Bucket Index", multi_map.len().to_formatted_string(&Locale::en), SWITCH_TO_BUCKET);
+                debug!("Old size: {}", multi_map.detailed_size());
+                let old_size = multi_map.get_size();
+
+                // Create a new bucket and convert the old to this.
+                let mut new_bucket = NodeIdWayIdsBucketWayIndex::with_bucket(6);
+                for (nid, wid) in multi_map.drain_all() {
+                    new_bucket.insert(nid, wid);
+                }
+
+                let converstion_duration = std::time::Instant::now() - started_conversion;
+                debug!("New size: {}", new_bucket.detailed_size());
+                debug!("It took {} sec to convert to bucket index", converstion_duration.as_secs());
+                debug!("New index is {}% the size of the old one", (100*new_bucket.get_size())/old_size);
+
+                // and we're that now
+                std::mem::replace(self, Self::BucketMap(new_bucket));
+            }
+        }
     }
 }
 
-impl NodeIdWayIds for NodeIdWayIdsAuto {
+/// After this many nodes, switch to the CPU slower, but RAM-smaller Bucket Way Index
+const SWITCH_TO_BUCKET: usize = 10_000_000;
 
+impl NodeIdWayIds for NodeIdWayIdsAuto {
     /// Number of nodes stored
     fn len(&self) -> usize {
         match self {
@@ -398,13 +424,20 @@ impl NodeIdWayIds for NodeIdWayIdsAuto {
 
     /// Record that node id `nid` is in way id `wid`.
     fn insert(&mut self, nid: i64, wid: i64) {
+        self.possibly_switch_backend();
         match self {
-            Self::MultiMap(x)  => x.insert(nid, wid),
+            Self::MultiMap(x) => x.insert(nid, wid),
             Self::BucketMap(x) => x.insert(nid, wid),
         }
     }
 
-    // TODO insert_many
+    fn insert_many(&mut self, wid: i64, nids: &[i64]) {
+        self.possibly_switch_backend();
+        match self {
+            Self::MultiMap(x) => x.insert_many(wid, nids),
+            Self::BucketMap(x) => x.insert_many(wid, nids),
+        }
+    }
 
     /// True iff node id `nid` has been seen
     fn contains_nid(&self, nid: &i64) -> bool {
