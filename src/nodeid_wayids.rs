@@ -148,8 +148,6 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
     }
 }
 
-const WAY_INDEX_BUCKET_SHIFT: i64 = 5;
-
 /// More memory effecient, but slower.
 #[derive(Debug, GetSize)]
 pub struct NodeIdWayIdsBucketWayIndex {
@@ -162,18 +160,29 @@ pub struct NodeIdWayIdsBucketWayIndex {
 
     /// Keep track of number of nodes
     num_nodes: usize,
+
+    bucket_shift: i64
 }
 
 impl NodeIdWayIdsBucketWayIndex {
-    fn new() -> Self
+    fn with_bucket(bucket_shift: i64) -> Self
     {
         Self {
             ways: BTreeMap::new(),
             num_nodes: 0,
             nodeid_bucket_wayid: BTreeMap::new(),
+            bucket_shift
         }
     }
 
+    fn new() -> Self
+    {
+        Self::with_bucket(5)
+    }
+
+    fn bucket_shift(&self) -> i64 {
+        self.bucket_shift
+    }
 
     fn set_nodeid_for_wayid(&mut self, wayid: i64, new_nodeid: i64) {
         let mut nodeids: Vec<i64> = self
@@ -248,7 +257,7 @@ impl NodeIdWayIdsBucketWayIndex {
     }
 
     fn nodeid_bucket(&self, nid: i64) -> i32 {
-        let bucket: i32 = (nid >> WAY_INDEX_BUCKET_SHIFT)
+        let bucket: i32 = (nid >> self.bucket_shift())
             .try_into()
             .expect("Node id >> by WAY_INDEX_BUCKET_SHIFT is too large to fit in i32. This tool uses optimizations which assume wayid < 2³²");
         bucket
