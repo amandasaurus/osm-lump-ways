@@ -30,7 +30,6 @@ pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
 
     /// Return all the ways that this node is in.
     fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = i64> + 'a>;
-
 }
 
 /// Some standard struct for doing this.
@@ -392,8 +391,14 @@ impl NodeIdWayIdsAuto {
 
                 let converstion_duration = std::time::Instant::now() - started_conversion;
                 debug!("New size: {}", new_bucket.detailed_size());
-                debug!("It took {} sec to convert to bucket index", converstion_duration.as_secs());
-                debug!("New index is {}% the size of the old one", (100*new_bucket.get_size())/old_size);
+                debug!(
+                    "It took {} sec to convert to bucket index",
+                    converstion_duration.as_secs()
+                );
+                debug!(
+                    "New index is {}% the size of the old one",
+                    (100 * new_bucket.get_size()) / old_size
+                );
 
                 // and we're that now
                 std::mem::replace(self, Self::BucketMap(new_bucket));
@@ -454,5 +459,4 @@ impl NodeIdWayIds for NodeIdWayIdsAuto {
             Self::BucketMap(x) => x.ways(nid),
         }
     }
-
 }
