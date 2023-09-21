@@ -408,7 +408,7 @@ impl NodeIdWayIdsAuto {
 }
 
 /// After this many nodes, switch to the CPU slower, but RAM-smaller Bucket Way Index
-const SWITCH_TO_BUCKET: usize = 10_000_000;
+const SWITCH_TO_BUCKET: usize = 100_000_000;
 
 impl NodeIdWayIds for NodeIdWayIdsAuto {
     /// Number of nodes stored
