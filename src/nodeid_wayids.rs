@@ -17,6 +17,13 @@ pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
     /// Record that node id `nid` is in way id `wid`.
     fn insert(&mut self, nid: i64, wid: i64);
 
+    /// Record that this nodes are in this way
+    fn insert_many(&mut self, wid: i64, nids: &[i64]) {
+        for nid in nids {
+            self.insert(*nid, wid);
+        }
+    }
+
     /// True iff node id `nid` has been seen
     fn contains_nid(&self, nid: &i64) -> bool;
 
