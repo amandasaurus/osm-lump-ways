@@ -30,6 +30,7 @@ pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
 
     /// Return all the ways that this node is in.
     fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = i64> + 'a>;
+
 }
 
 /// Some standard struct for doing this.
@@ -183,22 +184,20 @@ pub struct NodeIdWayIdsBucketWayIndex {
     /// Keep track of number of nodes
     num_nodes: usize,
 
-    bucket_shift: i64
+    bucket_shift: i64,
 }
 
 impl NodeIdWayIdsBucketWayIndex {
-    fn with_bucket(bucket_shift: i64) -> Self
-    {
+    fn with_bucket(bucket_shift: i64) -> Self {
         Self {
             ways: BTreeMap::new(),
             num_nodes: 0,
             nodeid_bucket_wayid: BTreeMap::new(),
-            bucket_shift
+            bucket_shift,
         }
     }
 
-    fn new() -> Self
-    {
+    fn new() -> Self {
         Self::with_bucket(5)
     }
 
@@ -260,7 +259,9 @@ impl NodeIdWayIdsBucketWayIndex {
 
     fn get_nodeids_for_wayid(&self, wayid: impl Into<i64>) -> Option<Vec<i64>> {
         let wayid: i64 = wayid.into();
-        let wayid: i32 = wayid.try_into().expect("way id is too large for i32. This tool uses optimizations which assume wayid < 2³²");
+        let wayid: i32 = wayid.try_into().expect(
+            "way id is too large for i32. This tool uses optimizations which assume wayid < 2³²",
+        );
         match self.ways.get(&wayid) {
             None => None,
             Some(nodeid_bytes) => {
@@ -271,7 +272,9 @@ impl NodeIdWayIdsBucketWayIndex {
     }
     fn get_nodeids_for_wayid_iter(&self, wayid: impl Into<i64>) -> impl Iterator<Item = i64> + '_ {
         let wayid: i64 = wayid.into();
-        let wayid: i32 = wayid.try_into().expect("way id is too large for i32. This tool uses optimizations which assume wayid < 2³²");
+        let wayid: i32 = wayid.try_into().expect(
+            "way id is too large for i32. This tool uses optimizations which assume wayid < 2³²",
+        );
         self.ways
             .get(&wayid)
             .into_iter()
@@ -287,7 +290,6 @@ impl NodeIdWayIdsBucketWayIndex {
 }
 
 impl NodeIdWayIds for NodeIdWayIdsBucketWayIndex {
-
     fn len(&self) -> usize {
         self.num_nodes
     }
@@ -402,10 +404,12 @@ impl NodeIdWayIds for NodeIdWayIdsAuto {
         }
     }
 
+    // TODO insert_many
+
     /// True iff node id `nid` has been seen
     fn contains_nid(&self, nid: &i64) -> bool {
         match self {
-            Self::MultiMap(x)  => x.contains_nid(nid),
+            Self::MultiMap(x) => x.contains_nid(nid),
             Self::BucketMap(x) => x.contains_nid(nid),
         }
     }
@@ -413,9 +417,9 @@ impl NodeIdWayIds for NodeIdWayIdsAuto {
     /// Return all the ways that this node is in.
     fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = i64> + 'a> {
         match self {
-            Self::MultiMap(x)  => x.ways(nid),
+            Self::MultiMap(x) => x.ways(nid),
             Self::BucketMap(x) => x.ways(nid),
         }
     }
-}
 
+}
