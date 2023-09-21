@@ -339,3 +339,61 @@ impl NodeIdWayIds for NodeIdWayIdsBucketWayIndex {
         )
     }
 }
+
+#[derive(Debug)]
+enum NodeIdWayIdsAuto {
+    MultiMap(NodeIdWayIdsMultiMap),
+    BucketMap(NodeIdWayIdsBucketWayIndex),
+}
+
+impl NodeIdWayIdsAuto {
+    fn new() -> Self
+    {
+        //NodeIdWayIdsAuto::MultiMap(NodeIdWayIdsMultiMap::new())
+        NodeIdWayIdsAuto::BucketMap(NodeIdWayIdsBucketWayIndex::with_bucket(8))
+    }
+}
+
+impl NodeIdWayIds for NodeIdWayIdsAuto {
+
+    /// Number of nodes stored
+    fn len(&self) -> usize {
+        match self {
+            Self::MultiMap(x) => x.len(),
+            Self::BucketMap(x) => x.len(),
+        }
+    }
+
+    /// Detailed memory usage of this
+    fn detailed_size(&self) -> String {
+        match self {
+            Self::MultiMap(x) => x.detailed_size(),
+            Self::BucketMap(x) => x.detailed_size(),
+        }
+    }
+
+    /// Record that node id `nid` is in way id `wid`.
+    fn insert(&mut self, nid: i64, wid: i64) {
+        match self {
+            Self::MultiMap(x)  => x.insert(nid, wid),
+            Self::BucketMap(x) => x.insert(nid, wid),
+        }
+    }
+
+    /// True iff node id `nid` has been seen
+    fn contains_nid(&self, nid: &i64) -> bool {
+        match self {
+            Self::MultiMap(x)  => x.contains_nid(nid),
+            Self::BucketMap(x) => x.contains_nid(nid),
+        }
+    }
+
+    /// Return all the ways that this node is in.
+    fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = i64> + 'a> {
+        match self {
+            Self::MultiMap(x)  => x.ways(nid),
+            Self::BucketMap(x) => x.ways(nid),
+        }
+    }
+}
+
