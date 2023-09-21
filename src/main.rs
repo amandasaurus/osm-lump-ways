@@ -170,7 +170,6 @@ fn main() -> Result<()> {
         .into_inner()
         .unwrap();
 
-    let mut nodeid_pos = Arc::try_unwrap(nodeid_pos).unwrap().into_inner().unwrap();
     let group_wayid_nodes = Arc::try_unwrap(group_wayid_nodes)
         .unwrap()
         .into_inner()
@@ -181,8 +180,9 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    if args.read_nodes_first {
+    let nodeid_pos = if args.read_nodes_first {
         info!("Removing unneeded node positions...");
+        let mut nodeid_pos = Arc::try_unwrap(nodeid_pos).unwrap().into_inner().unwrap();
         let old_total = nodeid_pos.len();
         nodeid_pos.retain_by_key(|nid| nodeid_wayids.contains_nid(nid));
         nodeid_pos.shrink_to_fit();
@@ -191,6 +191,7 @@ fn main() -> Result<()> {
             (old_total - nodeid_pos.len()),
             nodeid_pos.len()
         );
+        nodeid_pos
     } else {
         debug!("Re-reading file to read all nodes");
         let setting_node_pos = ProgressBar::new(nodeid_wayids.len() as u64)
@@ -200,29 +201,28 @@ fn main() -> Result<()> {
             setting_node_pos.set_draw_target(ProgressDrawTarget::hidden());
         }
         let mut reader = osmio::read_pbf(&args.input_filename)?;
-        nodeid_pos.reserve(nodeid_wayids.len());
-        nodeid_pos.extend(
-            reader
-                .objects()
-                .take_while(|o| o.is_node())
-                .filter_map(|o| {
+        reader
+            .objects()
+            .take_while(|o| o.is_node())
+            .par_bridge()
+            .for_each_with(
+                nodeid_pos.clone(),
+                |(nodeid_pos), o| {
                     if let Some(n) = o.into_node() {
                         if nodeid_wayids.contains_nid(&n.id()) {
                             let ll = n.lat_lon_f64().unwrap();
                             setting_node_pos.inc(1);
-                            Some((n.id(), (ll.1, ll.0)))
-                        } else {
-                            None
+                            nodeid_pos.lock().unwrap().insert(n.id(), (ll.1, ll.0));
                         }
-                    } else {
-                        None
                     }
-                }),
-        );
+                }
+            );
+            
         setting_node_pos.finish();
-    }
+        let nodeid_pos = Arc::try_unwrap(nodeid_pos).unwrap().into_inner().unwrap();
+        nodeid_pos
+    };
 
-    let nodeid_pos = nodeid_pos;
     debug!("{}", nodeid_pos.detailed_size());
 
     debug!("{}", nodeid_wayids.detailed_size());
