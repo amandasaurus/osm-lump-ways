@@ -34,11 +34,14 @@ use nodeid_position::NodeIdPosition;
 mod nodeid_wayids;
 
 fn main() -> Result<()> {
+    // Initially show with warn to catch warn's in the clap parsing
+    let logger = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
     let args = cli_args::Args::parse();
     let show_progress_bars = args.verbose.log_level_filter() >= log::Level::Info;
-    env_logger::Builder::from_env(env_logger::Env::default())
-        .filter_level(args.verbose.log_level_filter())
-        .init();
+
+    // now we use the -v/-q args to change the level
+    log::set_max_level(args.verbose.log_level_filter());
+
     let reader = read_progress::BufReaderWithSize::from_path(&args.input_filename)?;
     let mut reader = osmio::pbf::PBFReader::new(reader);
 
