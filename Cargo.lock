@@ -732,7 +732,7 @@ checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
 name = "osm-lump-ways"
-version = "0.5.0"
+version = "0.6.0-rc1"
 dependencies = [
  "anyhow",
  "clap",
@@ -1071,7 +1071,9 @@ checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 
 [[package]]
 name = "vartyint"
-version = "0.2.0-rc2"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec841fe4cd7ddb5acaeb3ff4de15138745ad9c521d1ead8155551f9411a6d44a"
 
 [[package]]
 name = "vcpkg"
