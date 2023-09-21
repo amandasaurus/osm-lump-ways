@@ -151,9 +151,7 @@ fn main() -> Result<()> {
                         }
 
                         trace!("Got a way {}, in group {:?}", w.id(), group);
-                        for nid in w.nodes() {
-                            nodeid_wayids.lock().unwrap().insert(*nid, w.id());
-                        }
+                        nodeid_wayids.lock().unwrap().insert_many(w.id(), w.nodes());
                         group_wayid_nodes
                             .lock()
                             .unwrap()
