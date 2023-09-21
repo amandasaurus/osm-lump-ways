@@ -4,6 +4,7 @@
 use super::*;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
+use std::iter;
 use vartyint;
 
 /// Something which stores which nodeids are in which wayid
@@ -58,10 +59,30 @@ impl NodeIdWayIdsMultiMap {
             multiples: BTreeMap::new(),
         }
     }
+
+    fn drain_all(self) -> impl Iterator<Item = (i64, i64)> {
+        let NodeIdWayIdsMultiMap {
+            singles,
+            doubles,
+            multiples,
+        } = self;
+
+        Box::new(
+            singles
+                .into_iter()
+                .chain(doubles.into_iter().flat_map(|(nid, wids)| {
+                    iter::once((nid, wids.0)).chain(iter::once((nid, wids.1)))
+                }))
+                .chain(
+                    multiples
+                        .into_iter()
+                        .flat_map(|(nid, wids)| wids.into_iter().map(move |wid| (nid, wid))),
+                ),
+        )
+    }
 }
 
 impl NodeIdWayIds for NodeIdWayIdsMultiMap {
-
     fn insert(&mut self, nid: i64, wid: i64) {
         if let Some(existing) = self.multiples.get_mut(&nid) {
             existing.push(wid);
