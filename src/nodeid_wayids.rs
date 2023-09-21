@@ -49,9 +49,6 @@ pub struct NodeIdWayIdsMultiMap {
     /// A node which is in exactly 1 way. Store the way id that it's in
     singles: BTreeMap<i64, i64>,
 
-    /// Node which is in exactly 2 ways.
-    doubles: BTreeMap<i64, (i64, i64)>,
-
     /// A node which is in many ways, Store the ways that it's in
     multiples: BTreeMap<i64, Vec<i64>>,
 }
@@ -61,16 +58,12 @@ impl NodeIdWayIdsMultiMap {
     fn drain_all(self) -> impl Iterator<Item = (i64, i64)> {
         let NodeIdWayIdsMultiMap {
             singles,
-            doubles,
             multiples,
         } = self;
 
         Box::new(
             singles
                 .into_iter()
-                .chain(doubles.into_iter().flat_map(|(nid, wids)| {
-                    iter::once((nid, wids.0)).chain(iter::once((nid, wids.1)))
-                }))
                 .chain(
                     multiples
                         .into_iter()
@@ -84,7 +77,6 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
     fn new() -> Self {
         NodeIdWayIdsMultiMap {
             singles: BTreeMap::new(),
-            doubles: BTreeMap::new(),
             multiples: BTreeMap::new(),
         }
     }
@@ -93,50 +85,35 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
         if let Some(existing) = self.multiples.get_mut(&nid) {
             existing.push(wid);
             assert!(!self.singles.contains_key(&nid));
-            assert!(!self.doubles.contains_key(&nid));
-        } else if let Some((existing1, existing2)) = self.doubles.get(&nid) {
-            if *existing1 != wid && *existing2 != wid {
-                // upgrade to multiple
-                self.multiples
-                    .insert(nid, vec![*existing1, *existing2, wid]);
-                self.doubles.remove(&nid);
-                assert!(!self.singles.contains_key(&nid));
-                assert!(!self.doubles.contains_key(&nid));
-            } else {
-                // already stored, do nothing
-            }
         } else if let Some(existing) = self.singles.get(&nid) {
             if *existing != wid {
-                // move to double
+                // move to multiple
                 assert!(!self.multiples.contains_key(&nid));
-                assert!(!self.doubles.contains_key(&nid));
-                self.doubles.insert(nid, (*existing, wid));
+                self.multiples
+                    .insert(nid, vec![*existing, wid]);
                 self.singles.remove(&nid);
             } else {
+                // same value
                 // do nothing
             }
         } else {
             self.singles.insert(nid, wid);
-            assert!(!self.doubles.contains_key(&nid));
             assert!(!self.multiples.contains_key(&nid));
         }
     }
 
     fn contains_nid(&self, nid: &i64) -> bool {
         self.singles.contains_key(nid)
-            || self.doubles.contains_key(nid)
             || self.multiples.contains_key(nid)
     }
     /// How many nodes have been saved
     fn len(&self) -> usize {
-        self.singles.len() + self.doubles.len() + self.multiples.len()
+        self.singles.len() + self.multiples.len()
     }
 
     fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = i64> + 'a> {
         if let Some(wid) = self.singles.get(nid) {
             Box::new(std::iter::once(*wid))
-        } else if let Some((wid1, wid2)) = self.doubles.get(nid) {
-            Box::new(std::iter::once(*wid1).chain(std::iter::once(*wid2)))
         } else if let Some(wids) = self.multiples.get(nid) {
             Box::new(wids.iter().map(|wid| *wid))
         } else {
@@ -159,12 +136,6 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
             self.singles.get_size(),
             self.singles.get_size().to_formatted_string(&Locale::en),
             self.singles.len().to_formatted_string(&Locale::en)
-        ));
-        output.push_str(&format!(
-            "Size of nodeid_wayids.doubles: {} = {} bytes, {} nodes\n",
-            self.doubles.get_size(),
-            self.doubles.get_size().to_formatted_string(&Locale::en),
-            self.doubles.len().to_formatted_string(&Locale::en),
         ));
         output.push_str(&format!(
             "Size of nodeid_wayids.multiples: {} = {} bytes, {} nodes\n",
