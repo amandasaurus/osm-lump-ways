@@ -54,21 +54,15 @@ pub struct NodeIdWayIdsMultiMap {
 }
 
 impl NodeIdWayIdsMultiMap {
-
     fn drain_all(self) -> impl Iterator<Item = (i64, i64)> {
-        let NodeIdWayIdsMultiMap {
-            singles,
-            multiples,
-        } = self;
+        let NodeIdWayIdsMultiMap { singles, multiples } = self;
 
         Box::new(
-            singles
-                .into_iter()
-                .chain(
-                    multiples
-                        .into_iter()
-                        .flat_map(|(nid, wids)| wids.into_iter().map(move |wid| (nid, wid))),
-                ),
+            singles.into_iter().chain(
+                multiples
+                    .into_iter()
+                    .flat_map(|(nid, wids)| wids.into_iter().map(move |wid| (nid, wid))),
+            ),
         )
     }
 }
@@ -89,8 +83,7 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
             if *existing != wid {
                 // move to multiple
                 assert!(!self.multiples.contains_key(&nid));
-                self.multiples
-                    .insert(nid, vec![*existing, wid]);
+                self.multiples.insert(nid, vec![*existing, wid]);
                 self.singles.remove(&nid);
             } else {
                 // same value
@@ -103,8 +96,7 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
     }
 
     fn contains_nid(&self, nid: &i64) -> bool {
-        self.singles.contains_key(nid)
-            || self.multiples.contains_key(nid)
+        self.singles.contains_key(nid) || self.multiples.contains_key(nid)
     }
     /// How many nodes have been saved
     fn len(&self) -> usize {
@@ -172,7 +164,6 @@ impl NodeIdWayIdsBucketWayIndex {
             bucket_shift,
         }
     }
-
 
     fn bucket_shift(&self) -> i64 {
         self.bucket_shift
@@ -348,7 +339,6 @@ enum NodeIdWayIdsAuto {
 }
 
 impl NodeIdWayIdsAuto {
-
     fn possibly_switch_backend(&mut self) {
         if let Self::MultiMap(ref mut multi_map) = self {
             if multi_map.len() > SWITCH_TO_BUCKET {
