@@ -8,10 +8,6 @@ use vartyint;
 
 /// Something which stores which nodeids are in which wayid
 pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
-    fn new() -> Self
-    where
-        Self: Sized + Send;
-
     /// Number of nodes stored
     fn len(&self) -> usize;
 
@@ -53,7 +49,7 @@ pub struct NodeIdWayIdsMultiMap {
     multiples: BTreeMap<i64, Vec<i64>>,
 }
 
-impl NodeIdWayIds for NodeIdWayIdsMultiMap {
+impl NodeIdWayIdsMultiMap {
     fn new() -> Self {
         NodeIdWayIdsMultiMap {
             singles: BTreeMap::new(),
@@ -61,6 +57,9 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
             multiples: BTreeMap::new(),
         }
     }
+}
+
+impl NodeIdWayIds for NodeIdWayIdsMultiMap {
 
     fn insert(&mut self, nid: i64, wid: i64) {
         if let Some(existing) = self.multiples.get_mut(&nid) {
@@ -166,6 +165,16 @@ pub struct NodeIdWayIdsBucketWayIndex {
 }
 
 impl NodeIdWayIdsBucketWayIndex {
+    fn new() -> Self
+    {
+        Self {
+            ways: BTreeMap::new(),
+            num_nodes: 0,
+            nodeid_bucket_wayid: BTreeMap::new(),
+        }
+    }
+
+
     fn set_nodeid_for_wayid(&mut self, wayid: i64, new_nodeid: i64) {
         let mut nodeids: Vec<i64> = self
             .get_nodeids_for_wayid(wayid)
@@ -247,16 +256,6 @@ impl NodeIdWayIdsBucketWayIndex {
 }
 
 impl NodeIdWayIds for NodeIdWayIdsBucketWayIndex {
-    fn new() -> Self
-    where
-        Self: Sized + Send,
-    {
-        Self {
-            ways: BTreeMap::new(),
-            num_nodes: 0,
-            nodeid_bucket_wayid: BTreeMap::new(),
-        }
-    }
 
     fn len(&self) -> usize {
         self.num_nodes
