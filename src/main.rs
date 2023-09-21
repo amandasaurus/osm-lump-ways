@@ -35,7 +35,7 @@ mod nodeid_wayids;
 
 fn main() -> Result<()> {
     // Initially show with warn to catch warn's in the clap parsing
-    let logger =
+    let _logger =
         env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
     let args = cli_args::Args::parse();
     let show_progress_bars = args.verbose.log_level_filter() >= log::Level::Info;
@@ -205,7 +205,7 @@ fn main() -> Result<()> {
             .objects()
             .take_while(|o| o.is_node())
             .par_bridge()
-            .for_each_with(nodeid_pos.clone(), |(nodeid_pos), o| {
+            .for_each_with(nodeid_pos.clone(), |nodeid_pos, o| {
                 if let Some(n) = o.into_node() {
                     if nodeid_wayids.contains_nid(&n.id()) {
                         let ll = n.lat_lon_f64().unwrap();
@@ -478,7 +478,7 @@ fn main() -> Result<()> {
         if (Instant::now() - started_processing).as_secs_f32() > 2. {
             // hack to discover if we timed out or not
             // set all to null
-            way_groups.par_iter_mut().update(|wg| {
+            way_groups.par_iter_mut().for_each(|wg| {
                 wg.extra_json_props["dist_to_longer_m"] = None::<Option<f64>>.into();
             });
         } else {
@@ -525,8 +525,8 @@ fn main() -> Result<()> {
             // sort by longest first
             feature_ranks.par_sort_unstable_by(|a, b| a.0.total_cmp(&b.0).reverse());
             // update feature_ranks to store the local rank
-            feature_ranks.par_iter_mut().enumerate().update(|(rank, (_len, _idx, mut new_rank))| {
-                new_rank = *rank;
+            feature_ranks.par_iter_mut().enumerate().for_each(|(rank, (_len, _idx, mut new_rank))| {
+                new_rank = rank;
             });
             // sort back by way_groups idx
             feature_ranks.par_sort_unstable_by_key(|(_len, wg_idx, _rank)| *wg_idx);
