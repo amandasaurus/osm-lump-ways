@@ -153,7 +153,7 @@ const WAY_INDEX_BUCKET_SHIFT: i64 = 5;
 
 /// More memory effecient, but slower.
 #[derive(Debug, GetSize)]
-pub struct NodeIdWayIdsWayIndex {
+pub struct NodeIdWayIdsBucketWayIndex {
     /// For each wayid, a vartyint delta encoded sorted list of all the nodeids it's in.
     ways: BTreeMap<i32, Vec<u8>>,
 
@@ -165,7 +165,7 @@ pub struct NodeIdWayIdsWayIndex {
     num_nodes: usize,
 }
 
-impl NodeIdWayIdsWayIndex {
+impl NodeIdWayIdsBucketWayIndex {
     fn set_nodeid_for_wayid(&mut self, wayid: i64, new_nodeid: i64) {
         let mut nodeids: Vec<i64> = self
             .get_nodeids_for_wayid(wayid)
@@ -246,12 +246,12 @@ impl NodeIdWayIdsWayIndex {
     }
 }
 
-impl NodeIdWayIds for NodeIdWayIdsWayIndex {
+impl NodeIdWayIds for NodeIdWayIdsBucketWayIndex {
     fn new() -> Self
     where
         Self: Sized + Send,
     {
-        NodeIdWayIdsWayIndex {
+        Self {
             ways: BTreeMap::new(),
             num_nodes: 0,
             nodeid_bucket_wayid: BTreeMap::new(),
