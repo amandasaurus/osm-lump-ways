@@ -9,6 +9,11 @@ use vartyint;
 
 /// Something which stores which nodeids are in which wayid
 pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
+    /// Create new version
+    fn new() -> Self
+    where
+        Self: Sized + Send;
+
     /// Number of nodes stored
     fn len(&self) -> usize;
 
@@ -52,13 +57,6 @@ pub struct NodeIdWayIdsMultiMap {
 }
 
 impl NodeIdWayIdsMultiMap {
-    fn new() -> Self {
-        NodeIdWayIdsMultiMap {
-            singles: BTreeMap::new(),
-            doubles: BTreeMap::new(),
-            multiples: BTreeMap::new(),
-        }
-    }
 
     fn drain_all(self) -> impl Iterator<Item = (i64, i64)> {
         let NodeIdWayIdsMultiMap {
@@ -83,6 +81,14 @@ impl NodeIdWayIdsMultiMap {
 }
 
 impl NodeIdWayIds for NodeIdWayIdsMultiMap {
+    fn new() -> Self {
+        NodeIdWayIdsMultiMap {
+            singles: BTreeMap::new(),
+            doubles: BTreeMap::new(),
+            multiples: BTreeMap::new(),
+        }
+    }
+
     fn insert(&mut self, nid: i64, wid: i64) {
         if let Some(existing) = self.multiples.get_mut(&nid) {
             existing.push(wid);
@@ -196,9 +202,6 @@ impl NodeIdWayIdsBucketWayIndex {
         }
     }
 
-    fn new() -> Self {
-        Self::with_bucket(5)
-    }
 
     fn bucket_shift(&self) -> i64 {
         self.bucket_shift
@@ -289,6 +292,10 @@ impl NodeIdWayIdsBucketWayIndex {
 }
 
 impl NodeIdWayIds for NodeIdWayIdsBucketWayIndex {
+    fn new() -> Self {
+        Self::with_bucket(5)
+    }
+
     fn len(&self) -> usize {
         self.num_nodes
     }
@@ -370,9 +377,6 @@ enum NodeIdWayIdsAuto {
 }
 
 impl NodeIdWayIdsAuto {
-    fn new() -> Self {
-        NodeIdWayIdsAuto::MultiMap(NodeIdWayIdsMultiMap::new())
-    }
 
     fn possibly_switch_backend(&mut self) {
         if let Self::MultiMap(ref mut multi_map) = self {
@@ -411,6 +415,10 @@ impl NodeIdWayIdsAuto {
 const SWITCH_TO_BUCKET: usize = 100_000_000;
 
 impl NodeIdWayIds for NodeIdWayIdsAuto {
+    fn new() -> Self {
+        NodeIdWayIdsAuto::MultiMap(NodeIdWayIdsMultiMap::new())
+    }
+
     /// Number of nodes stored
     fn len(&self) -> usize {
         match self {
