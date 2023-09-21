@@ -179,6 +179,11 @@ mod tests {
         TagFilter::HasReK(Regex::new("name:.*").unwrap())
     );
     test_parse!(
+        parse_regex3,
+        "∃~^name(:.+)?",
+        TagFilter::HasReK(Regex::new("^name(:.+)?").unwrap())
+    );
+    test_parse!(
         parse_regex_not2,
         "∄~name:.*",
         TagFilter::NotHasReK(Regex::new("name:.*").unwrap())
