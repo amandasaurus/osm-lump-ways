@@ -1,3 +1,5 @@
+#[allow(unused_imports)]
+use log::{debug, error, info, log_enabled, trace, warn, Level};
 use regex::Regex;
 
 #[derive(Debug, Clone)]
@@ -65,6 +67,9 @@ impl std::str::FromStr for TagFilter {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = s.trim();
+        if s.starts_with('"') || s.ends_with('"') {
+            warn!("Input string {} starts and/or ends with a double quote. Have you accidentally over-quoted? Continuing with that.", s);
+        }
         if s.contains('∨') {
             let tfs = s
                 .split('∨')
