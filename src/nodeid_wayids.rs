@@ -4,6 +4,7 @@
 use super::*;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
+use vartyint;
 
 pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
     fn new() -> Self
@@ -141,5 +142,182 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
             self.multiples.len().to_formatted_string(&Locale::en),
         ));
         output
+    }
+}
+
+const WAY_INDEX_BUCKET_SHIFT: i64 = 5;
+
+#[derive(Debug, GetSize)]
+pub struct NodeIdWayIdsWayIndex {
+    ways: BTreeMap<i32, Vec<u8>>,
+    nodeid_bucket_wayid: BTreeMap<i32, Vec<i32>>,
+
+    num_nodes: usize,
+}
+
+impl NodeIdWayIdsWayIndex {
+    fn set_nodeid_for_wayid(&mut self, wayid: i64, new_nodeid: i64) {
+        let mut nodeids: Vec<i64> = self
+            .get_nodeids_for_wayid(wayid)
+            .unwrap_or_else(|| Vec::with_capacity(1));
+        let old_num_nodes = nodeids.len();
+        let wayid: i32 = wayid.try_into().expect("way id is too large for i32");
+        nodeids.push(new_nodeid);
+        nodeids.sort();
+        nodeids.dedup();
+        self.num_nodes = self.num_nodes + nodeids.len() - old_num_nodes;
+
+        let new_nodeid_bucket = self.nodeid_bucket(new_nodeid);
+        let bucket_wayids = self
+            .nodeid_bucket_wayid
+            .entry(new_nodeid_bucket)
+            .or_default();
+        bucket_wayids.push(wayid);
+        bucket_wayids.sort();
+        bucket_wayids.dedup();
+
+        let nodeid_bytes = vartyint::write_many_delta_new(&nodeids);
+        self.ways.insert(wayid, nodeid_bytes);
+    }
+
+    fn set_nodeids_for_wayid(&mut self, wayid: i64, new_nodeids: &[i64]) {
+        let mut nodeids: Vec<i64> = self
+            .get_nodeids_for_wayid(wayid)
+            .unwrap_or_else(|| Vec::with_capacity(new_nodeids.len()));
+        let old_num_nodes = nodeids.len();
+        nodeids.extend(new_nodeids);
+        nodeids.sort();
+        nodeids.dedup();
+        self.num_nodes = self.num_nodes + nodeids.len() - old_num_nodes;
+
+        let wayid: i32 = wayid.try_into().expect("way id is too large for i32");
+        let nodeid_bytes = vartyint::write_many_delta_new(&nodeids);
+        self.ways.insert(wayid, nodeid_bytes);
+
+        let mut new_nodeid_bucket;
+        let mut bucket_wayids;
+        for nid in new_nodeids {
+            new_nodeid_bucket = self.nodeid_bucket(*nid);
+            bucket_wayids = self
+                .nodeid_bucket_wayid
+                .entry(new_nodeid_bucket)
+                .or_default();
+            bucket_wayids.push(wayid);
+            bucket_wayids.sort();
+            bucket_wayids.dedup();
+        }
+    }
+
+    fn get_nodeids_for_wayid(&self, wayid: impl Into<i64>) -> Option<Vec<i64>> {
+        let wayid: i64 = wayid.into();
+        let wayid: i32 = wayid.try_into().expect("way id is too large for i32");
+        match self.ways.get(&wayid) {
+            None => None,
+            Some(nodeid_bytes) => {
+                let nodeids: Vec<i64> = vartyint::read_many_delta_new(nodeid_bytes).unwrap();
+                Some(nodeids)
+            }
+        }
+    }
+    fn get_nodeids_for_wayid_iter(&self, wayid: impl Into<i64>) -> impl Iterator<Item = i64> + '_ {
+        let wayid: i64 = wayid.into();
+        let wayid: i32 = wayid.try_into().expect("way id is too large for i32");
+        self.ways
+            .get(&wayid)
+            .into_iter()
+            .flat_map(|nodeid_bytes| vartyint::read_many_delta(nodeid_bytes).map(|r| r.unwrap()))
+    }
+
+    fn nodeid_bucket(&self, nid: i64) -> i32 {
+        let bucket: i32 = (nid >> WAY_INDEX_BUCKET_SHIFT)
+            .try_into()
+            .expect("Node id >> by WAY_INDEX_BUCKET_SHIFT is too large to fit in i32");
+        bucket
+    }
+}
+
+impl NodeIdWayIds for NodeIdWayIdsWayIndex {
+    fn new() -> Self
+    where
+        Self: Sized + Send,
+    {
+        NodeIdWayIdsWayIndex {
+            ways: BTreeMap::new(),
+            num_nodes: 0,
+            nodeid_bucket_wayid: BTreeMap::new(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.num_nodes
+    }
+    fn detailed_size(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!(
+            "Size of nodeid_wayids: {} = {} bytes.\nnum_nodes: {} = {}.\nbytes/node={:>.2}\n",
+            self.get_size(),
+            self.get_size().to_formatted_string(&Locale::en),
+            self.len(),
+            self.len().to_formatted_string(&Locale::en),
+            self.get_size() as f64 / self.len() as f64,
+        ));
+        output.push_str(&format!(
+            "Size of self.ways: {} = {} bytes num_ways: {} = {} \n",
+            self.ways.get_size(),
+            self.ways.get_size().to_formatted_string(&Locale::en),
+            self.ways.len(),
+            self.ways.len().to_formatted_string(&Locale::en),
+        ));
+        output.push_str(&format!(
+            "Size of self.nodeid_bucket_wayid: {} = {} bytes num_ways: {} = {} \n",
+            self.nodeid_bucket_wayid.get_size(),
+            self.nodeid_bucket_wayid
+                .get_size()
+                .to_formatted_string(&Locale::en),
+            self.nodeid_bucket_wayid.len(),
+            self.nodeid_bucket_wayid
+                .len()
+                .to_formatted_string(&Locale::en),
+        ));
+        output
+    }
+
+    /// Record that node id `nid` is in way id `wid`.
+    fn insert(&mut self, nid: i64, wid: i64) {
+        self.set_nodeid_for_wayid(wid, nid);
+    }
+
+    /// Record that this nodes are in this way
+    fn insert_many(&mut self, wid: i64, nids: &[i64]) {
+        self.set_nodeids_for_wayid(wid, nids);
+    }
+
+    /// True iff node id `nid` has been seen
+    fn contains_nid(&self, nid: &i64) -> bool {
+        let new_nodeid_bucket = self.nodeid_bucket(*nid);
+        match self.nodeid_bucket_wayid.get(&new_nodeid_bucket) {
+            None => false,
+            Some(wids) => wids.iter().any(|wid| {
+                self.get_nodeids_for_wayid(*wid)
+                    .map_or(false, |nids| nids.contains(nid))
+            }),
+        }
+    }
+
+    /// Return all the ways that this node is in.
+    fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = i64> + 'a> {
+        let nid = *nid;
+        let bucketid = self.nodeid_bucket(nid);
+        Box::new(
+            self.nodeid_bucket_wayid
+                .get(&bucketid)
+                .into_iter()
+                .flat_map(|wids| wids.into_iter())
+                .filter(move |wid| {
+                    self.get_nodeids_for_wayid_iter(**wid)
+                        .any(|this_nid| this_nid == nid)
+                })
+                .map(|wid| (*wid).into()),
+        )
     }
 }
