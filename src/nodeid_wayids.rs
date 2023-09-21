@@ -377,7 +377,7 @@ impl NodeIdWayIdsAuto {
     fn possibly_switch_backend(&mut self) {
         if let Self::MultiMap(ref mut multi_map) = self {
             if multi_map.len() > SWITCH_TO_BUCKET {
-                let mut multi_map = std::mem::take(multi_map);
+                let multi_map = std::mem::take(multi_map);
                 let started_conversion = std::time::Instant::now();
                 debug!("There are {} nodes in the nodeid:wayid (> {}). Switching from CPU-faster memory-ineffecient MultiMap, to CPU-slower memory-effecientier Bucket Index", multi_map.len().to_formatted_string(&Locale::en), SWITCH_TO_BUCKET);
                 debug!("Old object: {}", multi_map.detailed_size());
@@ -401,7 +401,7 @@ impl NodeIdWayIdsAuto {
                 );
 
                 // and we're that now
-                std::mem::replace(self, Self::BucketMap(new_bucket));
+                *self = Self::BucketMap(new_bucket);
             }
         }
     }
