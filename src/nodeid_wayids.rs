@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 use std::fmt::Debug;
 use vartyint;
 
+/// Something which stores which nodeids are in which wayid
 pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
     fn new() -> Self
     where
@@ -13,6 +14,8 @@ pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
 
     /// Number of nodes stored
     fn len(&self) -> usize;
+
+    /// Detailed memory usage of this
     fn detailed_size(&self) -> String;
 
     /// Record that node id `nid` is in way id `wid`.
@@ -37,6 +40,7 @@ pub(crate) fn default() -> Box<dyn NodeIdWayIds> {
     Box::new(NodeIdWayIdsMultiMap::new())
 }
 
+/// Very simple BTreeMaps of nodeids:wayids
 #[derive(Debug, GetSize)]
 pub struct NodeIdWayIdsMultiMap {
     /// A node which is in exactly 1 way. Store the way id that it's in
@@ -147,11 +151,17 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
 
 const WAY_INDEX_BUCKET_SHIFT: i64 = 5;
 
+/// More memory effecient, but slower.
 #[derive(Debug, GetSize)]
 pub struct NodeIdWayIdsWayIndex {
+    /// For each wayid, a vartyint delta encoded sorted list of all the nodeids it's in.
     ways: BTreeMap<i32, Vec<u8>>,
+
+    /// nodeid<<WAY_INDEX_BUCKET_SHIFT is the key
+    /// value is unique list of wayids that have one of those nodeids
     nodeid_bucket_wayid: BTreeMap<i32, Vec<i32>>,
 
+    /// Keep track of number of nodes
     num_nodes: usize,
 }
 
@@ -210,7 +220,7 @@ impl NodeIdWayIdsWayIndex {
 
     fn get_nodeids_for_wayid(&self, wayid: impl Into<i64>) -> Option<Vec<i64>> {
         let wayid: i64 = wayid.into();
-        let wayid: i32 = wayid.try_into().expect("way id is too large for i32");
+        let wayid: i32 = wayid.try_into().expect("way id is too large for i32. This tool uses optimizations which assume wayid < 2³²");
         match self.ways.get(&wayid) {
             None => None,
             Some(nodeid_bytes) => {
@@ -221,7 +231,7 @@ impl NodeIdWayIdsWayIndex {
     }
     fn get_nodeids_for_wayid_iter(&self, wayid: impl Into<i64>) -> impl Iterator<Item = i64> + '_ {
         let wayid: i64 = wayid.into();
-        let wayid: i32 = wayid.try_into().expect("way id is too large for i32");
+        let wayid: i32 = wayid.try_into().expect("way id is too large for i32. This tool uses optimizations which assume wayid < 2³²");
         self.ways
             .get(&wayid)
             .into_iter()
@@ -231,7 +241,7 @@ impl NodeIdWayIdsWayIndex {
     fn nodeid_bucket(&self, nid: i64) -> i32 {
         let bucket: i32 = (nid >> WAY_INDEX_BUCKET_SHIFT)
             .try_into()
-            .expect("Node id >> by WAY_INDEX_BUCKET_SHIFT is too large to fit in i32");
+            .expect("Node id >> by WAY_INDEX_BUCKET_SHIFT is too large to fit in i32. This tool uses optimizations which assume wayid < 2³²");
         bucket
     }
 }
