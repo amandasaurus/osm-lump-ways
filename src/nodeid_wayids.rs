@@ -40,7 +40,7 @@ pub(crate) fn default() -> Box<dyn NodeIdWayIds> {
 }
 
 /// Very simple BTreeMaps of nodeids:wayids
-#[derive(Debug, GetSize)]
+#[derive(Debug, GetSize, Default)]
 pub struct NodeIdWayIdsMultiMap {
     /// A node which is in exactly 1 way. Store the way id that it's in
     singles: BTreeMap<i64, i64>,
