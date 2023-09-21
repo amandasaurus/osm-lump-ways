@@ -380,7 +380,7 @@ impl NodeIdWayIdsAuto {
                 let mut multi_map = std::mem::take(multi_map);
                 let started_conversion = std::time::Instant::now();
                 debug!("There are {} nodes in the nodeid:wayid (> {}). Switching from CPU-faster memory-ineffecient MultiMap, to CPU-slower memory-effecientier Bucket Index", multi_map.len().to_formatted_string(&Locale::en), SWITCH_TO_BUCKET);
-                debug!("Old size: {}", multi_map.detailed_size());
+                debug!("Old object: {}", multi_map.detailed_size());
                 let old_size = multi_map.get_size();
 
                 // Create a new bucket and convert the old to this.
@@ -390,7 +390,7 @@ impl NodeIdWayIdsAuto {
                 }
 
                 let converstion_duration = std::time::Instant::now() - started_conversion;
-                debug!("New size: {}", new_bucket.detailed_size());
+                debug!("New object: {}", new_bucket.detailed_size());
                 debug!(
                     "It took {} sec to convert to bucket index",
                     converstion_duration.as_secs()
