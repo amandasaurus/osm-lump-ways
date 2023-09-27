@@ -75,6 +75,27 @@ impl WayGroup {
         self.nodeids.par_iter().flat_map(|nids| nids.par_iter())
     }
 
+    pub fn nodeids_iter_seq(&self) -> impl Iterator<Item = i64> + '_ {
+        self.nodeids.iter().flat_map(|nids| nids.iter().copied())
+    }
+
+    pub fn coords_iter_par(&self) -> impl rayon::prelude::ParallelIterator<Item = [f64; 2]> + '_ {
+        self.coords
+            .as_ref()
+            .expect("You called WayGroup::coords_iter_seq before you have set the coords for this waygroup")
+            .par_iter()
+            .flat_map(|coord_string| coord_string.par_iter().map(|c| [c.0, c.1]))
+    }
+
+    pub fn coords_iter_seq(&self) -> impl Iterator<Item = [f64; 2]> + '_ {
+        //pub coords: Option<Vec<Vec<(f64, f64)>>>,
+        self.coords
+            .as_ref()
+            .expect("You called WayGroup::coords_iter_seq before you have set the coords for this waygroup")
+            .iter()
+            .flat_map(|coord_string| coord_string.iter().map(|c| [c.0, c.1]))
+    }
+
     pub fn filename(&self, output_filename: &str, split_files_by_group: bool) -> String {
         if !split_files_by_group {
             output_filename.to_string()

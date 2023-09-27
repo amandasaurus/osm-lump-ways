@@ -13,3 +13,7 @@ pub(crate) fn haversine_m(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 
     c * 6371008.8
 }
+
+pub(crate) fn haversine_m_arr(lat_lon1: &[f64], lat_lon2: &[f64]) -> f64 {
+    haversine_m(lat_lon1[0], lat_lon1[1], lat_lon2[0], lat_lon2[1])
+}

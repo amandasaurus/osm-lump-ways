@@ -12,6 +12,8 @@ use osmio::prelude::*;
 use osmio::OSMObjBase;
 use rayon::prelude::*;
 
+use kdtree::KdTree;
+
 use serde_json::json;
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap};
@@ -19,7 +21,6 @@ use std::io::Write;
 
 use std::sync::{Arc, Mutex};
 
-use std::time::Instant;
 //use get_size_derive::*;
 
 use num_format::{Locale, ToFormattedString};
@@ -454,50 +455,48 @@ fn main() -> Result<()> {
         }
     })
     .update(|(_filename, way_groups)| {
-        let max_timeout_s = args.timeout_dist_to_longer_s.unwrap_or(0.);
-        if max_timeout_s == 0. {
-            trace!("timeout_dist_to_longer_s is 0, so skipping this");
-            return;
-        }
-        debug!("Calculating the distance to the nearest longer object per way");
-        let started_processing = Instant::now();
+        if args.incl_dist_to_longer {
+            debug!("Calculating the distance to the nearest longer object per way");
 
-        let prog = ProgressBar::new((way_groups.len()*way_groups.len()) as u64)
-                .with_message("Calc distance to longer")
-                .with_style(style.clone());
-        // dist to larger
-        let longers = way_groups.par_iter().enumerate()
-            .map(|(i, wg)| {
-                if (Instant::now() - started_processing).as_secs_f32() > max_timeout_s {
-                    info!("Timeout calculating distance to nearer!");
-                    return None;
-                }
-                // we know way_groups is sorted by dist above
-                let nearest_longer = way_groups[0..i].par_iter()
-                    .inspect(|_| prog.inc(1))
-                    .filter(|wg2| wg != *wg2)
-                    .filter(|wg2| wg2.length_m > wg.length_m)
+            let mut points_distance_idx = KdTree::new(2);
 
-                    // Calc distance
-                    .map(|wg2| wg.distance_m(wg2).unwrap() )
-                    .min_by(|d1, d2| d1.total_cmp(d2));
+            let prog = ProgressBar::new(way_groups.iter().map(|wg| wg.num_nodeids() as u64).sum())
+                    .with_message("Calc distance to longer: Indexing data")
+                    .with_style(style.clone());
 
-                nearest_longer
-            })
-            .collect::<Vec<_>>();
-        prog.finish();
+            for (wg_id, coords) in way_groups.iter().enumerate().flat_map(|(wg_id, wg)| wg.coords_iter_seq().map(move |coords| (wg_id, coords)) ) {
+                points_distance_idx.add(coords, wg_id).unwrap();
+                prog.inc(1);
+            }
+            prog.finish();
 
-        if (Instant::now() - started_processing).as_secs_f32() > 2. {
-            // hack to discover if we timed out or not
-            // set all to null
-            way_groups.par_iter_mut().for_each(|wg| {
-                wg.extra_json_props["dist_to_longer_m"] = None::<Option<f64>>.into();
-            });
-        } else {
+            let prog = ProgressBar::new((way_groups.len()*way_groups.len()) as u64)
+                    .with_message("Calc distance to longer")
+                    .with_style(style.clone());
+            // dist to larger
+            let longers = way_groups.par_iter().enumerate()
+                .map(|(wg_id, wg)| {
+                    prog.inc(1);
+
+                    // for each point what's the nearest other point that's in a longer other wayid
+                    wg.coords_iter_par().map(|coord: [f64;2]| -> Option<(f64, i64)> {
+                        let nearest_longer = points_distance_idx.iter_nearest(&coord, &haversine::haversine_m_arr).unwrap()
+                            .filter(|(_dist, other_wg_id)| **other_wg_id != wg_id)
+                            .filter(|(_dist, other_wg_id)| way_groups[**other_wg_id].length_m > way_groups[wg_id].length_m)
+                            .next();
+                        nearest_longer.map(|(dist, wgid)| (dist, way_groups[*wgid].root_wayid))
+                    })
+                    .filter_map(|x| x)
+                    .min_by(|a, b| (a.0).total_cmp(&b.0))
+                })
+                .collect::<Vec<_>>();
+            prog.finish();
+
             // set the longer distance
             way_groups.par_iter_mut().zip(longers)
                 .for_each(|(wg, longer)| {
-                    wg.extra_json_props["dist_to_longer_m"] = longer.into();
+                    wg.extra_json_props["dist_to_longer_m"] = longer.map(|(dist, _)| dist).into();
+                    wg.extra_json_props["nearest_longer_waygroup"] = longer.map(|(_dist, wgid)| wgid).into();
                 });
         }
     })

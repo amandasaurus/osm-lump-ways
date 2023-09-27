@@ -101,9 +101,11 @@ pub(crate) struct Args {
     #[arg(long)]
     pub only_these_way_groups: Vec<i64>,
 
-    ///
-    #[arg(long, value_name = "SECONDS")]
-    pub timeout_dist_to_longer_s: Option<f32>,
+    /// For each output object, calculate the distance (in m) to the nearest, longer object. This
+    /// is increadily long for large complicated networks (e.g. waterways), but is reasonable for
+    /// named streets.
+    #[arg(long, default_value="false", aliases=["incl-distance-to-longer"])]
+    pub incl_dist_to_longer: bool,
 
     /// include all way ids
     #[arg(long, action=clap::ArgAction::SetTrue, default_value = "false", aliases=["incl-way-ids", "include-wayids", "include-way-ids"])]
