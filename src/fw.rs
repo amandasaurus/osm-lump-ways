@@ -48,9 +48,10 @@ pub(crate) fn into_fw_segments(
 
     for paths_generated_so_far in 0..only_longest_n_splitted_paths.unwrap_or(1_000_000) {
         if orig_edges.is_empty() {
-            debug!(
+            trace!(
                 "wg:{} step:{} Graph is empty, so finished",
-                wg.root_wayid, paths_generated_so_far
+                wg.root_wayid,
+                paths_generated_so_far
             );
             break;
         }
@@ -63,7 +64,7 @@ pub(crate) fn into_fw_segments(
         nodeids.par_sort();
         nodeids.dedup();
         nodeids.shrink_to_fit();
-        debug!(
+        trace!(
             "wg:{} step:{} Starting FW alg step. We have {} vertexes & {} edges",
             wg.root_wayid,
             paths_generated_so_far,
@@ -83,9 +84,10 @@ pub(crate) fn into_fw_segments(
             edges.set(i, j, *dist as f32);
         }
 
-        debug!(
+        trace!(
             "wg:{} step:{} Starting FW alg",
-            wg.root_wayid, paths_generated_so_far
+            wg.root_wayid,
+            paths_generated_so_far
         );
 
         trace!(
@@ -121,7 +123,7 @@ pub(crate) fn into_fw_segments(
         if let Some(min_length_m) = min_length_m {
             if (*longest.2 as f64) < min_length_m {
                 // Longest is too short. Don't bother any more
-                debug!(
+                trace!(
                     "wg:{} step:{} Longest path is {:.1} which is less than the min of {}. Finished with this WG.",
                     wg.root_wayid, paths_generated_so_far,
                     longest.2, min_length_m
@@ -129,9 +131,12 @@ pub(crate) fn into_fw_segments(
                 break;
             }
         }
-        debug!(
+        trace!(
             "wg:{} Longest is of length {:.1} and from {} → {}",
-            wg.root_wayid, longest.2, longest.0, longest.1
+            wg.root_wayid,
+            longest.2,
+            longest.0,
+            longest.1
         );
         trace!(
             "wg:{} Next's:\n{}",
@@ -162,7 +167,7 @@ pub(crate) fn into_fw_segments(
             }
             path.push(curr_pos);
         }
-        debug!(
+        trace!(
             "wg:{} The path has {} nodes {:?}",
             wg.root_wayid,
             path.len(),
@@ -176,7 +181,7 @@ pub(crate) fn into_fw_segments(
             orig_edges.remove(&min_max(a_b[0], a_b[1]));
         }
         orig_edges.shrink_to_fit();
-        debug!(
+        trace!(
             "wg:{} There are now {} edges in this graph, reduced by {} from {}",
             wg.root_wayid,
             orig_edges.len(),
@@ -187,7 +192,7 @@ pub(crate) fn into_fw_segments(
         results.push(path);
     }
 
-    debug!(
+    trace!(
         "wg:{} Finished into_fw_segments, found {} paths",
         wg.root_wayid,
         results.len()

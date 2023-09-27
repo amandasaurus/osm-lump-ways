@@ -3,7 +3,10 @@ use clap::Parser;
 use get_size::GetSize;
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 #[allow(unused_imports)]
-use log::{debug, error, info, log_enabled, trace, warn, Level};
+use log::{
+    debug, error, info, log, log_enabled, trace, warn,
+    Level::{Debug, Trace},
+};
 use osmio::obj_types::ArcOSMObj;
 use osmio::prelude::*;
 use osmio::OSMObjBase;
@@ -305,7 +308,8 @@ fn main() -> Result<()> {
             group
         );
         grouping.finish();
-        splitter.set_length(way_groups.len() as u64);
+        // Ways with more nodes take longer to split, so the splitter progress bar is based on that
+        splitter.set_length(way_groups.iter().map(|wg| wg.num_nodeids() as u64).sum());
         way_groups.into_par_iter()
     })
     // ↑ The breath first search is done
@@ -343,11 +347,19 @@ fn main() -> Result<()> {
             vec![way_group]
         } else {
 
-            debug!("splitting the groups into single paths with FW algorithm...");
+            trace!("splitting the groups into single paths with FW algorithm...");
+            let started = std::time::Instant::now();
             let paths = match fw::into_fw_segments(&way_group, &nodeid_pos, args.min_length_m, args.only_longest_n_splitted_paths) {
                 Ok(paths) => {
-                    splitter.inc(1);
-                    debug!("Have generated {} paths from wg:{}", paths.len(), way_group.root_wayid);
+                    let duration = (std::time::Instant::now() - started).as_secs_f64();
+                    // Ways with more nodes take longer to split, so the splitter progress bar is based on that
+                    splitter.inc(way_group.num_nodeids() as u64);
+                    log!(
+                        if paths.len() > 20 || duration > 2. { Debug } else { Trace },
+                        "Have generated {} paths from wg:{} ({} nodes) in {:.1} sec. {:.2} nodes/sec",
+                        paths.len(), way_group.root_wayid, way_group.num_nodeids(), duration, (way_group.num_nodeids() as f64)/duration
+                    );
+
                     paths
                 }
                 Err(e) => {
