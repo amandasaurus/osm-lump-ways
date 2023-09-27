@@ -1,8 +1,15 @@
 # Changelog
 
-## Unreleased
+## v0.6.0 (2023-09-28)
 
 * Error messages if you give incorrect options
+* Refactoring to reduce memory usage for larger datasets.
+* Internal refactors to speed up
+* “Distance to nearest longer item” ([Topographic
+  isolation](https://en.wikipedia.org/wiki/Topographic_isolation)) refactored
+  to be much faster. It's still disabled by default, but can be turned on with
+  `--incl-dist-to-longer`.
+* Log message output tweaks.
 
 ## v0.5.0 (2023-09-21)
 
