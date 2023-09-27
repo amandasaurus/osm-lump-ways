@@ -4,7 +4,6 @@
 use super::*;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
-use std::iter;
 use vartyint;
 
 /// Something which stores which nodeids are in which wayid
