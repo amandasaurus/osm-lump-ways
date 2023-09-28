@@ -184,6 +184,8 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    debug!("{}", nodeid_wayids.detailed_size());
+
     let nodeid_pos = if args.read_nodes_first {
         info!("Removing unneeded node positions...");
         let mut nodeid_pos = Arc::try_unwrap(nodeid_pos).unwrap().into_inner().unwrap();
@@ -225,8 +227,6 @@ fn main() -> Result<()> {
     };
 
     debug!("{}", nodeid_pos.detailed_size());
-
-    debug!("{}", nodeid_wayids.detailed_size());
 
     debug!(
         "Size of group_wayid_nodes: {} = {} bytes",
