@@ -244,8 +244,8 @@ fn main() -> Result<()> {
     let grouping = ProgressBar::new(
         group_wayid_nodes
             .values()
-            .map(|wayid_nodes| wayid_nodes.len())
-            .sum::<usize>() as u64,
+            .map(|wayid_nodes| wayid_nodes.par_iter().map(|(_k, v)| v.len()).sum::<usize>() as u64)
+            .sum(),
     )
     .with_message("Grouping all ways")
     .with_style(style.clone());
@@ -263,42 +263,53 @@ fn main() -> Result<()> {
     group_wayid_nodes.into_par_iter()
     .flat_map(|(group, wayid_nodes)| {
         // Actually do the breath first search
+        // TODO this is single threaded...
+        trace!("Starting breath-first search for group {:?}", group);
 
-        let mut unprocessed_wayids: BTreeSet<&i64> = wayid_nodes.keys().collect();
+        trace!("Starting to collect all the wayids into a set...");
+        let mut unprocessed_wayids: BTreeSet<i64> = wayid_nodes.par_iter().map(|(k, _v)| k).copied().collect();
+        trace!("... finished");
         let mut this_group_wayids = Vec::new();
 
         let mut way_groups = Vec::new();
-        trace!("grouping all the ways for group: {:?}", group);
         while let Some(root_wayid) = unprocessed_wayids.pop_first() {
-            grouping.inc(1);
-            this_group_wayids.push(*root_wayid);
+            grouping.inc(wayid_nodes[&root_wayid].len() as u64);
+            // wayids which are in this little group
+            this_group_wayids.push(root_wayid);
 
-            let mut this_group = WayGroup::new(*root_wayid, group.to_owned());
+            // struct for this group
+            let mut this_group = WayGroup::new(root_wayid, group.to_owned());
             trace!(
                 "root_wayid {:?} (there are {} unprocessed ways left)",
                 root_wayid,
                 unprocessed_wayids.len()
             );
             while let Some(wid) = this_group_wayids.pop() {
-                trace!("The way to look at is {}", wid);
                 trace!(
-                    "Currently there are {} ways on in this group",
-                    this_group.way_ids.len()
+                    "Wayid: {} Currently there are {} ways in this group",
+                    wid, this_group.way_ids.len()
                 );
 
                 this_group.way_ids.push(wid);
-                this_group.nodeids.push(wayid_nodes[&wid].clone());
-
-                // find all other ways
-                for other_wayid in wayid_nodes[&wid]
-                    .iter()
-                    .flat_map(|nid| nodeid_wayids.ways(nid))
-                {
-                    if unprocessed_wayids.remove(&other_wayid) {
-                        trace!("adding other way {}", other_wayid);
-                        this_group_wayids.push(other_wayid);
-                    }
-                }
+                // Kinda stupid way to try to get this *somewhat* multithreaded
+                rayon::join(
+                    || {
+                        this_group.nodeids.push(wayid_nodes[&wid].clone());
+                    },
+                    || {
+                        // find all other ways which are connected to wid, and add them to this_group
+                        for other_wayid in wayid_nodes[&wid]
+                            .iter()
+                            .flat_map(|nid| nodeid_wayids.ways(nid))
+                        {
+                            // If this other way hasn't been processed yet, then add to this group.
+                            if unprocessed_wayids.remove(&other_wayid) {
+                                grouping.inc(wayid_nodes[&other_wayid].len() as u64);
+                                trace!("adding other way {}", other_wayid);
+                                this_group_wayids.push(other_wayid);
+                            }
+                        }
+                    });
             }
 
             way_groups.push(this_group);
