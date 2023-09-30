@@ -14,7 +14,7 @@ fn min_max<T: PartialOrd>(a: T, b: T) -> (T, T) {
 
 pub(crate) fn into_fw_segments(
     wg: &WayGroup,
-    nodeid_pos: &NodeIdPosition,
+    nodeid_pos: &(impl NodeIdPosition+std::marker::Send),
     min_length_m: Option<f64>,
     only_longest_n_splitted_paths: Option<usize>,
 ) -> Result<Vec<Vec<i64>>> {
@@ -22,22 +22,27 @@ pub(crate) fn into_fw_segments(
 
     let mut orig_edges = HashMap::with_capacity(wg.num_nodeids());
 
+    let nodeid_pos = Arc::new(Mutex::new(nodeid_pos));
+
     orig_edges.par_extend(
         wg.nodeids
             .par_iter()
             .flat_map(|coord_string| coord_string.par_windows(2))
-            .filter_map(|edge| {
-                if nodeid_pos.contains_key(&edge[0]) && nodeid_pos.contains_key(&edge[1]) {
+            .map_with(nodeid_pos.clone(),
+            |nodeid_pos, edge| {
+                if nodeid_pos.lock().unwrap().contains_key(&edge[0]) && nodeid_pos.lock().unwrap().contains_key(&edge[1]) {
                     Some(edge)
                 } else {
                     warn!("No position found for edge: {:?}", edge);
                     None
                 }
             })
-            .map(|raw_edge| {
+            .filter_map(|x| x)
+            .map_with(nodeid_pos.clone(),
+            |nodeid_pos, raw_edge| {
                 // get local id for the node ids
-                let p1 = nodeid_pos.get(&raw_edge[0]).unwrap();
-                let p2 = nodeid_pos.get(&raw_edge[1]).unwrap();
+                let p1 = nodeid_pos.lock().unwrap().get(&raw_edge[0]).unwrap();
+                let p2 = nodeid_pos.lock().unwrap().get(&raw_edge[1]).unwrap();
                 let dist = haversine_m(p1.1, p1.0, p2.1, p2.0);
 
                 (min_max(raw_edge[0], raw_edge[1]), dist)

@@ -91,7 +91,7 @@ fn main() -> Result<()> {
     let group_wayid_nodes: HashMap<Vec<Option<String>>, HashMap<i64, Vec<i64>>> = HashMap::new();
     let group_wayid_nodes = Arc::new(Mutex::new(group_wayid_nodes));
 
-    let nodeid_pos = NodeIdPosition::new();
+    let nodeid_pos = nodeid_position::default();
     let nodeid_pos = Arc::new(Mutex::new(nodeid_pos));
 
     let nodeid_wayids = nodeid_wayids::default();

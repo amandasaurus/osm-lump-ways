@@ -44,16 +44,18 @@ impl WayGroup {
         )
     }
 
-    pub fn set_coords(&mut self, nodeid_pos: &NodeIdPosition) {
+    pub fn set_coords(&mut self, nodeid_pos: &impl NodeIdPosition) {
         if self.coords.is_some() {
             return;
         }
+        let nodeid_pos = Arc::new(Mutex::new(nodeid_pos));
         self.coords = Some(
             self.nodeids
                 .par_iter()
                 .map(|nids| {
                     nids.par_iter()
-                        .map(|nid| nodeid_pos.get(nid).map_or_else(
+                        .map_with(nodeid_pos.clone(),
+                              |nodeid_pos, nid| nodeid_pos.lock().unwrap().get(nid).map_or_else(
                                 || {
                                     error!("Cannot find position for node id {}, way_group root_wayid {}. Skipping this node", nid, self.root_wayid);
                                     None
