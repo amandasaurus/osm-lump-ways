@@ -66,8 +66,16 @@ impl NodeIdPosition for NodeIdPositionMap {
 
     fn detailed_size(&self) -> String {
         let mut output = String::new();
-        output.push_str(&format!("Size of nodeid:pos: {} = {} bytes\n", self.get_size(), self.get_size().to_formatted_string(&Locale::en)));
+        output.push_str(&format!(
+            "Size of nodeid_pos: {} = {} bytes.\nnum_nodes: {} = {}.\nbytes/node={:>.2}\n",
+            self.get_size(),
+            self.get_size().to_formatted_string(&Locale::en),
+            self.len(),
+            self.len().to_formatted_string(&Locale::en),
+            self.get_size() as f64 / self.len() as f64,
+        ));
         output
+
     }
 
     fn extend<I: IntoIterator<Item=(i64, (f64, f64))>>(&mut self, iter: I) {
