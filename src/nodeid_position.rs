@@ -14,7 +14,11 @@ pub trait NodeIdPosition: std::fmt::Debug + std::marker::Send+std::marker::Sync 
 
     fn retain_by_key(&mut self, f: impl FnMut(&i64) -> bool);
 
-    fn extend<I: IntoIterator<Item=(i64, (f64, f64))>>(&mut self, iter: I);
+    fn extend<I: IntoIterator<Item=(i64, (f64, f64))>>(&mut self, iter: I) {
+        for el in iter {
+            self.insert(el.0, el.1);
+        }
+    }
 
     fn detailed_size(&self) -> String;
 
