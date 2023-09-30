@@ -1,3 +1,4 @@
+#![allow(warnings)]
 use anyhow::{Context, Result};
 use clap::Parser;
 use get_size::GetSize;
