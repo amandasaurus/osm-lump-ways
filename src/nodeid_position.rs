@@ -37,7 +37,8 @@ pub trait NodeIdPosition: std::fmt::Debug + std::marker::Send + std::marker::Syn
 
 /// A default good value
 pub(crate) fn default() -> impl NodeIdPosition {
-    NodeIdPositionMap::new()
+    //NodeIdPositionMap::new()
+    NodeIdPositionBucket::with_bucket(5)
 }
 
 #[derive(Debug, GetSize)]
