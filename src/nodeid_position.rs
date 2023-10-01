@@ -32,7 +32,6 @@ pub trait NodeIdPosition: std::fmt::Debug + std::marker::Send + std::marker::Syn
     fn detailed_size(&self) -> String;
 
     fn shrink_to_fit(&mut self) {}
-
 }
 
 /// A default good value
@@ -214,16 +213,16 @@ impl NodeIdPosition for NodeIdPositionBucket {
     }
 }
 
+// First i64 has the i-th bit set if there is a node at position i
+// then there are all lat's delta encoded & varint encoded. then all the lng's
+// TODO this could return an iterator
 fn bucket_bytes_read(bucket_size: i64, bytes: &[u8]) -> Vec<Option<(i32, i32)>> {
     assert!(bucket_size <= 6); // only support i64
     let mut result = vec![None; 2_i32.pow(bucket_size as u32) as usize];
     let (mask, bytes) = vartyint::read_i64(bytes).expect("");
-    //dbg!(mask, format!("{:06b}", mask));
-    //dbg!(bytes);
     let mut nums: Vec<i32> = vartyint::read_many(bytes)
         .collect::<Result<_, _>>()
         .unwrap();
-    //dbg!(nums.len(), &nums);
 
     let mut curr_0 = 0;
     let mut curr_1 = 0;
@@ -255,8 +254,8 @@ fn bucket_bytes_write(bucket_size: i64, pos: &[Option<(i32, i32)>], output: &mut
     let mut curr_0 = 0;
     let mut curr_1 = 0;
     for p in pos.iter().filter_map(|x| *x) {
-        vartyint::write_i32((p.0 - curr_0), output);
-        vartyint::write_i32((p.1 - curr_1), output);
+        vartyint::write_i32(p.0 - curr_0, output);
+        vartyint::write_i32(p.1 - curr_1, output);
         curr_0 = p.0;
         curr_1 = p.1;
     }

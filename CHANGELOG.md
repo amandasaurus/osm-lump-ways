@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## v0.6.0 (2023-09-28)
 
 * Error messages if you give incorrect options
