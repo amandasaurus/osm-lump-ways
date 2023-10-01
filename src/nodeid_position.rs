@@ -1,6 +1,6 @@
 use super::*;
-use std::collections::{HashMap, BTreeMap};
 use osmio::{Lat, Lon};
+use std::collections::{BTreeMap, HashMap};
 
 pub trait NodeIdPosition: std::fmt::Debug + std::marker::Send + std::marker::Sync {
     fn new() -> Self
