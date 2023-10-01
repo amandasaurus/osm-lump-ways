@@ -83,7 +83,7 @@ impl NodeIdPosition for NodeIdPositionMap {
     fn detailed_size(&self) -> String {
         let mut output = String::new();
         output.push_str(&format!(
-            "Size of nodeid_pos: {} = {} bytes.\nnum_nodes: {} = {}.\nbytes/node={:>.2}\n",
+            "Size of nodeid_pos (NodeIdPositionMap): {} = {} bytes.\nnum_nodes: {} = {}.\nbytes/node = {:>.2}\n",
             self.get_size(),
             self.get_size().to_formatted_string(&Locale::en),
             self.len(),
