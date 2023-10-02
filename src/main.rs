@@ -39,14 +39,22 @@ use nodeid_position::NodeIdPosition;
 mod nodeid_wayids;
 
 fn main() -> Result<()> {
-    // Initially show with warn to catch warn's in the clap parsing
-    let _logger =
-        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
+    // If the RUST_LOG env is set, then use that. else parse from the -v/-q CLI args
+    if std::env::var("RUST_LOG").is_ok() {
+        env_logger::init();
+    } else {
+        // Initially show with warn to catch warn's in the clap parsing
+        let _logger =
+            env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
+    }
+
     let args = cli_args::Args::parse();
     let show_progress_bars = args.verbose.log_level_filter() >= log::Level::Info;
 
-    // now we use the -v/-q args to change the level
-    log::set_max_level(args.verbose.log_level_filter());
+    if !std::env::var("RUST_LOG").is_ok() {
+        // now we use the -v/-q args to change the level
+        log::set_max_level(args.verbose.log_level_filter());
+    }
 
     let reader = read_progress::BufReaderWithSize::from_path(&args.input_filename)?;
     let mut reader = osmio::pbf::PBFReader::new(reader);
