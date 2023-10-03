@@ -88,7 +88,7 @@ where
         });
 
         strs.into_iter()
-            .map(|row| row.join(" "))
+            .map(|row| row.join(col_join))
             .collect::<Vec<String>>()
             .join("\n")
     }
@@ -126,6 +126,8 @@ where
         &mut self.data[i * self.size + j]
     }
     pub fn set(&mut self, i: usize, j: usize, val: T) {
+        assert!(i <= self.size);
+        assert!(j <= self.size);
         self.data[i * self.size + j] = val;
     }
 
@@ -135,7 +137,7 @@ where
             .map(|(i, j)| (i, j, &self.data[i * self.size + j]))
     }
 
-    pub fn pretty_print(&self, fmt: &dyn Fn(&T) -> String) -> String {
+    pub fn pretty_print(&self, fmt: &dyn Fn(&T) -> String, col_join: &str) -> String {
         let mut strs: Vec<Vec<String>> = (0..self.size)
             .map(|i| {
                 (0..self.size)
@@ -157,8 +159,90 @@ where
         });
 
         strs.into_iter()
-            .map(|row| row.join(" "))
+            .map(|row| row.join(col_join))
             .collect::<Vec<String>>()
             .join("\n")
+    }
+}
+
+pub(crate) struct UndirectedAdjGraph<V, E>
+where
+    E: Clone,
+{
+    edges: HashMap<V, HashMap<V, E>>,
+}
+
+impl<V, E> UndirectedAdjGraph<V, E>
+where
+    V: std::hash::Hash + Eq + Copy + Ord,
+    E: Clone,
+{
+    pub fn new() -> Self {
+        Self {
+            edges: HashMap::new(),
+        }
+    }
+
+    pub fn set(&mut self, i: &V, j: &V, val: E) {
+        self.edges.entry(*i).or_default().insert(*j, val.clone());
+        self.edges.entry(*j).or_default().insert(*i, val);
+    }
+
+    pub fn get(&self, i: &V, j: &V) -> Option<&E> {
+        self.edges.get(&i).and_then(|from_i| from_i.get(&j))
+    }
+
+    pub fn neighbors(&self, i: &V) -> impl Iterator<Item = (&V, &E)> {
+        self.edges[i].iter()
+    }
+
+    pub fn max_vertex_id(&self) -> V {
+        self.edges.keys().max().unwrap().clone()
+    }
+    pub fn len(&self) -> usize {
+        self.edges
+            .values()
+            .map(|from_i| from_i.len())
+            .sum::<usize>()
+            / 2
+    }
+    pub fn num_edges(&self) -> usize {
+        self.edges
+            .values()
+            .map(|from_i| from_i.len())
+            .sum::<usize>()
+            / 2
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.edges.is_empty()
+    }
+    pub fn num_vertexes(&self) -> usize {
+        self.edges.len()
+    }
+    pub fn pretty_print(&self, fmt: &dyn Fn(&E) -> String, col_join: &str) -> String {
+        String::new()
+    }
+
+    pub fn vertexes(&self) -> impl Iterator<Item = &V> {
+        self.edges.keys()
+    }
+
+    pub fn shrink_to_fit(&mut self) {
+        self.edges.shrink_to_fit();
+    }
+    pub fn remove_edge(&mut self, i: &V, j: &V) {
+        if let Some(from_i) = self.edges.get_mut(i) {
+            from_i.remove(j);
+            if from_i.is_empty() {
+                self.edges.remove(i);
+            }
+        }
+        if let Some(from_j) = self.edges.get_mut(j) {
+            from_j.remove(i);
+            if from_j.is_empty() {
+                self.edges.remove(j);
+            }
+        }
     }
 }

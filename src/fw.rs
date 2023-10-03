@@ -98,11 +98,14 @@ pub(crate) fn into_fw_segments(
         trace!(
             "wg:{} Input edges:\n{}",
             wg.root_wayid,
-            edges.pretty_print(&|el| if el.is_nan() {
-                ".".to_string()
-            } else {
-                "#".to_string()
-            })
+            edges.pretty_print(
+                &|el| if el.is_nan() {
+                    ".".to_string()
+                } else {
+                    "#".to_string()
+                },
+                " "
+            )
         );
 
         // Run FW on the new graph
@@ -146,8 +149,10 @@ pub(crate) fn into_fw_segments(
         trace!(
             "wg:{} Next's:\n{}",
             wg.root_wayid,
-            fw_result_next
-                .pretty_print(&|el| el.map_or_else(|| "-".to_string(), |e| e.to_string()))
+            fw_result_next.pretty_print(
+                &|el| el.map_or_else(|| "-".to_string(), |e| e.to_string()),
+                " "
+            )
         );
 
         // Build the path of nodeids
@@ -225,7 +230,10 @@ fn fw(edges: &UndirectedGraph<f32>) -> (DirectedGraph<f32>, DirectedGraph<Option
     }
     trace!(
         "Next (inside FW):\n{}",
-        nexts.pretty_print(&|el| el.map_or_else(|| "-".to_string(), |e| e.to_string()))
+        nexts.pretty_print(
+            &|el| el.map_or_else(|| "-".to_string(), |e| e.to_string()),
+            " "
+        )
     );
     for k in 0..size {
         for i in 0..size {
