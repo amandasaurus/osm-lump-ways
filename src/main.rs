@@ -490,24 +490,25 @@ fn main() -> Result<()> {
             }
             prog.finish();
 
-            let prog = ProgressBar::new((way_groups.len()) as u64)
+            let prog = ProgressBar::new(way_groups.par_iter().map(|wg| wg.num_nodeids() as u64).sum::<u64>())
                     .with_message("Calc distance to longer")
                     .with_style(style.clone());
             // dist to larger
             let longers = way_groups.par_iter().enumerate()
                 .map(|(wg_id, wg)| {
-                    prog.inc(1);
 
                     // for each point what's the nearest other point that's in a longer other wayid
-                    wg.coords_iter_par().map(|coord: [f64;2]| -> Option<(f64, i64)> {
+                    let min = wg.coords_iter_par().map(|coord: [f64;2]| -> Option<(f64, i64)> {
                         let nearest_longer = points_distance_idx.iter_nearest(&coord, &haversine::haversine_m_arr).unwrap()
                             .filter(|(_dist, other_wg_id)| **other_wg_id != wg_id)
                             .filter(|(_dist, other_wg_id)| way_groups[**other_wg_id].length_m > way_groups[wg_id].length_m)
                             .next();
+                        prog.inc(1);
                         nearest_longer.map(|(dist, wgid)| (dist, way_groups[*wgid].root_wayid))
                     })
                     .filter_map(|x| x)
-                    .min_by(|a, b| (a.0).total_cmp(&b.0))
+                    .min_by(|a, b| (a.0).total_cmp(&b.0));
+                    min
                 })
                 .collect::<Vec<_>>();
             prog.finish();
