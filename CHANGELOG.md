@@ -5,6 +5,8 @@
 * Refactoring to reduce memory usage for larger datasets.
 * New feature: `--min-dist-to-longer` to only include output which is this far
   from nearer items
+* The “Split into single paths” function has been refactored to be much faster,
+  and hence much more usable.
 
 ## v0.6.0 (2023-09-28)
 

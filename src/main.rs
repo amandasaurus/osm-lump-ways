@@ -374,9 +374,9 @@ fn main() -> Result<()> {
             vec![way_group]
         } else {
 
-            trace!("splitting the groups into single paths with FW algorithm...");
+            trace!("wg:{} splitting the groups into single paths with Dij algorithm... wg.num_nodeids() = {}", way_group.root_wayid, way_group.num_nodeids());
             let started = std::time::Instant::now();
-            let paths = match fw::into_fw_segments(&way_group, &nodeid_pos, args.min_length_m, args.only_longest_n_splitted_paths) {
+            let paths = match dij::into_segments(&way_group, &nodeid_pos, args.min_length_m, args.only_longest_n_splitted_paths, &splitter) {
                 Ok(paths) => {
                     let duration = (std::time::Instant::now() - started).as_secs_f64();
                     // Ways with more nodes take longer to split, so the splitter progress bar is based on that
