@@ -379,8 +379,6 @@ fn main() -> Result<()> {
             let paths = match dij::into_segments(&way_group, &nodeid_pos, args.min_length_m, args.only_longest_n_splitted_paths, &splitter) {
                 Ok(paths) => {
                     let duration = (std::time::Instant::now() - started).as_secs_f64();
-                    // Ways with more nodes take longer to split, so the splitter progress bar is based on that
-                    splitter.inc(way_group.num_nodeids() as u64);
                     log!(
                         if paths.len() > 20 || duration > 2. { Debug } else { Trace },
                         "Have generated {} paths from wg:{} ({} nodes) in {:.1} sec. {:.2} nodes/sec",
