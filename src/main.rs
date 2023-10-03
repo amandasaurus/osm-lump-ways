@@ -246,28 +246,28 @@ fn main() -> Result<()> {
     );
 
     info!("All data has been loaded. Started processing...");
+    let process_spinners = indicatif::MultiProgress::new();
+    if !show_progress_bars {
+        process_spinners.set_draw_target(ProgressDrawTarget::hidden());
+    }
     info!(
         "Starting the breathfirst search. There are {} groups",
         group_wayid_nodes.len()
     );
-    let grouping = ProgressBar::new(
+    let grouping = process_spinners.add( ProgressBar::new(
         group_wayid_nodes
             .values()
             .map(|wayid_nodes| wayid_nodes.par_iter().map(|(_k, v)| v.len()).sum::<usize>() as u64)
             .sum(),
-    )
-    .with_message("Grouping all ways")
-    .with_style(style.clone());
-    if !show_progress_bars {
-        grouping.set_draw_target(ProgressDrawTarget::hidden());
-    }
+        )
+        .with_message("Grouping all ways")
+        .with_style(style.clone())
+    );
 
-    let splitter = ProgressBar::new(0)
+    let splitter = process_spinners.add( ProgressBar::new(0)
         .with_message("Splitting ways into lines")
-        .with_style(style.clone());
-    if !show_progress_bars {
-        splitter.set_draw_target(ProgressDrawTarget::hidden());
-    }
+        .with_style(style.clone())
+    );
 
     group_wayid_nodes.into_par_iter()
     .flat_map(|(group, wayid_nodes)| {
@@ -330,7 +330,7 @@ fn main() -> Result<()> {
         );
         grouping.finish();
         // Ways with more nodes take longer to split, so the splitter progress bar is based on that
-        splitter.set_length(way_groups.iter().map(|wg| wg.num_nodeids() as u64).sum());
+        splitter.inc_length(way_groups.iter().map(|wg| wg.num_nodeids() as u64).sum());
         way_groups.into_par_iter()
     })
     // ↑ The breath first search is done
@@ -490,7 +490,7 @@ fn main() -> Result<()> {
             }
             prog.finish();
 
-            let prog = ProgressBar::new((way_groups.len()*way_groups.len()) as u64)
+            let prog = ProgressBar::new((way_groups.len()) as u64)
                     .with_message("Calc distance to longer")
                     .with_style(style.clone());
             // dist to larger
