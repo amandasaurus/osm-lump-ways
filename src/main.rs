@@ -30,6 +30,7 @@ mod cli_args;
 mod haversine;
 mod tagfilter;
 use haversine::haversine_m;
+mod dij;
 mod fw;
 mod graph;
 mod way_group;

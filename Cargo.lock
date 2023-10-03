@@ -741,6 +741,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
+name = "ordered-float"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3a540f3e3b3d7929c884e46d093d344e4e5bdeed54d08bf007df50c93cc85d5"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "osm-lump-ways"
 version = "0.7.0-dev"
 dependencies = [
@@ -753,6 +762,7 @@ dependencies = [
  "kdtree",
  "log",
  "num-format",
+ "ordered-float",
  "osmio",
  "rayon",
  "read-progress",
