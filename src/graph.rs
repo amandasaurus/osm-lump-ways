@@ -66,7 +66,13 @@ where
             .map(|(i, j)| (i, j, &self.data[i * self.size + j]))
     }
 
-    pub fn pretty_print(&self, fmt: &dyn Fn(&T) -> String) -> String {
+    pub fn neighbors(&self, nid: usize) -> impl Iterator<Item = (usize, &T)> {
+        (0..self.size)
+            .filter(move |i| *i != nid)
+            .map(move |i| (i, self.get(nid, i)))
+    }
+
+    pub fn pretty_print(&self, fmt: &dyn Fn(&T) -> String, col_join: &str) -> String {
         let mut strs: Vec<Vec<String>> = (0..self.size)
             .map(|i| {
                 (0..self.size)
