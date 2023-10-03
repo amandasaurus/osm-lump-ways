@@ -518,6 +518,13 @@ fn main() -> Result<()> {
                     wg.extra_json_props["dist_to_longer_m"] = longer.map(|(dist, _)| dist).into();
                     wg.extra_json_props["nearest_longer_waygroup"] = longer.map(|(_dist, wgid)| wgid).into();
                 });
+
+            // remove any that are too short
+            // TODO this can prob. be done faster in the above line, where er 
+            if let Some(min_dist_to_longer_m) = args.min_dist_to_longer_m {
+                way_groups.retain(|wg|
+                                wg.extra_json_props["dist_to_longer_m"].as_f64().map_or(true, |d| d >= min_dist_to_longer_m) )
+            }
         }
     })
     .update(|(_filename, way_groups)| {

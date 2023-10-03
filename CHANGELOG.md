@@ -3,6 +3,8 @@
 ## Unreleased
 
 * Refactoring to reduce memory usage for larger datasets.
+* New feature: `--min-dist-to-longer` to only include output which is this far
+  from nearer items
 
 ## v0.6.0 (2023-09-28)
 

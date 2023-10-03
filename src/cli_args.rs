@@ -68,6 +68,11 @@ pub(crate) struct Args {
     #[arg(long, value_name = "NUMBER")]
     pub min_length_m: Option<f64>,
 
+    /// Only include (in the output) lines which have a dist_to_nearer greater than or equal to
+    /// this
+    #[arg(long, value_name = "NUMBER", requires = "incl_dist_to_longer")]
+    pub min_dist_to_longer_m: Option<f64>,
+
     /// Per tag group, only include the longest N lines
     #[arg(long, value_name = "N")]
     pub only_longest_n_per_group: Option<usize>,
