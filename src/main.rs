@@ -45,7 +45,8 @@ fn main() -> Result<()> {
     } else {
         // Initially show with warn to catch warn's in the clap parsing
         let _logger =
-            env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
+            env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
+                .init();
     }
 
     let args = cli_args::Args::parse();
@@ -254,19 +255,23 @@ fn main() -> Result<()> {
         "Starting the breathfirst search. There are {} groups",
         group_wayid_nodes.len()
     );
-    let grouping = process_spinners.add( ProgressBar::new(
-        group_wayid_nodes
-            .values()
-            .map(|wayid_nodes| wayid_nodes.par_iter().map(|(_k, v)| v.len()).sum::<usize>() as u64)
-            .sum(),
+    let grouping = process_spinners.add(
+        ProgressBar::new(
+            group_wayid_nodes
+                .values()
+                .map(|wayid_nodes| {
+                    wayid_nodes.par_iter().map(|(_k, v)| v.len()).sum::<usize>() as u64
+                })
+                .sum(),
         )
         .with_message("Grouping all ways")
-        .with_style(style.clone())
+        .with_style(style.clone()),
     );
 
-    let splitter = process_spinners.add( ProgressBar::new(0)
-        .with_message("Splitting ways into lines")
-        .with_style(style.clone())
+    let splitter = process_spinners.add(
+        ProgressBar::new(0)
+            .with_message("Splitting ways into lines")
+            .with_style(style.clone()),
     );
 
     group_wayid_nodes.into_par_iter()
