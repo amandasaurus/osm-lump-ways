@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Refactor “split into single paths” to be more effecient and faster.
+
 ## v0.7.0 (2023-10-03)
 
 * Refactoring to reduce memory usage for larger datasets.
