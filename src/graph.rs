@@ -175,7 +175,7 @@ pub(crate) struct UndirectedAdjGraph<V, E>
 where
     E: Clone,
 {
-    edges: HashMap<V, HashMap<V, E>>,
+    edges: HashMap<V, HashMap<V, (E, Vec<V>)>>,
 }
 
 impl<V, E> UndirectedAdjGraph<V, E>
@@ -190,16 +190,23 @@ where
     }
 
     pub fn set(&mut self, i: &V, j: &V, val: E) {
-        self.edges.entry(*i).or_default().insert(*j, val.clone());
-        self.edges.entry(*j).or_default().insert(*i, val);
+        self.edges
+            .entry(*i)
+            .or_default()
+            .insert(*j, (val.clone(), vec![]));
+        self.edges.entry(*j).or_default().insert(*i, (val, vec![]));
     }
 
     pub fn get(&self, i: &V, j: &V) -> Option<&E> {
-        self.edges.get(&i).and_then(|from_i| from_i.get(&j))
+        self.edges
+            .get(&i)
+            .and_then(|from_i| from_i.get(&j).map(|(e, intermediates)| e))
     }
 
     pub fn neighbors(&self, i: &V) -> impl Iterator<Item = (&V, &E)> {
-        self.edges[i].iter()
+        self.edges[i]
+            .iter()
+            .map(|(j, (edge_weight, intermediates))| (j, edge_weight))
     }
 
     pub fn max_vertex_id(&self) -> V {
