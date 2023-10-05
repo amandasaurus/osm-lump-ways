@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## v0.7.0 (2023-10-03)
 
 * Refactoring to reduce memory usage for larger datasets.
