@@ -335,8 +335,6 @@ fn main() -> Result<()> {
             group
         );
         grouping.finish();
-        // Ways with more nodes take longer to split, so the splitter progress bar is based on that
-        splitter.inc_length(way_groups.iter().map(|wg| wg.num_nodeids() as u64).sum());
         way_groups.into_par_iter()
     })
     // ↑ The breath first search is done

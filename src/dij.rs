@@ -54,6 +54,11 @@ pub(crate) fn into_segments(
         edges.set(&nid1, &nid2, dist);
     }
 
+    let old = (edges.num_edges(), edges.num_vertexes());
+    edges.contract_edges();
+    debug!("wg:{} Post-contraction. Removed {} edges and {} vertexes", wg.root_wayid, old.0-edges.num_edges(), old.1-edges.num_vertexes());
+    splitter.inc_length(edges.num_vertexes() as u64);
+
     for paths_generated_so_far in 0..only_longest_n_splitted_paths.unwrap_or(1_000_000) {
         if edges.is_empty() {
             // graph empty. Nothing to do
@@ -81,6 +86,7 @@ pub(crate) fn into_segments(
                 )
             );
         }
+
 
         let mut longest_summary: Option<(i64, i64, Option<i64>, f32)> = None;
         let mut longest_graph: Option<HashMap<i64, (Option<i64>, OrderedFloat<f32>)>> = None;
@@ -161,7 +167,7 @@ pub(crate) fn into_segments(
             longest_summary.2
         );
 
-        // Build the path of nodeids
+        // Build the path of nodeids (using the contracted edges)
         // we know the end nid, and the second last one. So build the path in reverse
         let first_pos = longest_summary.0;
         let mut last_pos = longest_summary.1;
@@ -181,20 +187,30 @@ pub(crate) fn into_segments(
         // Turn the local nids into proper node ids. do it in reverse
         path.reverse();
 
+        let mut full_path = vec![];
+        for a_b in path.windows(2) {
+            full_path.push(a_b[0]);
+            full_path.extend(edges.get_intermediates(&a_b[0], &a_b[1]).unwrap());
+        }
+        // and the last one
+        full_path.push(*path.last().unwrap());
+
         let old_num_edges = edges.len();
         for a_b in path.windows(2) {
             edges.remove_edge(&a_b[0], &a_b[1]);
         }
-        edges.shrink_to_fit();
         trace!(
-            "wg:{} There are now {} edges in this graph, reduced by {} from {}",
+            "wg:{} Post-removing used edges: There are now {} edges in this graph, reduced by {} from {}",
             wg.root_wayid,
             edges.len(),
             old_num_edges - edges.len(),
             old_num_edges
         );
+        let old = (edges.num_edges(), edges.num_vertexes());
+        edges.contract_edges();
+        debug!("wg:{} Post-contraction. Removed {} edges and {} vertexes", wg.root_wayid, old.0-edges.num_edges(), old.1-edges.num_vertexes());
 
-        results.push(path);
+        results.push(full_path);
     }
     log!(
         if results.len() > 5 { Debug } else { Trace },
@@ -229,13 +245,13 @@ fn dij_single(
     let mut this_dist;
     while let Some((mut curr_dist, curr_id)) = frontier.pop() {
         curr_dist *= -1.;
-        trace!(
-            "Current frontier. id {} curr dist {}, currently shortest known: {} frontier.len() {}",
-            curr_id,
-            curr_dist,
-            prev_dist[&curr_id].1,
-            frontier.len()
-        );
+        //trace!(
+        //    "Current frontier. id {:>13} curr dist {:>8}, currently shortest known: {:>10} frontier.len() {:>3}",
+        //    curr_id,
+        //    curr_dist,
+        //    prev_dist[&curr_id].1,
+        //    frontier.len()
+        //);
         if curr_dist > prev_dist[&curr_id].1 {
             // already found a shorter
             continue;
