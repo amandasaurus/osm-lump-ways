@@ -56,7 +56,12 @@ pub(crate) fn into_segments(
 
     let old = (edges.num_edges(), edges.num_vertexes());
     edges.contract_edges();
-    debug!("wg:{} Post-contraction. Removed {} edges and {} vertexes", wg.root_wayid, old.0-edges.num_edges(), old.1-edges.num_vertexes());
+    debug!(
+        "wg:{} Post-contraction. Removed {} edges and {} vertexes",
+        wg.root_wayid,
+        old.0 - edges.num_edges(),
+        old.1 - edges.num_vertexes()
+    );
     splitter.inc_length(edges.num_vertexes() as u64);
 
     for paths_generated_so_far in 0..only_longest_n_splitted_paths.unwrap_or(1_000_000) {
@@ -86,7 +91,6 @@ pub(crate) fn into_segments(
                 )
             );
         }
-
 
         let mut longest_summary: Option<(i64, i64, Option<i64>, f32)> = None;
         let mut longest_graph: Option<HashMap<i64, (Option<i64>, OrderedFloat<f32>)>> = None;
@@ -178,7 +182,7 @@ pub(crate) fn into_segments(
         }
         splitter.inc(path.len() as u64);
         trace!(
-            "wg:{} The path has {} nodes (reversed:) {:?}",
+            "wg:{} The contracted path has {} nodes (reversed:) {:?}",
             wg.root_wayid,
             path.len(),
             path
@@ -208,7 +212,12 @@ pub(crate) fn into_segments(
         );
         let old = (edges.num_edges(), edges.num_vertexes());
         edges.contract_edges();
-        debug!("wg:{} Post-contraction. Removed {} edges and {} vertexes", wg.root_wayid, old.0-edges.num_edges(), old.1-edges.num_vertexes());
+        debug!(
+            "wg:{} Post-contraction. Removed {} edges and {} vertexes",
+            wg.root_wayid,
+            old.0 - edges.num_edges(),
+            old.1 - edges.num_vertexes()
+        );
 
         results.push(full_path);
     }

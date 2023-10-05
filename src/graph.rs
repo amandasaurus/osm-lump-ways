@@ -1,7 +1,7 @@
 use super::*;
 use anyhow::{Context, Result};
-use std::collections::BTreeMap;
 use rayon::prelude::ParallelIterator;
+use std::collections::BTreeMap;
 
 pub(crate) struct UndirectedGraph<T>
 where
@@ -173,15 +173,14 @@ where
     }
 }
 
-pub(crate) struct UndirectedAdjGraph<V, E>
-{
+pub(crate) struct UndirectedAdjGraph<V, E> {
     edges: BTreeMap<V, BTreeMap<V, (E, Vec<V>)>>,
 }
 
 impl<V, E> UndirectedAdjGraph<V, E>
 where
     V: std::hash::Hash + Eq + Copy + Ord + Send + std::fmt::Debug,
-    E: Copy + Clone + std::fmt::Debug + std::ops::Add<Output=E> + std::cmp::PartialEq,
+    E: Copy + Clone + std::fmt::Debug + std::ops::Add<Output = E> + std::cmp::PartialEq,
 {
     pub fn new() -> Self {
         Self {
@@ -204,17 +203,16 @@ where
     }
 
     pub fn get_all(&self, i: &V, j: &V) -> Option<&(E, Vec<V>)> {
-        self.edges
-            .get(&i)
-            .and_then(|from_i| from_i.get(&j))
+        self.edges.get(&i).and_then(|from_i| from_i.get(&j))
     }
 
     pub fn get_intermediates(&self, i: &V, j: &V) -> Option<&[V]> {
-        self.get_all(i, j).and_then(|(_e, intermediates)| Some(intermediates.as_slice()))
+        self.get_all(i, j)
+            .and_then(|(_e, intermediates)| Some(intermediates.as_slice()))
     }
 
     /// returns each vertex id and how many neighbours it has
-    pub fn iter_vertexes_num_neighbours(&self) -> impl Iterator<Item=(&V, usize)> {
+    pub fn iter_vertexes_num_neighbours(&self) -> impl Iterator<Item = (&V, usize)> {
         self.edges.iter().map(|(vid, edges)| (vid, edges.len()))
     }
 
@@ -228,7 +226,7 @@ where
             .iter()
             .map(|(j, (edge_weight, intermediates))| (j, edge_weight))
     }
-    /// Number of neighbours for this vertex. 
+    /// Number of neighbours for this vertex.
     pub fn num_neighbors(&self, i: &V) -> usize {
         self.edges.get(i).map_or(0, |es| es.len())
     }
@@ -282,12 +280,16 @@ where
 
     /// Contract this vertex, returnign true iff this graph was modified
     pub fn contract_vertex(&mut self, v: &V) -> bool {
-        if ! self.contains_vertex(v) {
+        if !self.contains_vertex(v) {
             warn!("Called contract_vertex on v: {:?} which doesn't exist", v);
             return false;
         }
         if self.num_neighbors(v) != 2 {
-            trace!("Called contract_vertex on v: {:?} and it has {} ≠ 2 neighbours", v, self.num_neighbors(v));
+            trace!(
+                "Called contract_vertex on v: {:?} and it has {} ≠ 2 neighbours",
+                v,
+                self.num_neighbors(v)
+            );
             return false;
         }
         // a - v - b
@@ -301,7 +303,9 @@ where
         }
         assert!(self.edges[&a].contains_key(v));
         assert!(self.edges[&b].contains_key(v));
-        assert!(self.edges[&a][v].0+self.edges[v][&b].0 == self.edges[&b][v].0+self.edges[&v][&a].0);
+        assert!(
+            self.edges[&a][v].0 + self.edges[v][&b].0 == self.edges[&b][v].0 + self.edges[&v][&a].0
+        );
         let mut edge_a_v = self.edges.get_mut(&a).unwrap().remove(v).unwrap();
         let mut edge_b_v = self.edges.get_mut(&b).unwrap().remove(v).unwrap();
         let mut edge_v_a = self.edges.get_mut(v).unwrap().remove(&a).unwrap();
@@ -326,7 +330,11 @@ where
     pub fn contract_edges(&mut self) {
         let initial_num_edges = self.num_edges();
         let initial_num_vertexes = self.num_vertexes();
-        trace!("Starting contract_edges with {} edges and {} vertexes", initial_num_edges, initial_num_vertexes);
+        trace!(
+            "Starting contract_edges with {} edges and {} vertexes",
+            initial_num_edges,
+            initial_num_vertexes
+        );
         if initial_num_edges == 1 {
             return;
         }
@@ -336,9 +344,18 @@ where
         let mut contraction_round = 0;
         let mut this_vertex_contracted = false;
         loop {
-            trace!("Contraction round {}. There are {} vertexes and {} edges", contraction_round, self.num_vertexes(), self.num_edges());
-            contraction_round+=1;
-            candidate_vertexes.extend(self.iter_vertexes_num_neighbours().filter_map(|(v, nn)| if nn == 2 { Some(v) } else { None }).cloned());
+            trace!(
+                "Contraction round {}. There are {} vertexes and {} edges",
+                contraction_round,
+                self.num_vertexes(),
+                self.num_edges()
+            );
+            contraction_round += 1;
+            candidate_vertexes.extend(
+                self.iter_vertexes_num_neighbours()
+                    .filter_map(|(v, nn)| if nn == 2 { Some(v) } else { None })
+                    .cloned(),
+            );
             if candidate_vertexes.is_empty() {
                 trace!("No more candidate vertexes");
                 break;
@@ -355,13 +372,12 @@ where
                 }
             }
 
-            if ! graph_has_been_modified {
+            if !graph_has_been_modified {
                 trace!("End of loop, and no changes made → break out");
                 break;
             }
         }
 
         debug!("End of contract_edges there are now {} edges and {} vertexes. Removed {} edges and {} vertexes in {} rounds", self.num_edges(), self.num_vertexes(), initial_num_edges-self.num_edges(), initial_num_vertexes-self.num_vertexes(), contraction_round);
-
     }
 }
