@@ -284,9 +284,13 @@ fn main() -> Result<()> {
         trace!("Starting to collect all the wayids into a set...");
         let mut unprocessed_wayids: BTreeSet<i64> = wayid_nodes.par_iter().map(|(k, _v)| k).copied().collect();
         trace!("... finished");
+
+        // Current list of all wids which are in the group
         let mut this_group_wayids = Vec::new();
 
+        // all our resultant way groups
         let mut way_groups = Vec::new();
+
         while let Some(root_wayid) = unprocessed_wayids.pop_first() {
             grouping.inc(wayid_nodes[&root_wayid].len() as u64);
             // wayids which are in this little group
