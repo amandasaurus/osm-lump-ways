@@ -3,6 +3,7 @@
 ## Unreleased
 
 * Refactor “split into single paths” to be more effecient and faster.
+* Improve log output accuracy
 
 ## v0.7.0 (2023-10-03)
 

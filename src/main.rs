@@ -613,7 +613,7 @@ fn main() -> Result<()> {
         match std::fs::File::create(&filename) {
             Ok(f) => {
                 let mut f = std::io::BufWriter::new(f);
-                write_geojson_features_directly(&features, &mut f, args.save_as_linestrings)
+                let num_written = write_geojson_features_directly(&features, &mut f, args.save_as_linestrings)
                     .with_context(|| {
                         format!(
                             "Writing {} features to filename {:?}",
@@ -621,7 +621,7 @@ fn main() -> Result<()> {
                             filename
                         )
                     })?;
-                info!("Wrote {} feature(s) to {}", features.len().to_formatted_string(&Locale::en), filename);
+                info!("Wrote {} feature(s) to {}", num_written.to_formatted_string(&Locale::en), filename);
             }
             Err(e) => {
                 warn!("Couldn't open filename {:?}: {}", filename, e);
@@ -668,22 +668,26 @@ fn write_geojson_features_directly(
     features: &[(serde_json::Value, Vec<Vec<(f64, f64)>>)],
     mut f: &mut impl Write,
     save_as_linestrings: bool,
-) -> Result<()> {
+) -> Result<usize> {
+    let mut num_written = 0;
+
     f.write_all(b"{\"type\":\"FeatureCollection\", \"features\": [\n")?;
-    write_geojson_feature_directly(&mut f, &features[0], save_as_linestrings)?;
+    num_written += write_geojson_feature_directly(&mut f, &features[0], save_as_linestrings)?;
     for feature in &features[1..] {
         f.write_all(b",\n")?;
-        write_geojson_feature_directly(&mut f, feature, save_as_linestrings)?;
+        num_written += write_geojson_feature_directly(&mut f, feature, save_as_linestrings)?;
     }
     f.write_all(b"\n]}")?;
-    Ok(())
+
+    Ok(num_written)
 }
 
 fn write_geojson_feature_directly(
     mut f: &mut impl Write,
     feature: &(serde_json::Value, Vec<Vec<(f64, f64)>>),
     save_as_linestrings: bool,
-) -> Result<()> {
+) -> Result<usize> {
+    let mut num_written = 0;
     if save_as_linestrings {
         for (k, linestring) in feature.1.iter().enumerate() {
             if k != 0 {
@@ -701,6 +705,7 @@ fn write_geojson_feature_directly(
             }
             f.write_all(b"]")?;
             f.write_all(b"}, \"type\": \"Feature\"}")?;
+            num_written += 1;
         }
     } else {
         f.write_all(b"{\"properties\":")?;
@@ -722,7 +727,8 @@ fn write_geojson_feature_directly(
         }
         f.write_all(b"]")?;
         f.write_all(b"}, \"type\": \"Feature\"}")?;
+        num_written += 1;
     }
 
-    Ok(())
+    Ok(num_written)
 }
