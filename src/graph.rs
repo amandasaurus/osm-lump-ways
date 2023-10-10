@@ -2,6 +2,7 @@ use super::*;
 use anyhow::{Context, Result};
 use rayon::prelude::ParallelIterator;
 use std::collections::BTreeMap;
+use std::iter::once;
 
 pub(crate) struct UndirectedGraph<T>
 where
@@ -209,6 +210,29 @@ where
     pub fn get_intermediates(&self, i: &V, j: &V) -> Option<&[V]> {
         self.get_all(i, j)
             .and_then(|(_e, intermediates)| Some(intermediates.as_slice()))
+    }
+
+    /// Return iterator over all the “contracted” edges.
+    /// Each element is 1: the edge weight for that “segment”, and 2: an iterator over the vertexes
+    /// of this segment (in order)
+    pub fn get_all_contracted_edges(&self) -> impl Iterator<Item = (&E, impl Iterator<Item = &V>)> {
+        self.edges
+            .iter()
+            .flat_map(|(a, from_a)| {
+                from_a
+                    .iter()
+                    // since edges are stored twice, only take the first one
+                    .filter(move |(b, _)| a < b)
+                    .map(move |(b, (edge_weight, inter))| ((a, inter, b), edge_weight))
+            })
+            .map(|((a, inter, b), edge_weight)|
+                (
+                    edge_weight,
+                    once(a)
+                        .chain(inter.iter())
+                        .chain(once(b)),
+                )
+            )
     }
 
     /// returns each vertex id and how many neighbours it has
