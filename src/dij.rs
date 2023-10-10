@@ -160,8 +160,6 @@ pub(crate) fn into_segments(
         let longest_summary = longest_summary.expect("WTF no longest");
         let longest_graph = longest_graph.expect("The longest graph should have been set");
 
-        assert!(min_length_m.is_none());
-
         trace!(
             "wg:{} Longest is of length {:.1} and from {} → {} (via {:?})",
             wg.root_wayid,
@@ -170,6 +168,14 @@ pub(crate) fn into_segments(
             longest_summary.1,
             longest_summary.2
         );
+
+        if let Some(min_length_m) = min_length_m {
+            if longest_summary.3 < min_length_m as f32 {
+                trace!("wg:{} longest is < {}, so skipping the rest", wg.root_wayid, min_length_m);
+                splitter.inc(edges.num_vertexes() as u64);  // these vertexes are “done”
+                break;
+            }
+        }
 
         // Build the path of nodeids (using the contracted edges)
         // we know the end nid, and the second last one. So build the path in reverse
