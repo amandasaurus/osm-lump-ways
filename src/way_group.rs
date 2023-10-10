@@ -157,6 +157,10 @@ impl WayGroup {
             .map(|(c1, c2)| haversine_m(c1.0, c1.1, c2.0, c2.1))
             .min_by(|d1, d2| d1.total_cmp(d2))
     }
+
+    pub fn reorder_segments(&mut self) {
+        // TODO
+    }
 }
 
 impl PartialEq for WayGroup {

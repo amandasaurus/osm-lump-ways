@@ -354,6 +354,9 @@ fn main() -> Result<()> {
         }
     })
     .update(|way_group| {
+        way_group.reorder_segments();
+    })
+    .update(|way_group| {
         trace!("Saving coordinates for all ways");
         way_group.set_coords(&nodeid_pos);
     })
