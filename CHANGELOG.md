@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## v0.8.0 (2023-10-07)
 
 * Refactor “split into single paths” to be more effecient and faster.
