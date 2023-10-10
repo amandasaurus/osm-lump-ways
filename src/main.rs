@@ -157,7 +157,7 @@ fn main() -> Result<()> {
                         }
                         let group = args
                             .tag_group_k
-                            .iter()
+                            .par_iter()
                             .map(|tg| tg.get_values(&w))
                             .collect::<Vec<Option<String>>>();
                         if !args.incl_unset_group && group.iter().any(|x| x.is_none()) {
@@ -165,13 +165,15 @@ fn main() -> Result<()> {
                         }
 
                         trace!("Got a way {}, in group {:?}", w.id(), group);
-                        nodeid_wayids.lock().unwrap().insert_many(w.id(), w.nodes());
-                        group_wayid_nodes
+                        rayon::join(
+                            || { nodeid_wayids.lock().unwrap().insert_many(w.id(), w.nodes()); },
+                            || { group_wayid_nodes
                             .lock()
                             .unwrap()
                             .entry(group)
                             .or_default()
-                            .insert(w.id(), w.nodes().to_owned());
+                            .insert(w.id(), w.nodes().to_owned()); }
+                        );
                         ways_added.inc(1);
                     }
                     ArcOSMObj::Relation(_r) => {}
