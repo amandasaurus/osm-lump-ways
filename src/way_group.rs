@@ -159,7 +159,62 @@ impl WayGroup {
     }
 
     pub fn reorder_segments(&mut self) {
-        // TODO
+        let old_num_nodeids = self.nodeids.len();
+        if old_num_nodeids == 1 {
+            trace!(
+                "wg:{} Only one way in this group, skipping reorder",
+                self.root_wayid
+            );
+            return;
+        }
+        trace!(
+            "wg:{} Before reorder_segments there are {old_num_nodeids} segments",
+            self.root_wayid,
+        );
+
+        let mut graph_modified = false;
+        loop {
+            graph_modified = false;
+            let num_nodes = self.nodeids.len();
+            for i in 0..num_nodes {
+                let (left, right) = self.nodeids.split_at_mut(i+1);
+                let mut seg_i: &mut Vec<_> = left.last_mut().unwrap();
+                if seg_i.is_empty() {
+                    continue;
+                }
+                for seg_j in right.iter_mut() {
+                    if seg_j.is_empty() {
+                        continue;
+                    }
+                    if seg_i == seg_j {
+                        continue;
+                    }
+                    if seg_i.last() == seg_j.first() {
+                        seg_i.extend(seg_j.drain(..).skip(1));
+                        graph_modified = true;
+                    } else if seg_i.last() == seg_j.last() {
+                        seg_i.extend(seg_j.drain(..).rev().skip(1));
+                        graph_modified = true;
+                    }
+                }
+            }
+
+            self.nodeids.retain(|segments| !segments.is_empty());
+
+            if !graph_modified {
+                break;
+            }
+        }
+
+        self.nodeids.shrink_to_fit();
+
+        trace!(
+            "wg:{} After reorder_segments there are {} segments, {} {}",
+            self.root_wayid,
+            self.nodeids.len(),
+            if old_num_nodeids > self.nodeids.len() { "removed" } else { "added" },
+            old_num_nodeids.abs_diff(self.nodeids.len()),
+        );
     }
 }
 

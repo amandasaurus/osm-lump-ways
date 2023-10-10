@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+* Data is internally re-ordered, which makes output files smaller, especially
+  if using `--save-as-linestrings`
+
 ## v0.8.0 (2023-10-07)
 
 * Refactor “split into single paths” to be more effecient and faster.
