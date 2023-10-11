@@ -225,14 +225,9 @@ where
                     .filter(move |(b, _)| a < b)
                     .map(move |(b, (edge_weight, inter))| ((a, inter, b), edge_weight))
             })
-            .map(|((a, inter, b), edge_weight)|
-                (
-                    edge_weight,
-                    once(a)
-                        .chain(inter.iter())
-                        .chain(once(b)),
-                )
-            )
+            .map(|((a, inter, b), edge_weight)| {
+                (edge_weight, once(a).chain(inter.iter()).chain(once(b)))
+            })
     }
 
     /// returns each vertex id and how many neighbours it has

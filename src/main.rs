@@ -166,13 +166,17 @@ fn main() -> Result<()> {
 
                         trace!("Got a way {}, in group {:?}", w.id(), group);
                         rayon::join(
-                            || { nodeid_wayids.lock().unwrap().insert_many(w.id(), w.nodes()); },
-                            || { group_wayid_nodes
-                            .lock()
-                            .unwrap()
-                            .entry(group)
-                            .or_default()
-                            .insert(w.id(), w.nodes().to_owned()); }
+                            || {
+                                nodeid_wayids.lock().unwrap().insert_many(w.id(), w.nodes());
+                            },
+                            || {
+                                group_wayid_nodes
+                                    .lock()
+                                    .unwrap()
+                                    .entry(group)
+                                    .or_default()
+                                    .insert(w.id(), w.nodes().to_owned());
+                            },
                         );
                         ways_added.inc(1);
                     }

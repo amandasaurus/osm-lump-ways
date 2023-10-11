@@ -177,7 +177,7 @@ impl WayGroup {
             graph_modified = false;
             let num_nodes = self.nodeids.len();
             for i in 0..num_nodes {
-                let (left, right) = self.nodeids.split_at_mut(i+1);
+                let (left, right) = self.nodeids.split_at_mut(i + 1);
                 let mut seg_i: &mut Vec<_> = left.last_mut().unwrap();
                 if seg_i.is_empty() {
                     continue;
@@ -212,7 +212,11 @@ impl WayGroup {
             "wg:{} After reorder_segments there are {} segments, {} {}",
             self.root_wayid,
             self.nodeids.len(),
-            if old_num_nodeids > self.nodeids.len() { "removed" } else { "added" },
+            if old_num_nodeids > self.nodeids.len() {
+                "removed"
+            } else {
+                "added"
+            },
             old_num_nodeids.abs_diff(self.nodeids.len()),
         );
     }
