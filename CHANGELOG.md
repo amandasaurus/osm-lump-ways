@@ -1,9 +1,10 @@
 # Changelog
 
-## Unreleased
+## v0.9.0 (2023-10-11)
 
 * Data is internally re-ordered, which makes output files smaller, especially
   if using `--save-as-linestrings`
+* When splitting into single paths, use of --min-length-m now possible
 
 ## v0.8.0 (2023-10-07)
 
