@@ -231,14 +231,14 @@ impl Eq for WayGroup {}
 
 impl PartialOrd for WayGroup {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self.length_m, other.length_m) {
-            (Some(a), Some(b)) => Some(a.total_cmp(&b).reverse()),
-            _ => Some(self.root_wayid.cmp(&other.root_wayid)),
-        }
+        Some(self.cmp(other))
     }
 }
 impl Ord for WayGroup {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
+        match (self.length_m, other.length_m) {
+            (Some(a), Some(b)) => a.total_cmp(&b).reverse(),
+            _ => self.root_wayid.cmp(&other.root_wayid),
+        }
     }
 }
