@@ -182,14 +182,21 @@ impl WayGroup {
         loop {
             // Alternate putting the longest or the shortest first.
             // since the segements are matched in order, this optimises how they are matched up.
-            self.nodeids.par_sort_by_key(|e| (e.len() as isize) * (if round%2 == 0 { -1 } else { 1 }));
+            self.nodeids
+                .par_sort_by_key(|e| (e.len() as isize) * (if round % 2 == 0 { -1 } else { 1 }));
             graph_modified = false;
             num_nodes = self.nodeids.len();
             if old_num_nodeids > 1_000 {
-                trace!("wg:{} reorder_segments. round {round}. There are {num_nodes} nodeids", self.root_wayid);
+                trace!(
+                    "wg:{} reorder_segments. round {round}. There are {num_nodes} nodeids",
+                    self.root_wayid
+                );
             }
             if max_rounds.map_or(false, |max| round >= max) {
-                trace!("wg:{} reorder_segments. round {round}. Reached max rounds, breaking out", self.root_wayid);
+                trace!(
+                    "wg:{} reorder_segments. round {round}. Reached max rounds, breaking out",
+                    self.root_wayid
+                );
                 break;
             }
             round += 1;
