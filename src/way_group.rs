@@ -158,10 +158,11 @@ impl WayGroup {
             .min_by(|d1, d2| d1.total_cmp(d2))
     }
 
-    pub fn reorder_segments(&mut self, max_rounds: impl Into<Option<usize>>) {
+    pub fn reorder_segments(&mut self, max_rounds: impl Into<Option<usize>>, reorder_segments_bar: &ProgressBar) {
         let max_rounds = max_rounds.into();
         let old_num_nodeids = self.nodeids.len();
         if old_num_nodeids == 1 {
+            reorder_segments_bar.inc(self.nodeids.len() as u64);
             //trace!(
             //    "wg:{} Only one way in this group, skipping reorder",
             //    self.root_wayid
@@ -220,17 +221,21 @@ impl WayGroup {
                     if seg_i.last() == seg_j.first() {
                         seg_i.extend(seg_j.drain(..).skip(1));
                         graph_modified = true;
+                        reorder_segments_bar.inc(1);
                     } else if seg_i.last() == seg_j.last() {
                         seg_i.extend(seg_j.drain(..).rev().skip(1));
                         graph_modified = true;
+                        reorder_segments_bar.inc(1);
                     } else if seg_i.first() == seg_j.first() {
                         seg_i.reverse();
                         seg_i.extend(seg_j.drain(..).skip(1));
                         graph_modified = true;
+                        reorder_segments_bar.inc(1);
                     } else if seg_i.first() == seg_j.last() {
                         seg_i.reverse();
                         seg_i.extend(seg_j.drain(..).rev().skip(1));
                         graph_modified = true;
+                        reorder_segments_bar.inc(1);
                     }
                 }
             }
@@ -242,6 +247,8 @@ impl WayGroup {
         }
 
         self.nodeids.shrink_to_fit();
+        // these segments are “done”
+        reorder_segments_bar.inc(self.nodeids.len() as u64);
 
         trace!(
             "wg:{} After reorder_segments there are {} segments, {} {}, in {round} round(s)",

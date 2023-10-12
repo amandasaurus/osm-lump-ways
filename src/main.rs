@@ -276,6 +276,12 @@ fn main() -> Result<()> {
         .with_style(style.clone()),
     );
 
+    let reorder_segments_bar = process_spinners.add(
+        ProgressBar::new(0)
+            .with_message("Reordering inner segments")
+            .with_style(style.clone()),
+    );
+
     let splitter = process_spinners.add(
         ProgressBar::new(0)
             .with_message("Splitting ways into lines")
@@ -338,9 +344,10 @@ fn main() -> Result<()> {
                     });
             }
 
+            reorder_segments_bar.inc_length(this_group.nodeids.len() as u64);
             way_groups.push(this_group);
         }
-        trace!(
+        info!(
             "In total, found {} waygroups for the tag group {:?}",
             way_groups.len().to_formatted_string(&Locale::en),
             group
@@ -359,7 +366,8 @@ fn main() -> Result<()> {
         }
     })
     .update(|way_group| {
-        way_group.reorder_segments(5);
+        trace!("Reducing the number of inner segments");
+        way_group.reorder_segments(5, &reorder_segments_bar);
     })
     .update(|way_group| {
         trace!("Saving coordinates for all ways");
