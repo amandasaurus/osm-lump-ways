@@ -173,32 +173,45 @@ impl WayGroup {
         );
 
         let mut graph_modified = false;
+        let mut round = 0;
+        let mut seg_i: &mut Vec<_>;
+        let mut num_nodes;
+        let mut left;
+        let mut right;
         loop {
+            // Alternate putting the longest or the shortest first.
+            // since the segements are matched in order, this optimises how they are matched up.
+            self.nodeids.par_sort_by_key(|e| (e.len() as isize) * (if round%2 == 0 { -1 } else { 1 }));
             graph_modified = false;
-            let num_nodes = self.nodeids.len();
+            num_nodes = self.nodeids.len();
+            if old_num_nodeids > 1_000 {
+                trace!("wg:{} reorder_segments. round {round}. There are {num_nodes} nodeids", self.root_wayid);
+            }
+            round += 1;
             for i in 0..num_nodes {
-                let (left, right) = self.nodeids.split_at_mut(i + 1);
-                let mut seg_i: &mut Vec<_> = left.last_mut().unwrap();
+                (left, right) = self.nodeids.split_at_mut(i + 1);
+                seg_i = left.last_mut().unwrap();
                 if seg_i.is_empty() {
                     continue;
                 }
                 for seg_j in right.iter_mut() {
-                    if seg_j.is_empty() {
-                        continue;
-                    }
-                    if seg_i == seg_j {
-                        continue;
-                    }
                     if seg_i.last() == seg_j.first() {
                         seg_i.extend(seg_j.drain(..).skip(1));
                         graph_modified = true;
                     } else if seg_i.last() == seg_j.last() {
                         seg_i.extend(seg_j.drain(..).rev().skip(1));
                         graph_modified = true;
+                    } else if seg_i.first() == seg_j.first() {
+                        seg_i.reverse();
+                        seg_i.extend(seg_j.drain(..).skip(1));
+                        graph_modified = true;
+                    } else if seg_i.first() == seg_j.last() {
+                        seg_i.reverse();
+                        seg_i.extend(seg_j.drain(..).rev().skip(1));
+                        graph_modified = true;
                     }
                 }
             }
-
             self.nodeids.retain(|segments| !segments.is_empty());
 
             if !graph_modified {
@@ -209,7 +222,7 @@ impl WayGroup {
         self.nodeids.shrink_to_fit();
 
         trace!(
-            "wg:{} After reorder_segments there are {} segments, {} {}",
+            "wg:{} After reorder_segments there are {} segments, {} {}, in {round} round(s)",
             self.root_wayid,
             self.nodeids.len(),
             if old_num_nodeids > self.nodeids.len() {
