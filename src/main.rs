@@ -228,14 +228,15 @@ fn main() -> Result<()> {
             .objects()
             .take_while(|o| o.is_node())
             .par_bridge()
-            .for_each_with(nodeid_pos.clone(), |nodeid_pos, o| {
-                if let Some(n) = o.into_node() {
-                    if nodeid_wayids.contains_nid(&n.id()) {
-                        let ll = n.lat_lon_f64().unwrap();
-                        setting_node_pos.inc(1);
-                        nodeid_pos.lock().unwrap().insert(n.id(), (ll.1, ll.0));
-                    }
-                }
+            .filter_map(|o| o.into_node())
+            .filter(|n| nodeid_wayids.contains_nid(&n.id()))
+            .map(|n| {
+                let ll = n.lat_lon_f64().unwrap();
+                (n.id(), (ll.1, ll.0))
+            })
+            .for_each_with(nodeid_pos.clone(), |nodeid_pos, (nid, pos)| {
+                setting_node_pos.inc(1);
+                nodeid_pos.lock().unwrap().insert(nid, pos);
             });
 
         setting_node_pos.finish();
