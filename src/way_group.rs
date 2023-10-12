@@ -207,7 +207,16 @@ impl WayGroup {
                 if seg_i.is_empty() {
                     continue;
                 }
-                for seg_j in right.iter_mut() {
+                while let Some(seg_j) = right
+                    .par_iter_mut()
+                    .filter(|seg_j| !seg_j.is_empty())
+                    .find_any(|seg_j| {
+                        seg_i.last() == seg_j.first()
+                            || seg_i.last() == seg_j.last()
+                            || seg_i.first() == seg_j.first()
+                            || seg_i.first() == seg_j.last()
+                    })
+                {
                     if seg_i.last() == seg_j.first() {
                         seg_i.extend(seg_j.drain(..).skip(1));
                         graph_modified = true;
