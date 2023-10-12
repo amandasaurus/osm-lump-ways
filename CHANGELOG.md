@@ -4,7 +4,8 @@
 
 * Refactor the re-ordering to fix bug which practically caused an infinite
   loop.
-* Internal refactor to slightly speed up initial file read
+* Internal refactor to slightly speed up initial file read, incl. with node
+  positions
 
 ## v0.9.0 (2023-10-11)
 

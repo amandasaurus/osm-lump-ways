@@ -109,6 +109,7 @@ pub struct NodeIdPositionBucket {
     bucket_shift: i64,
     num_nodes: usize,
     inner: BTreeMap<i32, Vec<u8>>,
+    cache: Option<(i32, Vec<Option<(i32, i32)>>)>,
 }
 
 impl NodeIdPositionBucket {
@@ -117,6 +118,7 @@ impl NodeIdPositionBucket {
             bucket_shift: bucket_shift,
             num_nodes: 0,
             inner: BTreeMap::new(),
+            cache: None,
         }
     }
 
@@ -132,6 +134,24 @@ impl NodeIdPositionBucket {
         let local_index = (nid % (2_i64.pow(self.bucket_shift() as u32))) as usize;
         (bucket, local_index)
     }
+
+    fn warm_cache(&mut self, nid: i64) {
+        let (bucket_id, local_index) = self.nodeid_bucket_local(nid);
+        if let Some(cache) = &self.cache {
+            if cache.0 != bucket_id {
+                // store the cache in the inner
+                let mut bytes = vec![];
+                bucket_bytes_write(self.bucket_shift(), &cache.1, &mut bytes);
+                self.inner.insert(cache.0, bytes);
+                self.cache = None;
+            }
+        }
+        if self.cache.is_none() {
+            let bytes: &[u8] = self.inner.entry(bucket_id).or_insert_with(|| vec![0]);
+            let mut latlngs = bucket_bytes_read(self.bucket_shift, bytes);
+            self.cache = Some((bucket_id, latlngs));
+        }
+    }
 }
 
 impl NodeIdPosition for NodeIdPositionBucket {
@@ -145,19 +165,11 @@ impl NodeIdPosition for NodeIdPositionBucket {
             Lat::try_from(pos.0).unwrap().inner(),
             Lon::try_from(pos.1).unwrap().inner(),
         );
-
+        self.warm_cache(nid);
         let (bucket_id, local_index) = self.nodeid_bucket_local(nid);
-        trace!(
-            "nid = {} bucket_name = {} local_index = {}, self.inner.contains_key(X) {}",
-            nid,
-            bucket_id,
-            local_index,
-            self.inner.contains_key(&bucket_id)
-        );
-        let bytes: &[u8] = self.inner.entry(bucket_id).or_insert_with(|| vec![0]);
-        let mut latlngs = bucket_bytes_read(self.bucket_shift, bytes);
-        trace!("latlngs {:?}", latlngs);
-        /// TODO I think this is broken?!
+
+        let latlngs = &mut self.cache.as_mut().unwrap().1;
+
         if latlngs[local_index].is_none() {
             trace!("inc self.num_nodes");
             self.num_nodes += 1;
@@ -165,15 +177,22 @@ impl NodeIdPosition for NodeIdPositionBucket {
             trace!("latlngs[{}] {:?}", local_index, latlngs[local_index]);
         }
         latlngs[local_index] = Some(pos);
-        let mut bytes = vec![];
-
-        bucket_bytes_write(self.bucket_shift(), &latlngs, &mut bytes);
-
-        self.inner.insert(bucket_id, bytes);
     }
 
     fn get(&self, nid: &i64) -> Option<(f64, f64)> {
         let (bucket_id, local_index) = self.nodeid_bucket_local(*nid);
+        if let Some((cache_bucket_id, cache_latlngs)) = &self.cache {
+            if *cache_bucket_id == bucket_id {
+                return cache_latlngs[local_index]
+                    .map(|(lat_i32, lng_i32)| {
+                        (
+                            Lat::from_inner(lat_i32).degrees(),
+                            Lon::from_inner(lng_i32).degrees(),
+                        )
+                    });
+            }
+        }
+
         self.inner
             .get(&bucket_id)
             .map_or(None, |bytes| {
