@@ -169,6 +169,14 @@ impl WayGroup {
             //);
             return;
         }
+        if old_num_nodeids > 1000 {
+            reorder_segments_bar.inc(self.nodeids.len() as u64);
+            trace!(
+                "wg:{} Before reorder_segments there are {old_num_nodeids} segments, and this is too much. Returning w/o doing anything to this group",
+                self.root_wayid,
+            );
+            return
+        }
         trace!(
             "wg:{} Before reorder_segments there are {old_num_nodeids} segments",
             self.root_wayid,
