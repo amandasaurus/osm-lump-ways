@@ -358,7 +358,7 @@ fn main() -> Result<()> {
         }
     })
     .update(|way_group| {
-        way_group.reorder_segments();
+        way_group.reorder_segments(5);
     })
     .update(|way_group| {
         trace!("Saving coordinates for all ways");

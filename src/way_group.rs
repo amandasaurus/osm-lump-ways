@@ -158,7 +158,8 @@ impl WayGroup {
             .min_by(|d1, d2| d1.total_cmp(d2))
     }
 
-    pub fn reorder_segments(&mut self) {
+    pub fn reorder_segments(&mut self, max_rounds: impl Into<Option<usize>>) {
+        let max_rounds = max_rounds.into();
         let old_num_nodeids = self.nodeids.len();
         if old_num_nodeids == 1 {
             //trace!(
@@ -186,6 +187,10 @@ impl WayGroup {
             num_nodes = self.nodeids.len();
             if old_num_nodeids > 1_000 {
                 trace!("wg:{} reorder_segments. round {round}. There are {num_nodes} nodeids", self.root_wayid);
+            }
+            if max_rounds.map_or(false, |max| round >= max) {
+                trace!("wg:{} reorder_segments. round {round}. Reached max rounds, breaking out", self.root_wayid);
+                break;
             }
             round += 1;
             for i in 0..num_nodes {
