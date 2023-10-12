@@ -202,7 +202,8 @@ impl WayGroup {
                 break;
             }
             round += 1;
-            for i in 0..num_nodes {
+            // Only do the first 1,000 edges. otherwise it takes multiple times longer
+            for i in 0..std::cmp::min(num_nodes, 1_000) {
                 (left, right) = self.nodeids.split_at_mut(i + 1);
                 seg_i = left.last_mut().unwrap();
                 if seg_i.is_empty() {
