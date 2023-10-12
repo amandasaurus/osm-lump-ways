@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## v0.9.0 (2023-10-11)
 
 * Data is internally re-ordered, which makes output files smaller, especially
