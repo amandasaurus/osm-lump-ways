@@ -250,6 +250,11 @@ impl WayGroup {
         // these segments are “done”
         reorder_segments_bar.inc(self.nodeids.len() as u64);
 
+        // coords no longer valid
+        self.coords = None;
+        // in theory this shouldn't change, but just in case
+        self.length_m = None;
+
         trace!(
             "wg:{} After reorder_segments there are {} segments, {} {}, in {round} round(s)",
             self.root_wayid,
