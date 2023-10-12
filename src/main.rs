@@ -58,6 +58,8 @@ fn main() -> Result<()> {
         log::set_max_level(args.verbose.log_level_filter());
     }
 
+    info!("Starting osm-lump-ways v{}", std::env!("CARGO_PKG_VERSION"));
+
     let reader = read_progress::BufReaderWithSize::from_path(&args.input_filename)?;
     let mut reader = osmio::pbf::PBFReader::new(reader);
 
