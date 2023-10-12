@@ -161,10 +161,10 @@ impl WayGroup {
     pub fn reorder_segments(&mut self) {
         let old_num_nodeids = self.nodeids.len();
         if old_num_nodeids == 1 {
-            trace!(
-                "wg:{} Only one way in this group, skipping reorder",
-                self.root_wayid
-            );
+            //trace!(
+            //    "wg:{} Only one way in this group, skipping reorder",
+            //    self.root_wayid
+            //);
             return;
         }
         trace!(
