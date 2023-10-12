@@ -171,7 +171,7 @@ impl WayGroup {
         }
         if old_num_nodeids > 50_000 {
             reorder_segments_bar.inc(self.nodeids.len() as u64);
-            trace!(
+            debug!(
                 "wg:{} Before reorder_segments there are {old_num_nodeids} segments, and this is too much. Returning w/o doing anything to this group",
                 self.root_wayid,
             );
@@ -263,15 +263,11 @@ impl WayGroup {
         // in theory this shouldn't change, but just in case
         self.length_m = None;
 
-        trace!(
-            "wg:{} After reorder_segments there are {} segments, {} {}, in {round} round(s)",
+        log!(
+            if old_num_nodeids > 1_000 || old_num_nodeids - self.nodeids.len() > 5_000 { Debug } else { Trace },
+            "wg:{} After reorder_segments there are {} segments, removed {}, in {round} round(s)",
             self.root_wayid,
             self.nodeids.len(),
-            if old_num_nodeids > self.nodeids.len() {
-                "removed"
-            } else {
-                "added"
-            },
             old_num_nodeids.abs_diff(self.nodeids.len()),
         );
     }
