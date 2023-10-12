@@ -175,7 +175,7 @@ impl WayGroup {
                 "wg:{} Before reorder_segments there are {old_num_nodeids} segments, and this is too much. Returning w/o doing anything to this group",
                 self.root_wayid,
             );
-            return
+            return;
         }
         trace!(
             "wg:{} Before reorder_segments there are {old_num_nodeids} segments",
