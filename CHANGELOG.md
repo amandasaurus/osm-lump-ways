@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+* Refactor the re-ordering to fix bug which practically caused an infinite
+  loop.
+* Internal refactor to slightly speed up initial file read
+
 ## v0.9.0 (2023-10-11)
 
 * Data is internally re-ordered, which makes output files smaller, especially
