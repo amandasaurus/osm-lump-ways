@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* Update dependency to use a version without a bug
+
 ## v0.10.0 (2023-10-13)
 
 * Refactor the re-ordering to fix bug which practically caused an infinite
