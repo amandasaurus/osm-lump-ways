@@ -80,8 +80,8 @@ fn main() -> Result<()> {
         && !args.overwrite
         && std::path::Path::new(&args.output_filename).exists()
     {
-        warn!("Output file {} already exists and --overwrite not used. Refusing to overwrite, and exiting early", args.output_filename);
-        return Ok(());
+        error!("Output file {} already exists and --overwrite not used. Refusing to overwrite, and exiting early", args.output_filename);
+        anyhow::bail!("Output file {} already exists and --overwrite not used. Refusing to overwrite, and exiting early", args.output_filename);
     }
 
     if !args.input_filename.is_file() {

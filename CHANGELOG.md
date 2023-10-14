@@ -3,6 +3,8 @@
 ## Unreleased
 
 * Update dependency to use a version without a bug
+* If the output file already exists, then exit with error so script can know
+  “something is not as I expect”
 
 ## v0.10.0 (2023-10-13)
 
