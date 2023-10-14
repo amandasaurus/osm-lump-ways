@@ -158,6 +158,8 @@ impl WayGroup {
             .min_by(|d1, d2| d1.total_cmp(d2))
     }
 
+    /// Try to reduce the number of inner segments, by merging segments which are end to end
+    /// connected
     pub fn reorder_segments(
         &mut self,
         max_rounds: impl Into<Option<usize>>,
@@ -166,14 +168,12 @@ impl WayGroup {
         let max_rounds = max_rounds.into();
         let old_num_nodeids = self.nodeids.len();
         if old_num_nodeids == 1 {
+            // nothing to do
             reorder_segments_bar.inc(self.nodeids.len() as u64);
-            //trace!(
-            //    "wg:{} Only one way in this group, skipping reorder",
-            //    self.root_wayid
-            //);
             return;
         }
-        if old_num_nodeids > 500_000 {
+        /// This algorithm can take ages on very large groups, so skip them.
+        if old_num_nodeids > 500_000_000 {
             reorder_segments_bar.inc(self.nodeids.len() as u64);
             debug!(
                 "wg:{} Before reorder_segments there are {old_num_nodeids} segments, and this is too much. Returning w/o doing anything to this group",
@@ -192,6 +192,8 @@ impl WayGroup {
         let mut num_nodes;
         let mut left;
         let mut right;
+
+        // Main loop to remove segments
         loop {
             // Alternate putting the longest or the shortest first.
             // since the segements are matched in order, this optimises how they are matched up.
@@ -214,12 +216,18 @@ impl WayGroup {
                 break;
             }
             round += 1;
+
+            // Go over all the existing segments
             for i in 0..num_nodes {
                 (left, right) = self.nodeids.split_at_mut(i + 1);
                 seg_i = left.last_mut().unwrap();
                 if seg_i.is_empty() {
                     continue;
                 }
+
+                // Look at all segments after this one, and see if they can be merged into this
+                // TODO Can this be done faster? With every iteration it looks at the start of the
+                // slice and goes onwards (right?)
                 while let Some(seg_j) = right
                     .par_iter_mut()
                     .filter(|seg_j| !seg_j.is_empty())
@@ -251,6 +259,7 @@ impl WayGroup {
                     }
                 }
             }
+            // Shrink our total
             self.nodeids.retain(|segments| !segments.is_empty());
 
             if !graph_modified {

@@ -1,8 +1,10 @@
+/// Storing the position of nodes based on their node id
 use super::*;
 use osmio::{Lat, Lon};
 use std::collections::{BTreeMap, HashMap};
 use vartyint;
 
+/// Store the position of a node based on it's id
 pub trait NodeIdPosition: std::fmt::Debug + std::marker::Send + std::marker::Sync {
     fn new() -> Self
     where
@@ -40,6 +42,8 @@ pub(crate) fn default() -> impl NodeIdPosition {
     NodeIdPositionBucket::with_bucket(5)
 }
 
+/// A simple map
+// IME BTreeMap is smaller than HashMap. Positions are stored as i32
 #[derive(Debug, GetSize)]
 pub struct NodeIdPositionMap {
     inner: BTreeMap<i64, (i32, i32)>,
@@ -104,15 +108,24 @@ impl NodeIdPosition for NodeIdPositionMap {
     }
 }
 
+/// A memory effecient node location store
+/// nodes with the same id are often very close together. This will bucket nodes based on id, and
+/// store several relative offsets (in a compressed form)
 #[derive(Debug, GetSize)]
 pub struct NodeIdPositionBucket {
+    /// left shift node ids by this much. Max 6
     bucket_shift: i64,
     num_nodes: usize,
+
+    /// All the data is here. Key is the bucket id
     inner: BTreeMap<i32, Vec<u8>>,
+
+    /// A local cache of decoded values to make lookup & inserts faster
     cache: Option<(i32, Vec<Option<(i32, i32)>>)>,
 }
 
 impl NodeIdPositionBucket {
+    /// Create a new object with this shift
     fn with_bucket(bucket_shift: i64) -> Self {
         NodeIdPositionBucket {
             bucket_shift: bucket_shift,
@@ -122,10 +135,12 @@ impl NodeIdPositionBucket {
         }
     }
 
+    /// a simple getter
     fn bucket_shift(&self) -> i64 {
         self.bucket_shift
     }
 
+    /// Return the bucket id, and the local offset within that bucket for this nodeid
     fn nodeid_bucket_local(&self, nid: i64) -> (i32, usize) {
         let bucket: i32 = (nid >> self.bucket_shift())
             .try_into()
@@ -135,18 +150,24 @@ impl NodeIdPositionBucket {
         (bucket, local_index)
     }
 
+    /// Set the cache to be the value for this node id
     fn warm_cache(&mut self, nid: i64) {
         let (bucket_id, local_index) = self.nodeid_bucket_local(nid);
+
+        // Do we have a cache that isn't for this node id? If so, write that out
         if let Some(cache) = &self.cache {
             if cache.0 != bucket_id {
-                // store the cache in the inner
+                // store the current cache in the inner
                 let mut bytes = vec![];
                 bucket_bytes_write(self.bucket_shift(), &cache.1, &mut bytes);
                 self.inner.insert(cache.0, bytes);
                 self.cache = None;
             }
         }
+
+        // Now set the cache to the required value
         if self.cache.is_none() {
+            // Read from the inner data
             let bytes: &[u8] = self.inner.entry(bucket_id).or_insert_with(|| vec![0]);
             let mut latlngs = bucket_bytes_read(self.bucket_shift, bytes);
             self.cache = Some((bucket_id, latlngs));
@@ -257,10 +278,18 @@ fn bucket_bytes_read(bucket_size: i64, bytes: &[u8]) -> Vec<Option<(i32, i32)>> 
     result
 }
 
+/// Store the node positions
+/// Data format:
+///   varint i64 bitmask. if bit i is set (i.e. `1`) then that node has a position set, `0` =
+///   nid not in the bucket
+///   Then 2N more varint32's. 2 int for each node, the latitude & longitudes
+///   All lats are stored as the offset from the last lat. (lng are the same).
 fn bucket_bytes_write(bucket_size: i64, pos: &[Option<(i32, i32)>], output: &mut Vec<u8>) {
     assert_eq!(pos.len(), 2_i32.pow(bucket_size as u32) as usize);
     assert!(bucket_size <= 6); // only support i64
     output.truncate(0);
+
+    // Node id mask
     let mut mask = 0i64;
     for (i, p) in pos.iter().enumerate() {
         if p.is_some() {
@@ -269,6 +298,7 @@ fn bucket_bytes_write(bucket_size: i64, pos: &[Option<(i32, i32)>], output: &mut
     }
     vartyint::write_i64(mask, output);
 
+    // the locations
     let mut curr_0 = 0;
     let mut curr_1 = 0;
     for p in pos.iter().filter_map(|x| *x) {
