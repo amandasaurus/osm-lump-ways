@@ -183,13 +183,12 @@ impl NodeIdPosition for NodeIdPositionBucket {
         let (bucket_id, local_index) = self.nodeid_bucket_local(*nid);
         if let Some((cache_bucket_id, cache_latlngs)) = &self.cache {
             if *cache_bucket_id == bucket_id {
-                return cache_latlngs[local_index]
-                    .map(|(lat_i32, lng_i32)| {
-                        (
-                            Lat::from_inner(lat_i32).degrees(),
-                            Lon::from_inner(lng_i32).degrees(),
-                        )
-                    });
+                return cache_latlngs[local_index].map(|(lat_i32, lng_i32)| {
+                    (
+                        Lat::from_inner(lat_i32).degrees(),
+                        Lon::from_inner(lng_i32).degrees(),
+                    )
+                });
             }
         }
 

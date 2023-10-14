@@ -158,7 +158,11 @@ impl WayGroup {
             .min_by(|d1, d2| d1.total_cmp(d2))
     }
 
-    pub fn reorder_segments(&mut self, max_rounds: impl Into<Option<usize>>, reorder_segments_bar: &ProgressBar) {
+    pub fn reorder_segments(
+        &mut self,
+        max_rounds: impl Into<Option<usize>>,
+        reorder_segments_bar: &ProgressBar,
+    ) {
         let max_rounds = max_rounds.into();
         let old_num_nodeids = self.nodeids.len();
         if old_num_nodeids == 1 {
@@ -264,7 +268,11 @@ impl WayGroup {
         self.length_m = None;
 
         log!(
-            if old_num_nodeids > 1_000 || old_num_nodeids - self.nodeids.len() > 5_000 { Debug } else { Trace },
+            if old_num_nodeids > 1_000 || old_num_nodeids - self.nodeids.len() > 5_000 {
+                Debug
+            } else {
+                Trace
+            },
             "wg:{} After reorder_segments there are {} segments, removed {}, in {round} round(s)",
             self.root_wayid,
             self.nodeids.len(),
