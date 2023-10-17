@@ -1,3 +1,4 @@
+#![allow(unused)]
 /// https://en.wikipedia.org/wiki/Floyd%E2%80%93Warshall_algorithm
 use super::*;
 use anyhow::{Context, Result};

@@ -12,6 +12,8 @@ where
     size: usize,
 }
 
+// This code could probably be deleted. It's not used.
+#[allow(unused)]
 impl<T> UndirectedGraph<T>
 where
     T: Clone,
@@ -111,6 +113,7 @@ where
     size: usize,
 }
 
+#[allow(unused)]
 impl<T> DirectedGraph<T>
 where
     T: Clone,
@@ -197,6 +200,7 @@ where
         self.edges.entry(*j).or_default().insert(*i, (val, vec![]));
     }
 
+    #[allow(unused)]
     pub fn get(&self, i: &V, j: &V) -> Option<&E> {
         self.edges
             .get(i)
@@ -211,6 +215,7 @@ where
         self.get_all(i, j).map(|(_e, intermediates)| intermediates.as_slice())
     }
 
+    #[allow(unused)]
     /// Return iterator over all the “contracted” edges.
     /// Each element is 1: the edge weight for that “segment”, and 2: an iterator over the vertexes
     /// of this segment (in order)
@@ -357,10 +362,10 @@ where
             return;
         }
 
-        let mut graph_has_been_modified = false;
+        let mut graph_has_been_modified;
         let mut candidate_vertexes = Vec::new();
         let mut contraction_round = 0;
-        let mut this_vertex_contracted = false;
+        let mut this_vertex_contracted;
         loop {
             trace!(
                 "Contraction round {}. There are {} vertexes and {} edges",
