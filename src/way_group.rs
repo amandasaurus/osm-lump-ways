@@ -172,7 +172,7 @@ impl WayGroup {
             reorder_segments_bar.inc(self.nodeids.len() as u64);
             return;
         }
-        /// This algorithm can take ages on very large groups, so skip them.
+        // This algorithm can take ages on very large groups, so skip them.
         if old_num_nodeids > 500_000_000 {
             reorder_segments_bar.inc(self.nodeids.len() as u64);
             debug!(
@@ -186,7 +186,7 @@ impl WayGroup {
             self.root_wayid,
         );
 
-        let mut graph_modified = false;
+        let mut graph_modified;
         let mut round = 0;
         let mut seg_i: &mut Vec<_>;
         let mut num_nodes;

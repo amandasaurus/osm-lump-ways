@@ -1,7 +1,7 @@
 /// Storing the position of nodes based on their node id
 use super::*;
 use osmio::{Lat, Lon};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use vartyint;
 
 /// Store the position of a node based on it's id

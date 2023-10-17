@@ -1,9 +1,8 @@
 use super::*;
-use anyhow::{Context, Result};
-use graph::{DirectedGraph, UndirectedAdjGraph, UndirectedGraph};
+use anyhow::{Result};
+use graph::UndirectedAdjGraph;
 use ordered_float::OrderedFloat;
 use std::collections::BinaryHeap;
-use std::iter;
 
 fn min_max<T: PartialOrd>(a: T, b: T) -> (T, T) {
     if a < b {
