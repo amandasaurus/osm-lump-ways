@@ -1,6 +1,7 @@
 /*.geojson
 /*.mbtiles
 /*.pmtiles
+/*.pmtiles-journal
 /*.osm.pbf
 /*.qgz
 /blog-posts/*
