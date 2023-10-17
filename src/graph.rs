@@ -193,23 +193,22 @@ where
         self.edges
             .entry(*i)
             .or_default()
-            .insert(*j, (val.clone(), vec![]));
+            .insert(*j, (val, vec![]));
         self.edges.entry(*j).or_default().insert(*i, (val, vec![]));
     }
 
     pub fn get(&self, i: &V, j: &V) -> Option<&E> {
         self.edges
-            .get(&i)
-            .and_then(|from_i| from_i.get(&j).map(|(e, intermediates)| e))
+            .get(i)
+            .and_then(|from_i| from_i.get(j).map(|(e, _intermediates)| e))
     }
 
     pub fn get_all(&self, i: &V, j: &V) -> Option<&(E, Vec<V>)> {
-        self.edges.get(&i).and_then(|from_i| from_i.get(&j))
+        self.edges.get(i).and_then(|from_i| from_i.get(j))
     }
 
     pub fn get_intermediates(&self, i: &V, j: &V) -> Option<&[V]> {
-        self.get_all(i, j)
-            .and_then(|(_e, intermediates)| Some(intermediates.as_slice()))
+        self.get_all(i, j).map(|(_e, intermediates)| intermediates.as_slice())
     }
 
     /// Return iterator over all the “contracted” edges.
@@ -243,7 +242,7 @@ where
     pub fn neighbors(&self, i: &V) -> impl Iterator<Item = (&V, &E)> {
         self.edges[i]
             .iter()
-            .map(|(j, (edge_weight, intermediates))| (j, edge_weight))
+            .map(|(j, (edge_weight, _intermediates))| (j, edge_weight))
     }
     /// Number of neighbours for this vertex.
     pub fn num_neighbors(&self, i: &V) -> usize {
@@ -251,7 +250,7 @@ where
     }
 
     pub fn max_vertex_id(&self) -> V {
-        self.edges.keys().max().unwrap().clone()
+        *self.edges.keys().max().unwrap()
     }
     pub fn len(&self) -> usize {
         self.edges
@@ -274,7 +273,7 @@ where
     pub fn num_vertexes(&self) -> usize {
         self.edges.len()
     }
-    pub fn pretty_print(&self, fmt: &dyn Fn(&E) -> String, col_join: &str) -> String {
+    pub fn pretty_print(&self, _fmt: &dyn Fn(&E) -> String, _col_join: &str) -> String {
         String::new()
     }
 
@@ -312,8 +311,8 @@ where
             return false;
         }
         // a - v - b
-        let a = self.edges[v].keys().nth(0).unwrap().clone();
-        let b = self.edges[v].keys().nth(1).unwrap().clone();
+        let a = *self.edges[v].keys().nth(0).unwrap();
+        let b = *self.edges[v].keys().nth(1).unwrap();
         assert!(a != b);
         if self.edges[&a].contains_key(&b) {
             // there already is an edge from a↔b, so skip this
@@ -326,16 +325,16 @@ where
             self.edges[&a][v].0 + self.edges[v][&b].0 == self.edges[&b][v].0 + self.edges[&v][&a].0
         );
         let mut edge_a_v = self.edges.get_mut(&a).unwrap().remove(v).unwrap();
-        let mut edge_b_v = self.edges.get_mut(&b).unwrap().remove(v).unwrap();
-        let mut edge_v_a = self.edges.get_mut(v).unwrap().remove(&a).unwrap();
+        let _edge_b_v = self.edges.get_mut(&b).unwrap().remove(v).unwrap();
+        let _edge_v_a = self.edges.get_mut(v).unwrap().remove(&a).unwrap();
         let mut edge_v_b = self.edges.get_mut(v).unwrap().remove(&b).unwrap();
         assert!(self.edges[v].is_empty());
         self.edges.remove(v);
         let new_weight = edge_a_v.0 + edge_v_b.0;
         let mut a_b_intermediates: Vec<V> = vec![];
-        a_b_intermediates.extend(edge_a_v.1.drain(..));
-        a_b_intermediates.push(v.clone());
-        a_b_intermediates.extend(edge_v_b.1.drain(..));
+        a_b_intermediates.append(&mut edge_a_v.1);
+        a_b_intermediates.push(*v);
+        a_b_intermediates.append(&mut edge_v_b.1);
         let new_edge_a_b = (new_weight, a_b_intermediates);
         let mut new_edge_b_a = new_edge_a_b.clone();
         new_edge_b_a.1.reverse();
@@ -343,7 +342,7 @@ where
         self.edges.get_mut(&a).unwrap().insert(b, new_edge_a_b);
         self.edges.get_mut(&b).unwrap().insert(a, new_edge_b_a);
 
-        return true;
+        true
     }
 
     pub fn contract_edges(&mut self) {

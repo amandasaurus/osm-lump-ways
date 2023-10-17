@@ -2,7 +2,7 @@
 use super::*;
 use osmio::{Lat, Lon};
 use std::collections::BTreeMap;
-use vartyint;
+
 
 /// Store the position of a node based on it's id
 pub trait NodeIdPosition: std::fmt::Debug + std::marker::Send + std::marker::Sync {
@@ -102,7 +102,7 @@ impl NodeIdPosition for NodeIdPositionMap {
         for el in iter {
             self.insert(
                 el.0,
-                ((el.1 .0.try_into().unwrap(), el.1 .1.try_into().unwrap())),
+                (el.1 .0.try_into().unwrap(), el.1 .1.try_into().unwrap()),
             );
         }
     }
@@ -128,7 +128,7 @@ impl NodeIdPositionBucket {
     /// Create a new object with this shift
     fn with_bucket(bucket_shift: i64) -> Self {
         NodeIdPositionBucket {
-            bucket_shift: bucket_shift,
+            bucket_shift,
             num_nodes: 0,
             inner: BTreeMap::new(),
             cache: None,
@@ -152,7 +152,7 @@ impl NodeIdPositionBucket {
 
     /// Set the cache to be the value for this node id
     fn warm_cache(&mut self, nid: i64) {
-        let (bucket_id, local_index) = self.nodeid_bucket_local(nid);
+        let (bucket_id, _local_index) = self.nodeid_bucket_local(nid);
 
         // Do we have a cache that isn't for this node id? If so, write that out
         if let Some(cache) = &self.cache {
@@ -169,7 +169,7 @@ impl NodeIdPositionBucket {
         if self.cache.is_none() {
             // Read from the inner data
             let bytes: &[u8] = self.inner.entry(bucket_id).or_insert_with(|| vec![0]);
-            let mut latlngs = bucket_bytes_read(self.bucket_shift, bytes);
+            let latlngs = bucket_bytes_read(self.bucket_shift, bytes);
             self.cache = Some((bucket_id, latlngs));
         }
     }
@@ -187,7 +187,7 @@ impl NodeIdPosition for NodeIdPositionBucket {
             Lon::try_from(pos.1).unwrap().inner(),
         );
         self.warm_cache(nid);
-        let (bucket_id, local_index) = self.nodeid_bucket_local(nid);
+        let (_bucket_id, local_index) = self.nodeid_bucket_local(nid);
 
         let latlngs = &mut self.cache.as_mut().unwrap().1;
 
@@ -214,10 +214,9 @@ impl NodeIdPosition for NodeIdPositionBucket {
         }
 
         self.inner
-            .get(&bucket_id)
-            .map_or(None, |bytes| {
+            .get(&bucket_id).and_then(|bytes| {
                 let latlngs = bucket_bytes_read(self.bucket_shift, bytes);
-                latlngs[local_index as usize]
+                latlngs[local_index]
             })
             .map(|(lat_i32, lng_i32)| {
                 (
@@ -231,7 +230,7 @@ impl NodeIdPosition for NodeIdPositionBucket {
         self.num_nodes
     }
 
-    fn retain_by_key(&mut self, f: impl FnMut(&i64) -> bool) {
+    fn retain_by_key(&mut self, _f: impl FnMut(&i64) -> bool) {
         todo!()
     }
 

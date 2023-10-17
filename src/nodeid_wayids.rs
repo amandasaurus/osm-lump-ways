@@ -4,7 +4,7 @@
 use super::*;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
-use vartyint;
+
 
 /// Something which stores which nodeids are in which wayid
 pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
@@ -106,7 +106,7 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
         if let Some(wid) = self.singles.get(nid) {
             Box::new(std::iter::once(*wid))
         } else if let Some(wids) = self.multiples.get(nid) {
-            Box::new(wids.iter().map(|wid| *wid))
+            Box::new(wids.iter().copied())
         } else {
             Box::new(std::iter::empty())
         }
@@ -321,7 +321,7 @@ impl NodeIdWayIds for NodeIdWayIdsBucketWayIndex {
             self.nodeid_bucket_wayid
                 .get(&bucketid)
                 .into_iter()
-                .flat_map(|wids| wids.into_iter())
+                .flat_map(|wids| wids.iter())
                 .filter(move |wid| {
                     self.get_nodeids_for_wayid_iter(**wid)
                         .any(|this_nid| this_nid == nid)

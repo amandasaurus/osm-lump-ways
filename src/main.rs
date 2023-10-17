@@ -44,15 +44,14 @@ fn main() -> Result<()> {
         env_logger::init();
     } else {
         // Initially show with warn to catch warn's in the clap parsing
-        let _logger =
-            env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
                 .init();
     }
 
     let args = cli_args::Args::parse();
     let show_progress_bars = args.verbose.log_level_filter() >= log::Level::Info;
 
-    if !std::env::var("RUST_LOG").is_ok() {
+    if std::env::var("RUST_LOG").is_err() {
         // now we use the -v/-q args to change the level
         log::set_max_level(args.verbose.log_level_filter());
     }
@@ -241,8 +240,8 @@ fn main() -> Result<()> {
             });
 
         setting_node_pos.finish();
-        let nodeid_pos = Arc::try_unwrap(nodeid_pos).unwrap().into_inner().unwrap();
-        nodeid_pos
+        
+        Arc::try_unwrap(nodeid_pos).unwrap().into_inner().unwrap()
     };
 
     debug!("{}", nodeid_pos.detailed_size());
@@ -525,9 +524,7 @@ fn main() -> Result<()> {
                     // for each point what's the nearest other point that's in a longer other wayid
                     let min = wg.coords_iter_par().map(|coord: [f64;2]| -> Option<(f64, i64)> {
                         let nearest_longer = points_distance_idx.iter_nearest(&coord, &haversine::haversine_m_arr).unwrap()
-                            .filter(|(_dist, other_wg_id)| **other_wg_id != wg_id)
-                            .filter(|(_dist, other_wg_id)| way_groups[**other_wg_id].length_m > way_groups[wg_id].length_m)
-                            .next();
+                            .filter(|(_dist, other_wg_id)| **other_wg_id != wg_id).find(|(_dist, other_wg_id)| way_groups[**other_wg_id].length_m > way_groups[wg_id].length_m);
                         prog.inc(1);
                         nearest_longer.map(|(dist, wgid)| (dist, way_groups[*wgid].root_wayid))
                     })
