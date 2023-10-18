@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## v0.11.0 (2023-10-18)
 
 * Update dependency to use a version without a bug
