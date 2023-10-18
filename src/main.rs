@@ -138,7 +138,7 @@ fn main() -> Result<()> {
         .par_bridge()
         .inspect(|_| obj_reader.inc(1))
         .filter_map(|o| o.into_way())
-        .filter(|w| args.tag_filter.par_iter().any(|tf| tf.filter(w)))
+        .filter(|w| args.tag_filter.par_iter().all(|tf| tf.filter(w)))
         .map(|w| {
                 let group = args
                     .tag_group_k
