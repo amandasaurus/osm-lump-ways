@@ -157,7 +157,7 @@ fn main() -> Result<()> {
                 .collect::<Vec<Option<String>>>();
             (w, group)
         })
-        .filter(|(_w, group)| !(!args.incl_unset_group && group.iter().any(|x| x.is_none())))
+        .filter(|(_w, group)| args.incl_unset_group || !group.iter().any(|x| x.is_none()))
         .for_each_with(
             (nodeid_wayids.clone(), group_wayid_nodes.clone()),
             |(nodeid_wayids, group_wayid_nodes), (w, group)| {
