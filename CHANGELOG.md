@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+* Output improvements with log messages and progress bars
+* Small bug fixes when generating properties
+
 ## v0.11.0 (2023-10-18)
 
 * Update dependency to use a version without a bug
