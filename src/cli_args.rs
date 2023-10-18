@@ -20,9 +20,13 @@ pub(crate) struct Args {
     #[arg(short, long, value_name = "FILENAME.osm.pbf")]
     pub input_filename: PathBuf,
 
-    /// Output filename. If `--split-files-by-group` specified, include `%s` for where to place the group.
-    #[arg(short, long, value_name = "OUTPUT.geojson")]
+    /// Output filename. If `--split-files-by-group` specified, include `%s` for where to place the
+    /// group.
+    /// Filename .geojson will be GeoJSON, .geojsons will be GeoJSONSeq which is faster for
+    /// tippecanoe to read
+    #[arg(short, long, value_name = "OUTPUT.geojson[s]")]
     pub output_filename: String,
+
 
     /// If the output file already exists, overwrite it. By default, exit if the output already
     /// exists

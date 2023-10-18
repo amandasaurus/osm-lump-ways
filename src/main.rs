@@ -71,8 +71,8 @@ fn main() -> Result<()> {
         warn!("The output filename ({}) contains '%s'. Did you forget --split-files-by-group ? Continuing without splitting by group", args.output_filename);
     }
 
-    if !args.output_filename.ends_with(".geojson") {
-        warn!("Output filename {} doesn't end with .geojson. This programme only created GeoJSON files", args.output_filename);
+    if !args.output_filename.ends_with(".geojson") && !args.output_filename.ends_with(".geojsons") {
+        warn!("Output filename '{}' doesn't end with '.geojson' or '.geojsons'. This programme only created GeoJSON or GeoJSONSeq files", args.output_filename);
     }
 
     if args.split_files_by_group && args.tag_group_k.is_empty() {
@@ -97,6 +97,13 @@ fn main() -> Result<()> {
             args.input_filename.display()
         );
     }
+
+    let output_format = if args.output_filename.ends_with(".geojson") { OutputFormat::GeoJSON } else if args.output_filename.ends_with(".geojsons") { OutputFormat::GeoJSONSeq } else {
+        warn!("Unknown output format for file {:?}", args.output_filename);
+        anyhow::bail!("Unknown output format for file {:?}", args.output_filename);
+    };
+    debug!("Output format: {output_format:?}");
+
 
     info!("Starting to read {:?}", &args.input_filename);
     info!("Tag filter(s) in operation: {:?}", args.tag_filter);
@@ -617,7 +624,7 @@ fn main() -> Result<()> {
         match std::fs::File::create(&filename) {
             Ok(f) => {
                 let mut f = std::io::BufWriter::new(f);
-                let num_written = write_geojson_features_directly(&features, &mut f, args.save_as_linestrings)
+                let num_written = write_geojson_features_directly(&features, &mut f, args.save_as_linestrings, &output_format)
                     .with_context(|| {
                         format!(
                             "Writing {} features to filename {:?}",
@@ -670,16 +677,23 @@ fn write_geojson_features_directly(
     features: &[(serde_json::Value, Vec<Vec<(f64, f64)>>)],
     mut f: &mut impl Write,
     save_as_linestrings: bool,
+    output_format: &OutputFormat,
 ) -> Result<usize> {
     let mut num_written = 0;
 
-    f.write_all(b"{\"type\":\"FeatureCollection\", \"features\": [\n")?;
-    num_written += write_geojson_feature_directly(&mut f, &features[0], save_as_linestrings)?;
-    for feature in &features[1..] {
-        f.write_all(b",\n")?;
-        num_written += write_geojson_feature_directly(&mut f, feature, save_as_linestrings)?;
+    if output_format == &OutputFormat::GeoJSON {
+        f.write_all(b"{\"type\":\"FeatureCollection\", \"features\": [\n")?;
     }
-    f.write_all(b"\n]}")?;
+    num_written += write_geojson_feature_directly(&mut f, &features[0], save_as_linestrings, output_format)?;
+    for feature in &features[1..] {
+        if output_format == &OutputFormat::GeoJSON {
+            f.write_all(b",\n")?;
+        }
+        num_written += write_geojson_feature_directly(&mut f, feature, save_as_linestrings, output_format)?;
+    }
+    if output_format == &OutputFormat::GeoJSON {
+        f.write_all(b"\n]}")?;
+    }
 
     Ok(num_written)
 }
@@ -688,13 +702,21 @@ fn write_geojson_feature_directly(
     mut f: &mut impl Write,
     feature: &(serde_json::Value, Vec<Vec<(f64, f64)>>),
     save_as_linestrings: bool,
+    output_format: &OutputFormat,
 ) -> Result<usize> {
     let mut num_written = 0;
     if save_as_linestrings {
         for (k, linestring) in feature.1.iter().enumerate() {
-            if k != 0 {
-                f.write_all(b",\n")?;
-            }
+            match output_format {
+                OutputFormat::GeoJSON => {
+                    if k != 0 {
+                        f.write_all(b",\n")?;
+                    }
+                },
+                OutputFormat::GeoJSONSeq => {
+                    f.write_all(b"\x1E")?;
+                }
+            };
             f.write_all(b"{\"properties\":")?;
             serde_json::to_writer(&mut f, &feature.0)?;
             f.write_all(b", \"geometry\": {\"type\":\"LineString\", \"coordinates\": ")?;
@@ -707,9 +729,15 @@ fn write_geojson_feature_directly(
             }
             f.write_all(b"]")?;
             f.write_all(b"}, \"type\": \"Feature\"}")?;
+            if output_format == &OutputFormat::GeoJSONSeq {
+                f.write_all(b"\x0A")?;
+            }
             num_written += 1;
         }
     } else {
+        if output_format == &OutputFormat::GeoJSONSeq {
+            f.write_all(b"\x1E")?;
+        }
         f.write_all(b"{\"properties\":")?;
         serde_json::to_writer(&mut f, &feature.0)?;
         f.write_all(b", \"geometry\": {\"type\":\"MultiLineString\", \"coordinates\": ")?;
@@ -729,8 +757,17 @@ fn write_geojson_feature_directly(
         }
         f.write_all(b"]")?;
         f.write_all(b"}, \"type\": \"Feature\"}")?;
+        if output_format == &OutputFormat::GeoJSONSeq {
+            f.write_all(b"\x0A")?;
+        }
         num_written += 1;
     }
 
     Ok(num_written)
+}
+
+#[derive(PartialEq, Eq, Debug)]
+enum OutputFormat {
+    GeoJSON,
+    GeoJSONSeq,
 }
