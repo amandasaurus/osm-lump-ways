@@ -346,7 +346,7 @@ fn main() -> Result<()> {
             reorder_segments_bar.inc_length(this_group.nodeids.len() as u64);
             way_groups.push(this_group);
         }
-        info!(
+        debug!(
             "In total, found {} waygroups for the tag group {:?}",
             way_groups.len().to_formatted_string(&Locale::en),
             group
