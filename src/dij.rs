@@ -61,7 +61,8 @@ pub(crate) fn into_segments(
         old.0 - edges.num_edges(),
         old.1 - edges.num_vertexes()
     );
-    splitter.inc_length(edges.num_vertexes() as u64);
+    // This vertexes are now “done”
+    splitter.inc((old.1 - edges.num_vertexes()) as u64);
 
     for paths_generated_so_far in 0..only_longest_n_splitted_paths.unwrap_or(1_000_000) {
         if edges.is_empty() {

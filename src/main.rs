@@ -358,6 +358,11 @@ fn main() -> Result<()> {
             Some(min_len) => way_group.length_m.unwrap() >= min_len,
         }
     )
+    .inspect(|way_group| {
+        if args.split_into_single_paths {
+            splitter.inc_length(way_group.num_nodeids() as u64);
+        }
+    })
 
     // ↓ Split into paths if needed
     .flat_map(|way_group| {
