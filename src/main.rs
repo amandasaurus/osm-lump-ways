@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use get_size::GetSize;
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
+use indicatif_log_bridge::LogWrapper;
 #[allow(unused_imports)]
 use log::{
     debug, error, info, log, log_enabled, trace, warn,
@@ -39,20 +40,23 @@ use nodeid_position::NodeIdPosition;
 mod nodeid_wayids;
 
 fn main() -> Result<()> {
-    // If the RUST_LOG env is set, then use that. else parse from the -v/-q CLI args
-    if std::env::var("RUST_LOG").is_ok() {
-        env_logger::init();
-    } else {
-        // Initially show with warn to catch warn's in the clap parsing
-        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
-    }
+    let logger =
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
+            .build();
+    let progress_bars = indicatif::MultiProgress::new();
+    LogWrapper::new(progress_bars.clone(), logger)
+        .try_init()
+        .unwrap();
 
     let args = cli_args::Args::parse();
-    let show_progress_bars = args.verbose.log_level_filter() >= log::Level::Info;
 
     if std::env::var("RUST_LOG").is_err() {
         // now we use the -v/-q args to change the level
         log::set_max_level(args.verbose.log_level_filter());
+    }
+    let show_progress_bars = args.verbose.log_level_filter() >= log::Level::Info;
+    if !show_progress_bars {
+        progress_bars.set_draw_target(ProgressDrawTarget::hidden());
     }
 
     info!("Starting osm-lump-ways v{}", std::env!("CARGO_PKG_VERSION"));
@@ -110,11 +114,7 @@ fn main() -> Result<()> {
         "[{elapsed_precise}] {percent:>3}% done. eta {eta:>4} {bar:10.cyan/blue} {pos:>7}/{len:7} {per_sec:>12} {msg}",
     )
     .unwrap();
-    let input_spinners = indicatif::MultiProgress::new();
-    if !show_progress_bars {
-        input_spinners.set_draw_target(ProgressDrawTarget::hidden());
-    }
-    let obj_reader = input_spinners.add(
+    let obj_reader = progress_bars.add(
         ProgressBar::new_spinner().with_style(
             ProgressStyle::with_template(
                 "[{elapsed_precise}] {human_pos} OSM objects read {per_sec:>20} obj/sec",
@@ -122,7 +122,7 @@ fn main() -> Result<()> {
             .unwrap(),
         ),
     );
-    let ways_added = input_spinners.add(
+    let ways_added = progress_bars.add(
         ProgressBar::new_spinner().with_style(
             ProgressStyle::with_template(
                 "           {human_pos} ways collected so far for later processing",
@@ -184,7 +184,9 @@ fn main() -> Result<()> {
             },
         );
     obj_reader.finish();
+    progress_bars.remove(&obj_reader);
     ways_added.finish();
+    progress_bars.remove(&ways_added);
     let nodeid_wayids = Arc::try_unwrap(nodeid_wayids)
         .unwrap()
         .into_inner()
@@ -216,12 +218,9 @@ fn main() -> Result<()> {
         nodeid_pos
     } else {
         debug!("Re-reading file to read all nodes");
-        let setting_node_pos = ProgressBar::new(nodeid_wayids.len() as u64)
+        let setting_node_pos = progress_bars.add(ProgressBar::new(nodeid_wayids.len() as u64)
             .with_message("Re-reading file to save node locations")
-            .with_style(style.clone());
-        if !show_progress_bars {
-            setting_node_pos.set_draw_target(ProgressDrawTarget::hidden());
-        }
+            .with_style(style.clone()));
         let mut reader = osmio::read_pbf(&args.input_filename)?;
         reader
             .objects()
@@ -239,6 +238,7 @@ fn main() -> Result<()> {
             });
 
         setting_node_pos.finish();
+        progress_bars.remove(&setting_node_pos);
 
         Arc::try_unwrap(nodeid_pos).unwrap().into_inner().unwrap()
     };
@@ -254,15 +254,11 @@ fn main() -> Result<()> {
     );
 
     info!("All data has been loaded. Started processing...");
-    let process_spinners = indicatif::MultiProgress::new();
-    if !show_progress_bars {
-        process_spinners.set_draw_target(ProgressDrawTarget::hidden());
-    }
     info!(
         "Starting the breathfirst search. There are {} groups",
         group_wayid_nodes.len()
     );
-    let grouping = process_spinners.add(
+    let grouping = progress_bars.add(
         ProgressBar::new(
             group_wayid_nodes
                 .values()
@@ -275,13 +271,13 @@ fn main() -> Result<()> {
         .with_style(style.clone()),
     );
 
-    let reorder_segments_bar = process_spinners.add(
+    let reorder_segments_bar = progress_bars.add(
         ProgressBar::new(0)
             .with_message("Reordering inner segments")
             .with_style(style.clone()),
     );
 
-    let splitter = process_spinners.add(
+    let splitter = progress_bars.add(
         ProgressBar::new(0)
             .with_message("Splitting ways into lines")
             .with_style(style.clone()),
@@ -352,6 +348,7 @@ fn main() -> Result<()> {
             group
         );
         grouping.finish();
+        progress_bars.remove(&grouping);
         way_groups.into_par_iter()
     })
     // ↑ The breath first search is done
@@ -644,8 +641,6 @@ fn main() -> Result<()> {
         }
         Ok(()) as Result<()>
     })?;
-
-    info!("post processing way_groups");
 
     info!("Finished");
     Ok(())
