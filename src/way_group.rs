@@ -173,7 +173,7 @@ impl WayGroup {
             return;
         }
         // This algorithm can take ages on very large groups, so skip them.
-        if old_num_nodeids > 500_000_000 {
+        if old_num_nodeids > 5_000_000 {
             reorder_segments_bar.inc(self.nodeids.len() as u64);
             debug!(
                 "wg:{} Before reorder_segments there are {old_num_nodeids} segments, and this is too much. Returning w/o doing anything to this group",
