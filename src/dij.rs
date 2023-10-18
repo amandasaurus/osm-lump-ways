@@ -49,7 +49,10 @@ pub(crate) fn into_segments(
         .for_each_with(sender, |sender, x| sender.send(x).unwrap());
 
     for ((nid1, nid2), dist) in receiver.iter() {
-        assert!(nid1 < nid2, "Creating the Dij graph, and got nid1<nid2 nid1={nid1} nid2={nid2} dist={dist}");
+        assert!(
+            nid1 < nid2,
+            "Creating the Dij graph, and got nid1<nid2 nid1={nid1} nid2={nid2} dist={dist}"
+        );
         edges.set(&nid1, &nid2, dist);
     }
 

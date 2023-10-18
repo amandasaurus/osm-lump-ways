@@ -98,12 +98,15 @@ fn main() -> Result<()> {
         );
     }
 
-    let output_format = if args.output_filename.ends_with(".geojson") { OutputFormat::GeoJSON } else if args.output_filename.ends_with(".geojsons") { OutputFormat::GeoJSONSeq } else {
+    let output_format = if args.output_filename.ends_with(".geojson") {
+        OutputFormat::GeoJSON
+    } else if args.output_filename.ends_with(".geojsons") {
+        OutputFormat::GeoJSONSeq
+    } else {
         warn!("Unknown output format for file {:?}", args.output_filename);
         anyhow::bail!("Unknown output format for file {:?}", args.output_filename);
     };
     debug!("Output format: {output_format:?}");
-
 
     info!("Starting to read {:?}", &args.input_filename);
     info!("Tag filter(s) in operation: {:?}", args.tag_filter);
@@ -147,19 +150,16 @@ fn main() -> Result<()> {
         .filter_map(|o| o.into_way())
         .filter(|w| args.tag_filter.par_iter().all(|tf| tf.filter(w)))
         .map(|w| {
-                let group = args
-                    .tag_group_k
-                    .par_iter()
-                    .map(|tg| tg.get_values(&w))
-                    .collect::<Vec<Option<String>>>();
-                (w, group)
-            })
-        .filter(|(_w, group)| ! ( !args.incl_unset_group && group.iter().any(|x| x.is_none()) ) )
+            let group = args
+                .tag_group_k
+                .par_iter()
+                .map(|tg| tg.get_values(&w))
+                .collect::<Vec<Option<String>>>();
+            (w, group)
+        })
+        .filter(|(_w, group)| !(!args.incl_unset_group && group.iter().any(|x| x.is_none())))
         .for_each_with(
-            (
-                nodeid_wayids.clone(),
-                group_wayid_nodes.clone(),
-            ),
+            (nodeid_wayids.clone(), group_wayid_nodes.clone()),
             |(nodeid_wayids, group_wayid_nodes), (w, group)| {
                 trace!("Got a way {}, in group {:?}", w.id(), group);
                 rayon::join(
@@ -200,9 +200,11 @@ fn main() -> Result<()> {
     debug!("{}", nodeid_wayids.detailed_size());
 
     debug!("Re-reading file to read all nodes");
-    let setting_node_pos = progress_bars.add(ProgressBar::new(nodeid_wayids.len() as u64)
-        .with_message("Re-reading file to save node locations")
-        .with_style(style.clone()));
+    let setting_node_pos = progress_bars.add(
+        ProgressBar::new(nodeid_wayids.len() as u64)
+            .with_message("Re-reading file to save node locations")
+            .with_style(style.clone()),
+    );
     let mut reader = osmio::read_pbf(&args.input_filename)?;
     let (sender, receiver) = std::sync::mpsc::channel();
     reader
@@ -225,7 +227,6 @@ fn main() -> Result<()> {
 
     setting_node_pos.finish();
     progress_bars.remove(&setting_node_pos);
-
 
     debug!("{}", nodeid_pos.detailed_size());
 
@@ -254,14 +255,10 @@ fn main() -> Result<()> {
         .with_message("Grouping all ways")
         .with_style(style.clone()),
     );
-    let total_groups_found = progress_bars.add(
-        ProgressBar::new_spinner().with_style(
-            ProgressStyle::with_template(
-                "            {human_pos} groups found"
-            )
-            .unwrap(),
-        ),
-    );
+    let total_groups_found =
+        progress_bars.add(ProgressBar::new_spinner().with_style(
+            ProgressStyle::with_template("            {human_pos} groups found").unwrap(),
+        ));
 
     let reorder_segments_bar = progress_bars.add(
         ProgressBar::new(0)
@@ -684,12 +681,14 @@ fn write_geojson_features_directly(
     if output_format == &OutputFormat::GeoJSON {
         f.write_all(b"{\"type\":\"FeatureCollection\", \"features\": [\n")?;
     }
-    num_written += write_geojson_feature_directly(&mut f, &features[0], save_as_linestrings, output_format)?;
+    num_written +=
+        write_geojson_feature_directly(&mut f, &features[0], save_as_linestrings, output_format)?;
     for feature in &features[1..] {
         if output_format == &OutputFormat::GeoJSON {
             f.write_all(b",\n")?;
         }
-        num_written += write_geojson_feature_directly(&mut f, feature, save_as_linestrings, output_format)?;
+        num_written +=
+            write_geojson_feature_directly(&mut f, feature, save_as_linestrings, output_format)?;
     }
     if output_format == &OutputFormat::GeoJSON {
         f.write_all(b"\n]}")?;
@@ -712,7 +711,7 @@ fn write_geojson_feature_directly(
                     if k != 0 {
                         f.write_all(b",\n")?;
                     }
-                },
+                }
                 OutputFormat::GeoJSONSeq => {
                     f.write_all(b"\x1E")?;
                 }

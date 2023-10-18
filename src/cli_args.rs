@@ -27,7 +27,6 @@ pub(crate) struct Args {
     #[arg(short, long, value_name = "OUTPUT.geojson[s]")]
     pub output_filename: String,
 
-
     /// If the output file already exists, overwrite it. By default, exit if the output already
     /// exists
     #[arg(long)]
