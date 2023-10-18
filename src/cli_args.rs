@@ -91,13 +91,6 @@ pub(crate) struct Args {
     #[arg(long)]
     pub split_files_by_group: bool,
 
-    /// Save time by storing node locations at the first pass. Omit to do it in 2-pass, memory
-    /// friendly manner
-    ///
-    /// For small files, using this option can speed up processing time
-    #[arg(long)]
-    pub read_nodes_first: bool,
-
     /// After grouping the ways, split based on longest linear paths
     #[arg(long)]
     pub split_into_single_paths: bool,

@@ -140,18 +140,13 @@ fn main() -> Result<()> {
         .par_bridge()
         .for_each_with(
             (
-                nodeid_pos.clone(),
                 nodeid_wayids.clone(),
                 group_wayid_nodes.clone(),
             ),
-            |(nodeid_pos, nodeid_wayids, group_wayid_nodes), o| {
+            |(nodeid_wayids, group_wayid_nodes), o| {
                 obj_reader.inc(1);
                 match o {
-                    ArcOSMObj::Node(n) => {
-                        if args.read_nodes_first {
-                            let ll = n.lat_lon_f64().unwrap();
-                            nodeid_pos.lock().unwrap().insert(n.id(), (ll.1, ll.0));
-                        }
+                    ArcOSMObj::Node(_n) => {
                     }
                     ArcOSMObj::Way(w) => {
                         if args.tag_filter.par_iter().any(|tf| !tf.filter(&w)) {
@@ -207,44 +202,30 @@ fn main() -> Result<()> {
 
     debug!("{}", nodeid_wayids.detailed_size());
 
-    let nodeid_pos = if args.read_nodes_first {
-        info!("Removing unneeded node positions...");
-        let mut nodeid_pos = Arc::try_unwrap(nodeid_pos).unwrap().into_inner().unwrap();
-        let old_total = nodeid_pos.len();
-        nodeid_pos.retain_by_key(|nid| nodeid_wayids.contains_nid(nid));
-        nodeid_pos.shrink_to_fit();
-        info!(
-            "Removed {} unneeded node positions, only keeping the {} we need",
-            (old_total - nodeid_pos.len()),
-            nodeid_pos.len()
-        );
-        nodeid_pos
-    } else {
-        debug!("Re-reading file to read all nodes");
-        let setting_node_pos = progress_bars.add(ProgressBar::new(nodeid_wayids.len() as u64)
-            .with_message("Re-reading file to save node locations")
-            .with_style(style.clone()));
-        let mut reader = osmio::read_pbf(&args.input_filename)?;
-        reader
-            .objects()
-            .take_while(|o| o.is_node())
-            .par_bridge()
-            .filter_map(|o| o.into_node())
-            .filter(|n| nodeid_wayids.contains_nid(&n.id()))
-            .map(|n| {
-                let ll = n.lat_lon_f64().unwrap();
-                (n.id(), (ll.1, ll.0))
-            })
-            .for_each_with(nodeid_pos.clone(), |nodeid_pos, (nid, pos)| {
-                setting_node_pos.inc(1);
-                nodeid_pos.lock().unwrap().insert(nid, pos);
-            });
+    debug!("Re-reading file to read all nodes");
+    let setting_node_pos = progress_bars.add(ProgressBar::new(nodeid_wayids.len() as u64)
+        .with_message("Re-reading file to save node locations")
+        .with_style(style.clone()));
+    let mut reader = osmio::read_pbf(&args.input_filename)?;
+    reader
+        .objects()
+        .take_while(|o| o.is_node())
+        .par_bridge()
+        .filter_map(|o| o.into_node())
+        .filter(|n| nodeid_wayids.contains_nid(&n.id()))
+        .map(|n| {
+            let ll = n.lat_lon_f64().unwrap();
+            (n.id(), (ll.1, ll.0))
+        })
+        .for_each_with(nodeid_pos.clone(), |nodeid_pos, (nid, pos)| {
+            setting_node_pos.inc(1);
+            nodeid_pos.lock().unwrap().insert(nid, pos);
+        });
 
-        setting_node_pos.finish();
-        progress_bars.remove(&setting_node_pos);
+    setting_node_pos.finish();
+    progress_bars.remove(&setting_node_pos);
 
-        Arc::try_unwrap(nodeid_pos).unwrap().into_inner().unwrap()
-    };
+    let nodeid_pos = Arc::try_unwrap(nodeid_pos).unwrap().into_inner().unwrap();
 
     debug!("{}", nodeid_pos.detailed_size());
 
