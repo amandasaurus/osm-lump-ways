@@ -68,6 +68,9 @@ fn main() -> Result<()> {
         error!("No %s found in output filename ({})", args.output_filename);
         anyhow::bail!("No %s found in output filename ({})", args.output_filename);
     }
+    if !args.split_files_by_group && args.output_filename.contains("%s") {
+        warn!("The output filename ({}) contains '%s'. Did you forget --split-files-by-group ? Continuing without splitting by group", args.output_filename);
+    }
 
     if !args.output_filename.ends_with(".geojson") {
         warn!("Output filename {} doesn't end with .geojson. This programme only created GeoJSON files", args.output_filename);
