@@ -247,6 +247,14 @@ fn main() -> Result<()> {
         .with_message("Grouping all ways")
         .with_style(style.clone()),
     );
+    let total_groups_found = progress_bars.add(
+        ProgressBar::new_spinner().with_style(
+            ProgressStyle::with_template(
+                "            {human_pos} groups found"
+            )
+            .unwrap(),
+        ),
+    );
 
     let reorder_segments_bar = progress_bars.add(
         ProgressBar::new(0)
@@ -317,6 +325,7 @@ fn main() -> Result<()> {
             }
 
             reorder_segments_bar.inc_length(this_group.nodeids.len() as u64);
+            total_groups_found.inc(1);
             way_groups.push(this_group);
         }
         debug!(
@@ -326,6 +335,7 @@ fn main() -> Result<()> {
         );
         grouping.finish();
         progress_bars.remove(&grouping);
+        progress_bars.remove(&total_groups_found);
         way_groups.into_par_iter()
     })
     // ↑ The breath first search is done
