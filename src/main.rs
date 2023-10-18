@@ -8,7 +8,6 @@ use log::{
     debug, error, info, log, log_enabled, trace, warn,
     Level::{Debug, Trace},
 };
-use osmio::obj_types::ArcOSMObj;
 use osmio::prelude::*;
 use osmio::OSMObjBase;
 use rayon::prelude::*;
@@ -138,47 +137,39 @@ fn main() -> Result<()> {
         .objects()
         .take_while(|o| o.is_node() || o.is_way())
         .par_bridge()
+        .inspect(|_| obj_reader.inc(1))
+        .filter_map(|o| o.into_way())
+        .filter(|w| args.tag_filter.par_iter().any(|tf| tf.filter(w)))
+        .map(|w| {
+                let group = args
+                    .tag_group_k
+                    .par_iter()
+                    .map(|tg| tg.get_values(&w))
+                    .collect::<Vec<Option<String>>>();
+                (w, group)
+            })
+        .filter(|(_w, group)| ! ( !args.incl_unset_group && group.iter().any(|x| x.is_none()) ) )
         .for_each_with(
             (
                 nodeid_wayids.clone(),
                 group_wayid_nodes.clone(),
             ),
-            |(nodeid_wayids, group_wayid_nodes), o| {
-                obj_reader.inc(1);
-                match o {
-                    ArcOSMObj::Node(_n) => {
-                    }
-                    ArcOSMObj::Way(w) => {
-                        if args.tag_filter.par_iter().any(|tf| !tf.filter(&w)) {
-                            return;
-                        }
-                        let group = args
-                            .tag_group_k
-                            .par_iter()
-                            .map(|tg| tg.get_values(&w))
-                            .collect::<Vec<Option<String>>>();
-                        if !args.incl_unset_group && group.iter().any(|x| x.is_none()) {
-                            return;
-                        }
-
-                        trace!("Got a way {}, in group {:?}", w.id(), group);
-                        rayon::join(
-                            || {
-                                nodeid_wayids.lock().unwrap().insert_many(w.id(), w.nodes());
-                            },
-                            || {
-                                group_wayid_nodes
-                                    .lock()
-                                    .unwrap()
-                                    .entry(group)
-                                    .or_default()
-                                    .insert(w.id(), w.nodes().to_owned());
-                            },
-                        );
-                        ways_added.inc(1);
-                    }
-                    ArcOSMObj::Relation(_r) => {}
-                }
+            |(nodeid_wayids, group_wayid_nodes), (w, group)| {
+                trace!("Got a way {}, in group {:?}", w.id(), group);
+                rayon::join(
+                    || {
+                        nodeid_wayids.lock().unwrap().insert_many(w.id(), w.nodes());
+                    },
+                    || {
+                        group_wayid_nodes
+                            .lock()
+                            .unwrap()
+                            .entry(group)
+                            .or_default()
+                            .insert(w.id(), w.nodes().to_owned());
+                    },
+                );
+                ways_added.inc(1);
             },
         );
     obj_reader.finish();

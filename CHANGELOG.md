@@ -4,6 +4,7 @@
 
 * Output improvements with log messages and progress bars
 * Small bug fixes when generating properties
+* Refactor to parallelize the initial data read more
 
 ## v0.11.0 (2023-10-18)
 
