@@ -582,13 +582,13 @@ fn main() -> Result<()> {
             // sort by longest first
             feature_ranks.par_sort_unstable_by(|a, b| a.0.total_cmp(&b.0).reverse());
             // update feature_ranks to store the local rank
-            feature_ranks.par_iter_mut().enumerate().for_each(|(rank, (_len, _idx, mut new_rank))| {
-                new_rank = rank;
+            feature_ranks.par_iter_mut().enumerate().for_each(|(rank, (_len, _idx, new_rank))| {
+                *new_rank = rank;
             });
             // sort back by way_groups idx
             feature_ranks.par_sort_unstable_by_key(|(_len, wg_idx, _rank)| *wg_idx);
             // now update the way_groups
-            way_groups.par_iter_mut().zip(feature_ranks.par_iter()).update(|(wg, (_len, _wg_idx, rank))| {
+            way_groups.par_iter_mut().zip(feature_ranks.par_iter()).for_each(|(wg, (_len, _wg_idx, rank))| {
                 wg.extra_json_props["dist_ends_desc_rank"] = (*rank).into();
                 wg.extra_json_props["dist_ends_asc_rank"] = (way_groups_len - *rank).into();
             });
