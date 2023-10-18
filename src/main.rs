@@ -106,8 +106,7 @@ fn main() -> Result<()> {
     let group_wayid_nodes: HashMap<Vec<Option<String>>, HashMap<i64, Vec<i64>>> = HashMap::new();
     let group_wayid_nodes = Arc::new(Mutex::new(group_wayid_nodes));
 
-    let nodeid_pos = nodeid_position::default();
-    let nodeid_pos = Arc::new(Mutex::new(nodeid_pos));
+    let mut nodeid_pos = nodeid_position::default();
 
     let nodeid_wayids = nodeid_wayids::default();
     let nodeid_wayids = Arc::new(Mutex::new(nodeid_wayids));
@@ -198,6 +197,7 @@ fn main() -> Result<()> {
         .with_message("Re-reading file to save node locations")
         .with_style(style.clone()));
     let mut reader = osmio::read_pbf(&args.input_filename)?;
+    let (sender, receiver) = std::sync::mpsc::channel();
     reader
         .objects()
         .take_while(|o| o.is_node())
@@ -208,15 +208,17 @@ fn main() -> Result<()> {
             let ll = n.lat_lon_f64().unwrap();
             (n.id(), (ll.1, ll.0))
         })
-        .for_each_with(nodeid_pos.clone(), |nodeid_pos, (nid, pos)| {
-            setting_node_pos.inc(1);
-            nodeid_pos.lock().unwrap().insert(nid, pos);
-        });
+        .for_each_with(sender, |sender, x| sender.send(x).unwrap());
+
+    for (nid, pos) in receiver.iter() {
+        setting_node_pos.inc(1);
+        nodeid_pos.insert(nid, pos);
+    }
+    let nodeid_pos = nodeid_pos;
 
     setting_node_pos.finish();
     progress_bars.remove(&setting_node_pos);
 
-    let nodeid_pos = Arc::try_unwrap(nodeid_pos).unwrap().into_inner().unwrap();
 
     debug!("{}", nodeid_pos.detailed_size());
 
