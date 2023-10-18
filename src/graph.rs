@@ -193,10 +193,7 @@ where
     }
 
     pub fn set(&mut self, i: &V, j: &V, val: E) {
-        self.edges
-            .entry(*i)
-            .or_default()
-            .insert(*j, (val, vec![]));
+        self.edges.entry(*i).or_default().insert(*j, (val, vec![]));
         self.edges.entry(*j).or_default().insert(*i, (val, vec![]));
     }
 
@@ -212,7 +209,8 @@ where
     }
 
     pub fn get_intermediates(&self, i: &V, j: &V) -> Option<&[V]> {
-        self.get_all(i, j).map(|(_e, intermediates)| intermediates.as_slice())
+        self.get_all(i, j)
+            .map(|(_e, intermediates)| intermediates.as_slice())
     }
 
     #[allow(unused)]

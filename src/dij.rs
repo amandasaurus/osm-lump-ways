@@ -1,5 +1,5 @@
 use super::*;
-use anyhow::{Result};
+use anyhow::Result;
 use graph::UndirectedAdjGraph;
 use ordered_float::OrderedFloat;
 use std::collections::BinaryHeap;

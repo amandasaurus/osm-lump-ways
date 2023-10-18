@@ -5,7 +5,6 @@ use super::*;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 
-
 /// Something which stores which nodeids are in which wayid
 pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
     /// Create new version

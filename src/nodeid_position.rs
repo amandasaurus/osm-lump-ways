@@ -3,7 +3,6 @@ use super::*;
 use osmio::{Lat, Lon};
 use std::collections::BTreeMap;
 
-
 /// Store the position of a node based on it's id
 pub trait NodeIdPosition: std::fmt::Debug + std::marker::Send + std::marker::Sync {
     fn new() -> Self
@@ -214,7 +213,8 @@ impl NodeIdPosition for NodeIdPositionBucket {
         }
 
         self.inner
-            .get(&bucket_id).and_then(|bytes| {
+            .get(&bucket_id)
+            .and_then(|bytes| {
                 let latlngs = bucket_bytes_read(self.bucket_shift, bytes);
                 latlngs[local_index]
             })

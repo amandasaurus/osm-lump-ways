@@ -44,8 +44,7 @@ fn main() -> Result<()> {
         env_logger::init();
     } else {
         // Initially show with warn to catch warn's in the clap parsing
-        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
-                .init();
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
     }
 
     let args = cli_args::Args::parse();
@@ -240,7 +239,7 @@ fn main() -> Result<()> {
             });
 
         setting_node_pos.finish();
-        
+
         Arc::try_unwrap(nodeid_pos).unwrap().into_inner().unwrap()
     };
 
