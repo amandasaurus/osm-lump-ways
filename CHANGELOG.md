@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.12.0 (2023-10-19)
 
 * Output improvements with log messages and progress bars
 * Small bug fixes when generating properties
