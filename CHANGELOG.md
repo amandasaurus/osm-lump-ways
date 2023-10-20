@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+ 
+* Improvements to output messages (showing time things took)
 
 ## v0.12.0 (2023-10-19)
 
