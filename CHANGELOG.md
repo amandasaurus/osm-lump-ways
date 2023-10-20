@@ -6,6 +6,7 @@
   matching way group)
 * More options to filter the data (`--only-these-way-groups-nodeid`) to track
   down debugging
+* `all_wayids` option now a string `wNNN` which can be fed into `osmium getid`.
 
 ## v0.12.0 (2023-10-19)
 

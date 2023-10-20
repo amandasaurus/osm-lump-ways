@@ -637,7 +637,7 @@ fn main() -> Result<()> {
                 properties["length_m"] = w.length_m.into();
             }
             if args.incl_wayids {
-                properties["all_wayids"] = w.way_ids.into();
+                properties["all_wayids"] = w.way_ids.iter().map(|wid| format!("w{}", wid)).collect::<Vec<String>>().into();
             }
 
             properties.as_object_mut().unwrap().append(w.extra_json_props.as_object_mut().unwrap());
