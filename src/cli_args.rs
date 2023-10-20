@@ -102,13 +102,28 @@ pub(crate) struct Args {
     #[arg(long)]
     pub only_these_way_groups: Vec<i64>,
 
+    /// Only procoess way groups which include these node ids
+    #[arg(long)]
+    pub only_these_way_groups_nodeid: Vec<i64>,
+ 
+    /// Only procoess way groups where waygroup ID % FIRST = SECOND
+    /// Usage: `--only-these-way-groups-divmod 2/0` which only processes way groups where id % 2 ==
+    /// 0
+    /// Only useful for internal debugging to find problematic way groups
+    #[arg(long)]
+    pub only_these_way_groups_divmod: Option<String>,
+
     /// For each output object, calculate the distance (in m) to the nearest, longer object. This
     /// is increadily long for large complicated networks (e.g. waterways), but is reasonable for
     /// named streets.
     #[arg(long, default_value="false", aliases=["incl-distance-to-longer"])]
     pub incl_dist_to_longer: bool,
 
-    /// include all way ids
+    /// Include list of OSM wayids for each feature
+    /// For each way group, include a JSON property `all_wayids`, a list of all the OSM way ids
+    /// that make up this group. Each is a JSON string "w123" (i.e. /^w[0-9]+$/), the same format
+    /// `osmium getid` accepts.
+    ///
     #[arg(long, action=clap::ArgAction::SetTrue, default_value = "false", aliases=["incl-way-ids", "include-wayids", "include-way-ids"])]
     pub incl_wayids: bool,
 

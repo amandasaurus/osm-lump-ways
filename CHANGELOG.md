@@ -2,7 +2,10 @@
 
 ## Unreleased
  
-* Improvements to output messages (showing time things took)
+* Improvements to output messages (showing time things took, warning if no
+  matching way group)
+* More options to filter the data (`--only-these-way-groups-nodeid`) to track
+  down debugging
 
 ## v0.12.0 (2023-10-19)
 

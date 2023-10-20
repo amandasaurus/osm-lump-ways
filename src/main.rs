@@ -111,9 +111,20 @@ fn main() -> Result<()> {
     };
     debug!("Output format: {output_format:?}");
 
+    let only_these_way_groups_divmod: Option<(i64, i64)> = args.only_these_way_groups_divmod.map(|s| (s.split("/").nth(0).unwrap().parse().unwrap(), s.split("/").nth(1).unwrap().parse().unwrap()));
+    if let Some((a, b)) = only_these_way_groups_divmod {
+        anyhow::ensure!(a > b);
+    }
+
     info!("Starting to read {:?}", &args.input_filename);
     info!("Tag filter(s) in operation: {:?}", args.tag_filter);
     info!("Tag grouping(s) in operation: {:?}", args.tag_group_k);
+    if !args.only_these_way_groups.is_empty() {
+        info!("Only keeping groups which include the following ways: {:?}", args.only_these_way_groups);
+    }
+    if !args.only_these_way_groups_nodeid.is_empty() {
+        info!("Only keeping groups which include the following nodes: {:?}", args.only_these_way_groups_nodeid);
+    }
 
     // For each group, a hashmap of wayid:nodes in that way
     let group_wayid_nodes: HashMap<Vec<Option<String>>, HashMap<i64, Vec<i64>>> = HashMap::new();
@@ -356,6 +367,21 @@ fn main() -> Result<()> {
             true    // no filtering in operation
         } else {
             args.only_these_way_groups.par_iter().any(|only| *only == way_group.root_wayid)
+        }
+    })
+    .filter(|way_group| {
+        match only_these_way_groups_divmod {
+            None => true,
+            Some((a, b)) => {
+                way_group.root_wayid % a == b
+            }
+        }
+    })
+    .filter(|way_group| {
+        if args.only_these_way_groups_nodeid.is_empty() {
+            true
+        } else {
+            args.only_these_way_groups_nodeid.par_iter().any(|nid1| way_group.nodeids_iter().any(|nid2| nid1==nid2))
         }
     })
     .update(|way_group| {
@@ -652,9 +678,15 @@ fn main() -> Result<()> {
     if total_files_written == 0 {
         if !args.only_these_way_groups.is_empty() {
             warn!("No files have been written, and you specified to only process the following waygroups: {:?}. Perhaps nothing in your input data matches that", args.only_these_way_groups);
-        } else {
+        }
+        if !args.only_these_way_groups_nodeid.is_empty() {
+            warn!("No files have been written, and you specified to only include way groups with the following nodeids {:?}. Perhaps nothing in your input data matches that", args.only_these_way_groups_nodeid);
+        }
+        if args.only_these_way_groups.is_empty() && args.only_these_way_groups_nodeid.is_empty() {
             warn!("No files have been written.");
         }
+    } else {
+        info!("Wrote {} feature(s) to {} file(s)", total_features_written, total_files_written);
     }
     info!("Finished writing {} features to {} files in {}", total_features_written, total_files_written, format_duration(Instant::now() - global_start));
     Ok(())
