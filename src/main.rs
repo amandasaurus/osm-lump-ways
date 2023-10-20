@@ -688,7 +688,8 @@ fn main() -> Result<()> {
     } else {
         info!("Wrote {} feature(s) to {} file(s)", total_features_written, total_files_written);
     }
-    info!("Finished writing {} features to {} files in {}", total_features_written, total_files_written, format_duration(Instant::now() - global_start));
+
+    info!("Finished all in {}", format_duration(Instant::now() - global_start));
     Ok(())
 }
 #[derive(Debug, Clone, Hash, serde::Serialize, PartialEq, Eq)]
