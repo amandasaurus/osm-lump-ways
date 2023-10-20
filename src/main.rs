@@ -21,6 +21,7 @@ use std::io::Write;
 use std::time::Instant;
 
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicUsize, Ordering as atomic_Ordering};
 
 //use get_size_derive::*;
 
@@ -240,6 +241,9 @@ fn main() -> Result<()> {
             .to_formatted_string(&Locale::en)
     );
 
+
+    let total_files_written = AtomicUsize::new(0);
+    let total_features_written = AtomicUsize::new(0);
     info!("All data has been loaded in {}. Started processing...", format_duration(Instant::now() - global_start));
     info!(
         "Starting the breathfirst search. There are {} groups",
@@ -632,6 +636,8 @@ fn main() -> Result<()> {
                         )
                     })?;
                 info!("Wrote {} feature(s) to {}", num_written.to_formatted_string(&Locale::en), filename);
+                total_features_written.fetch_add(num_written, atomic_Ordering::SeqCst);
+                total_files_written.fetch_add(1, atomic_Ordering::SeqCst);
             }
             Err(e) => {
                 warn!("Couldn't open filename {:?}: {}", filename, e);
@@ -640,7 +646,17 @@ fn main() -> Result<()> {
         Ok(()) as Result<()>
     })?;
 
-    info!("Finished all in {}", format_duration(Instant::now() - global_start));
+    let total_files_written = total_files_written.into_inner();
+    let total_features_written = total_features_written.into_inner();
+
+    if total_files_written == 0 {
+        if !args.only_these_way_groups.is_empty() {
+            warn!("No files have been written, and you specified to only process the following waygroups: {:?}. Perhaps nothing in your input data matches that", args.only_these_way_groups);
+        } else {
+            warn!("No files have been written.");
+        }
+    }
+    info!("Finished writing {} features to {} files in {}", total_features_written, total_files_written, format_duration(Instant::now() - global_start));
     Ok(())
 }
 #[derive(Debug, Clone, Hash, serde::Serialize, PartialEq, Eq)]
