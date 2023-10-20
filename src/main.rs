@@ -272,8 +272,8 @@ fn main() -> Result<()> {
         .with_message("Grouping all ways")
         .with_style(style.clone()),
     );
-    let total_groups_found =
-        progress_bars.add(ProgressBar::new_spinner().with_style(
+    let total_groups_found = progress_bars.add(
+        ProgressBar::new_spinner().with_style(
             ProgressStyle::with_template("            {human_pos} groups found").unwrap(),
         ));
 
