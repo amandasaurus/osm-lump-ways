@@ -542,9 +542,11 @@ fn main() -> Result<()> {
 
             let mut points_distance_idx = KdTree::new(2);
 
-            let prog = ProgressBar::new(way_groups.iter().map(|wg| wg.num_nodeids() as u64).sum())
+            let prog = progress_bars.add(
+                ProgressBar::new(way_groups.iter().map(|wg| wg.num_nodeids() as u64).sum())
                     .with_message("Calc distance to longer: Indexing data")
-                    .with_style(style.clone());
+                    .with_style(style.clone()
+                                ));
 
             for (wg_id, coords) in way_groups.iter().enumerate().flat_map(|(wg_id, wg)| wg.coords_iter_seq().map(move |coords| (wg_id, coords)) ) {
                 points_distance_idx.add(coords, wg_id).unwrap();
@@ -552,9 +554,10 @@ fn main() -> Result<()> {
             }
             prog.finish();
 
-            let prog = ProgressBar::new(way_groups.par_iter().map(|wg| wg.num_nodeids() as u64).sum::<u64>())
+            let prog = progress_bars.add(
+                ProgressBar::new(way_groups.par_iter().map(|wg| wg.num_nodeids() as u64).sum::<u64>())
                     .with_message("Calc distance to longer")
-                    .with_style(style.clone());
+                    .with_style(style.clone()));
             // dist to larger
             let longers = way_groups.par_iter().enumerate()
                 .map(|(wg_id, wg)| {
