@@ -22,7 +22,10 @@ pub(crate) fn into_segments(
     let nodeid_pos = Arc::new(Mutex::new(nodeid_pos));
     let mut results = Vec::new();
 
-    trace!("Starting into_segments with wg.num_nodeids {}", wg.num_nodeids());
+    trace!(
+        "Starting into_segments with wg.num_nodeids {}",
+        wg.num_nodeids()
+    );
     let mut edges = UndirectedAdjGraph::new();
     let (sender, receiver) = std::sync::mpsc::channel();
     wg.nodeids

@@ -20,8 +20,8 @@ use std::collections::{BTreeSet, HashMap};
 use std::io::Write;
 use std::time::Instant;
 
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering as atomic_Ordering};
+use std::sync::{Arc, Mutex};
 
 //use get_size_derive::*;
 
@@ -111,7 +111,13 @@ fn main() -> Result<()> {
     };
     debug!("Output format: {output_format:?}");
 
-    let only_these_way_groups_divmod: Option<(i64, i64)> = args.only_these_way_groups_divmod.map(|s| (s.split("/").nth(0).unwrap().parse().unwrap(), s.split("/").nth(1).unwrap().parse().unwrap()));
+    let only_these_way_groups_divmod: Option<(i64, i64)> =
+        args.only_these_way_groups_divmod.map(|s| {
+            (
+                s.split("/").nth(0).unwrap().parse().unwrap(),
+                s.split("/").nth(1).unwrap().parse().unwrap(),
+            )
+        });
     if let Some((a, b)) = only_these_way_groups_divmod {
         anyhow::ensure!(a > b);
     }
@@ -120,10 +126,16 @@ fn main() -> Result<()> {
     info!("Tag filter(s) in operation: {:?}", args.tag_filter);
     info!("Tag grouping(s) in operation: {:?}", args.tag_group_k);
     if !args.only_these_way_groups.is_empty() {
-        info!("Only keeping groups which include the following ways: {:?}", args.only_these_way_groups);
+        info!(
+            "Only keeping groups which include the following ways: {:?}",
+            args.only_these_way_groups
+        );
     }
     if !args.only_these_way_groups_nodeid.is_empty() {
-        info!("Only keeping groups which include the following nodes: {:?}", args.only_these_way_groups_nodeid);
+        info!(
+            "Only keeping groups which include the following nodes: {:?}",
+            args.only_these_way_groups_nodeid
+        );
     }
 
     // For each group, a hashmap of wayid:nodes in that way
@@ -252,10 +264,12 @@ fn main() -> Result<()> {
             .to_formatted_string(&Locale::en)
     );
 
-
     let total_files_written = AtomicUsize::new(0);
     let total_features_written = AtomicUsize::new(0);
-    info!("All data has been loaded in {}. Started processing...", format_duration(Instant::now() - global_start));
+    info!(
+        "All data has been loaded in {}. Started processing...",
+        format_duration(Instant::now() - global_start)
+    );
     info!(
         "Starting the breathfirst search. There are {} groups",
         group_wayid_nodes.len()
@@ -272,8 +286,8 @@ fn main() -> Result<()> {
         .with_message("Grouping all ways")
         .with_style(style.clone()),
     );
-    let total_groups_found = progress_bars.add(
-        ProgressBar::new_spinner().with_style(
+    let total_groups_found =
+        progress_bars.add(ProgressBar::new_spinner().with_style(
             ProgressStyle::with_template("            {human_pos} groups found").unwrap(),
         ));
 
@@ -686,10 +700,16 @@ fn main() -> Result<()> {
             warn!("No files have been written.");
         }
     } else {
-        info!("Wrote {} feature(s) to {} file(s)", total_features_written, total_files_written);
+        info!(
+            "Wrote {} feature(s) to {} file(s)",
+            total_features_written, total_files_written
+        );
     }
 
-    info!("Finished all in {}", format_duration(Instant::now() - global_start));
+    info!(
+        "Finished all in {}",
+        format_duration(Instant::now() - global_start)
+    );
     Ok(())
 }
 #[derive(Debug, Clone, Hash, serde::Serialize, PartialEq, Eq)]
@@ -850,8 +870,10 @@ pub fn format_duration_human(duration: &std::time::Duration) -> String {
     }
 }
 
-
-fn format_duration(d: std::time::Duration) -> String
-{
-    format!("{} ( {:>.1}sec )", format_duration_human(&d), d.as_secs_f32())
+fn format_duration(d: std::time::Duration) -> String {
+    format!(
+        "{} ( {:>.1}sec )",
+        format_duration_human(&d),
+        d.as_secs_f32()
+    )
 }

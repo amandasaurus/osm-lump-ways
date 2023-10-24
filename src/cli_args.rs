@@ -105,7 +105,7 @@ pub(crate) struct Args {
     /// Only procoess way groups which include these node ids
     #[arg(long)]
     pub only_these_way_groups_nodeid: Vec<i64>,
- 
+
     /// Only procoess way groups where waygroup ID % FIRST = SECOND
     /// Usage: `--only-these-way-groups-divmod 2/0` which only processes way groups where id % 2 ==
     /// 0
