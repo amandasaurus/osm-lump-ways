@@ -22,11 +22,15 @@ pub(crate) fn into_segments(
     let nodeid_pos = Arc::new(Mutex::new(nodeid_pos));
     let mut results = Vec::new();
 
+    trace!("Starting into_segments with wg.num_nodeids {}", wg.num_nodeids());
     let mut edges = UndirectedAdjGraph::new();
     let (sender, receiver) = std::sync::mpsc::channel();
     wg.nodeids
         .par_iter()
         .flat_map(|coord_string| coord_string.par_windows(2))
+        // There are a few cases where a node is doubled in a way, and this code requires that they
+        // be ordered.
+        .filter(|edge| edge[0] != edge[1])
         .map_with(nodeid_pos.clone(), |nodeid_pos, edge| {
             if nodeid_pos.lock().unwrap().contains_key(&edge[0])
                 && nodeid_pos.lock().unwrap().contains_key(&edge[1])
