@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity)]
 use super::*;
 use anyhow::Result;
 use graph::UndirectedAdjGraph;

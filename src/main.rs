@@ -111,11 +111,12 @@ fn main() -> Result<()> {
     };
     debug!("Output format: {output_format:?}");
 
+    #[allow(clippy::iter_nth_zero)]
     let only_these_way_groups_divmod: Option<(i64, i64)> =
         args.only_these_way_groups_divmod.map(|s| {
             (
-                s.split("/").nth(0).unwrap().parse().unwrap(),
-                s.split("/").nth(1).unwrap().parse().unwrap(),
+                s.split('/').nth(0).unwrap().parse().unwrap(),
+                s.split('/').nth(1).unwrap().parse().unwrap(),
             )
         });
     if let Some((a, b)) = only_these_way_groups_divmod {
@@ -743,6 +744,7 @@ impl TagGrouper {
     }
 }
 
+#[allow(clippy::type_complexity)]
 /// Write a geojson featurecollection, but manually construct it
 fn write_geojson_features_directly(
     features: &[(serde_json::Value, Vec<Vec<(f64, f64)>>)],

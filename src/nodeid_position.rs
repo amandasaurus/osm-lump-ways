@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity)]
 /// Storing the position of nodes based on their node id
 use super::*;
 use osmio::{Lat, Lon};
@@ -98,11 +99,8 @@ impl NodeIdPosition for NodeIdPositionMap {
     }
 
     fn extend<I: IntoIterator<Item = (i64, (f64, f64))>>(&mut self, iter: I) {
-        for el in iter {
-            self.insert(
-                el.0,
-                (el.1 .0.try_into().unwrap(), el.1 .1.try_into().unwrap()),
-            );
+        for (nid, pos) in iter {
+            self.insert(nid, pos);
         }
     }
 }
