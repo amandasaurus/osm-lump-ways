@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.13.0 (2023-10-27)
  
 * Improvements to output messages (showing time things took, warning if no
   matching way group)
