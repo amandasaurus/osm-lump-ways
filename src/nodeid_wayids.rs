@@ -253,7 +253,7 @@ impl NodeIdWayIdsBucketWayIndex {
 
 impl NodeIdWayIds for NodeIdWayIdsBucketWayIndex {
     fn new() -> Self {
-        Self::with_bucket(5)
+        Self::with_bucket(6)
     }
 
     fn len(&self) -> usize {
@@ -347,7 +347,7 @@ impl NodeIdWayIdsAuto {
                 let old_size = multi_map.get_size();
 
                 // Create a new bucket and convert the old to this.
-                let mut new_bucket = NodeIdWayIdsBucketWayIndex::with_bucket(6);
+                let mut new_bucket = NodeIdWayIdsBucketWayIndex::with_bucket(7);
                 for (nid, wid) in multi_map.drain_all() {
                     new_bucket.insert(nid, wid);
                 }

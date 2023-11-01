@@ -39,7 +39,7 @@ pub trait NodeIdPosition: std::fmt::Debug + std::marker::Send + std::marker::Syn
 /// A default good value
 pub(crate) fn default() -> impl NodeIdPosition {
     //NodeIdPositionMap::new()
-    NodeIdPositionBucket::with_bucket(5)
+    NodeIdPositionBucket::with_bucket(6)
 }
 
 /// A simple map
@@ -174,7 +174,7 @@ impl NodeIdPositionBucket {
 
 impl NodeIdPosition for NodeIdPositionBucket {
     fn new() -> Self {
-        Self::with_bucket(4)
+        Self::with_bucket(6)
     }
 
     fn insert(&mut self, nid: i64, pos: (f64, f64)) {
