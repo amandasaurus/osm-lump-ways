@@ -240,23 +240,17 @@ impl WayGroup {
                 {
                     if seg_i.last() == seg_j.first() {
                         seg_i.extend(seg_j.drain(..).skip(1));
-                        graph_modified = true;
-                        reorder_segments_bar.inc(1);
                     } else if seg_i.last() == seg_j.last() {
                         seg_i.extend(seg_j.drain(..).rev().skip(1));
-                        graph_modified = true;
-                        reorder_segments_bar.inc(1);
                     } else if seg_i.first() == seg_j.first() {
                         seg_i.reverse();
                         seg_i.extend(seg_j.drain(..).skip(1));
-                        graph_modified = true;
-                        reorder_segments_bar.inc(1);
                     } else if seg_i.first() == seg_j.last() {
                         seg_i.reverse();
                         seg_i.extend(seg_j.drain(..).rev().skip(1));
-                        graph_modified = true;
-                        reorder_segments_bar.inc(1);
                     }
+                    graph_modified = true;
+                    reorder_segments_bar.inc(1);
                 }
             }
             // Shrink our total
