@@ -277,7 +277,7 @@ impl WayGroup {
         self.length_m = None;
 
         log!(
-            if old_num_nodeids > 10_000 || old_num_nodeids - self.nodeids.len() > 5_000 {
+            if old_num_nodeids > 20_000 || old_num_nodeids - self.nodeids.len() > 20_000 {
                 Debug
             } else {
                 Trace
