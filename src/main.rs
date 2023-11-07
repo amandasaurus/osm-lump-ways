@@ -143,7 +143,7 @@ fn main() -> Result<()> {
     let group_wayid_nodes: HashMap<Vec<Option<String>>, HashMap<i64, Vec<i64>>> = HashMap::new();
     let group_wayid_nodes = Arc::new(Mutex::new(group_wayid_nodes));
 
-    let mut nodeid_pos = nodeid_position::default();
+    let nodeid_pos = nodeid_position::default();
 
     let nodeid_wayids = nodeid_wayids::default();
     let nodeid_wayids = Arc::new(Mutex::new(nodeid_wayids));
@@ -232,8 +232,8 @@ fn main() -> Result<()> {
             .with_message("Re-reading file to save node locations")
             .with_style(style.clone()),
     );
-    let mut reader = osmio::stringpbf::PBFNodePositionReader::from_filename(args.input_filename)?;
-    let mut nodeid_pos = Arc::new(Mutex::new(nodeid_pos));
+    let reader = osmio::stringpbf::PBFNodePositionReader::from_filename(args.input_filename)?;
+    let nodeid_pos = Arc::new(Mutex::new(nodeid_pos));
     reader
         .into_iter()
         .par_bridge()
