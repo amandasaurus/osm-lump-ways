@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* Massive speed improvements to the “reorder data internally”.
+
 ## v0.13.0 (2023-10-27)
  
 * Improvements to output messages (showing time things took, warning if no

@@ -401,7 +401,7 @@ fn main() -> Result<()> {
     })
     .update(|way_group| {
         trace!("Reducing the number of inner segments");
-        way_group.reorder_segments(5, &reorder_segments_bar);
+        way_group.reorder_segments(20, &reorder_segments_bar);
     })
     .update(|way_group| {
         trace!("Saving coordinates for all ways");

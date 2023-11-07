@@ -172,15 +172,6 @@ impl WayGroup {
             reorder_segments_bar.inc(self.nodeids.len() as u64);
             return;
         }
-        // This algorithm can take ages on very large groups, so skip them.
-        if old_num_nodeids > 500_000 {
-            reorder_segments_bar.inc(self.nodeids.len() as u64);
-            debug!(
-                "wg:{} Before reorder_segments there are {old_num_nodeids} segments, and this is too much. Returning w/o doing anything to this group",
-                self.root_wayid,
-            );
-            return;
-        }
         trace!(
             "wg:{} Before reorder_segments there are {old_num_nodeids} segments",
             self.root_wayid,
@@ -188,18 +179,21 @@ impl WayGroup {
 
         let mut graph_modified;
         let mut round = 0;
-        let mut seg_i: &mut Vec<_>;
+        let (mut seg_i, mut seg_j);
         let mut num_nodes;
-        let mut left;
-        let mut right;
+        let (mut left, mut right);
+        let (mut i, mut j);
+
+        let mut nid_num_neighbours: HashMap<i64, Vec<usize>> =
+            HashMap::with_capacity(2 * self.nodeids.len());
 
         // Main loop to remove segments
         loop {
-            // Alternate putting the longest or the shortest first.
-            // since the segments are matched in order, this optimises how they are matched up.
-            // IME this speeds things up *a lot*
-            self.nodeids
-                .par_sort_by_key(|e| (e.len() as isize) * (if round % 2 == 0 { -1 } else { 1 }));
+            if self.nodeids.len() == 1 {
+                break;
+            }
+            // shortest segments first. this seems to have the largest reduction in segments
+            self.nodeids.par_sort_by_key(|e| e.len());
             graph_modified = false;
             num_nodes = self.nodeids.len();
             if old_num_nodeids > 1_000 {
@@ -217,49 +211,70 @@ impl WayGroup {
             }
             round += 1;
 
-            // Go over all the existing segments
-            for i in 0..num_nodes {
+            nid_num_neighbours.clear();
+            for (i, segment) in self.nodeids.iter().enumerate() {
+                if segment.is_empty() {
+                    continue;
+                }
+                nid_num_neighbours
+                    .entry(*segment.first().unwrap())
+                    .or_default()
+                    .push(i);
+                nid_num_neighbours
+                    .entry(*segment.last().unwrap())
+                    .or_default()
+                    .push(i);
+            }
+            nid_num_neighbours.shrink_to_fit();
+
+            for edges in nid_num_neighbours
+                .drain()
+                .map(|(_k, v)| v)
+                .filter(|e| e.len() >= 2)
+            {
+                i = edges[0];
+                j = edges[1];
+                if i == j {
+                    continue;
+                }
+                if i > j {
+                    std::mem::swap(&mut i, &mut j);
+                }
                 (left, right) = self.nodeids.split_at_mut(i + 1);
                 seg_i = left.last_mut().unwrap();
-                if seg_i.is_empty() {
+                seg_j = right.get_mut(j - i - 1).unwrap();
+                if seg_i.is_empty() || seg_j.is_empty() {
                     continue;
                 }
 
-                // Look at all segments after this one, and see if they can be merged into this
-                // TODO Can this be done faster? With every iteration it looks at the start of the
-                // slice and goes onwards (right?)
-                while let Some(seg_j) = right
-                    .par_iter_mut()
-                    .filter(|seg_j| !seg_j.is_empty())
-                    .find_any(|seg_j| {
-                        seg_i.last() == seg_j.first()
-                            || seg_i.last() == seg_j.last()
-                            || seg_i.first() == seg_j.first()
-                            || seg_i.first() == seg_j.last()
-                    })
-                {
-                    if seg_i.last() == seg_j.first() {
-                        seg_i.extend(seg_j.drain(..).skip(1));
-                    } else if seg_i.last() == seg_j.last() {
-                        seg_i.extend(seg_j.drain(..).rev().skip(1));
-                    } else if seg_i.first() == seg_j.first() {
-                        seg_i.reverse();
-                        seg_i.extend(seg_j.drain(..).skip(1));
-                    } else if seg_i.first() == seg_j.last() {
-                        seg_i.reverse();
-                        seg_i.extend(seg_j.drain(..).rev().skip(1));
-                    }
+                if seg_i.last() == seg_j.first() {
                     graph_modified = true;
                     reorder_segments_bar.inc(1);
+                    seg_i.extend(seg_j.drain(..).skip(1));
+                } else if seg_i.last() == seg_j.last() {
+                    graph_modified = true;
+                    reorder_segments_bar.inc(1);
+                    seg_i.extend(seg_j.drain(..).rev().skip(1));
+                } else if seg_i.first() == seg_j.first() {
+                    graph_modified = true;
+                    reorder_segments_bar.inc(1);
+                    seg_i.reverse();
+                    seg_i.extend(seg_j.drain(..).skip(1));
+                } else if seg_i.first() == seg_j.last() {
+                    graph_modified = true;
+                    reorder_segments_bar.inc(1);
+                    seg_i.reverse();
+                    seg_i.extend(seg_j.drain(..).rev().skip(1));
                 }
             }
-            // Shrink our total
-            self.nodeids.retain(|segments| !segments.is_empty());
 
             if !graph_modified {
                 break;
             }
         }
+        drop(nid_num_neighbours);
+        // Shrink our total
+        self.nodeids.retain(|segments| !segments.is_empty());
 
         self.nodeids.shrink_to_fit();
         // these segments are “done”
@@ -276,10 +291,10 @@ impl WayGroup {
             } else {
                 Trace
             },
-            "wg:{} After reorder_segments there are {} segments, removed {}, in {round} round(s)",
+            "wg:{} After reorder_segments there are {}K segments, removed {}K, in {round} round(s)",
             self.root_wayid,
-            self.nodeids.len(),
-            old_num_nodeids.abs_diff(self.nodeids.len()),
+            self.nodeids.len() / 1_000,
+            old_num_nodeids.abs_diff(self.nodeids.len()) / 1_000,
         );
     }
 }
