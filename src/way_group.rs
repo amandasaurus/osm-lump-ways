@@ -196,7 +196,7 @@ impl WayGroup {
         // Main loop to remove segments
         loop {
             // Alternate putting the longest or the shortest first.
-            // since the segements are matched in order, this optimises how they are matched up.
+            // since the segments are matched in order, this optimises how they are matched up.
             // IME this speeds things up *a lot*
             self.nodeids
                 .par_sort_by_key(|e| (e.len() as isize) * (if round % 2 == 0 { -1 } else { 1 }));
