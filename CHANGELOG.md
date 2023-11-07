@@ -3,6 +3,7 @@
 ## Unreleased
 
 * Massive speed improvements to the “reorder data internally”.
+* Upgrade file reading library, which speeds up processing.
 
 ## v0.13.0 (2023-10-27)
  
