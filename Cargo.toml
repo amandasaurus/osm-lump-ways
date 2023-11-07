@@ -1,6 +1,6 @@
 [package]
 name = "osm-lump-ways"
-version = "0.13.0"
+version = "0.14.0-dev"
 edition = "2021"
 authors = ["Amanda McCann <amanda@technomancy.org>"]
 license = "MIT OR Apache-2.0"
@@ -20,7 +20,7 @@ kdtree = "0.7.0"
 log = "0.4.17"
 num-format = "0.4.4"
 ordered-float = "4.1.0"
-osmio = "0.8.1"
+osmio = "0.10.0"
 rayon = "1.6.1"
 read-progress = "0.5.0"
 regex = "1.7.0"

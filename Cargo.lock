@@ -750,7 +750,7 @@ dependencies = [
 
 [[package]]
 name = "osm-lump-ways"
-version = "0.13.0"
+version = "0.14.0-dev"
 dependencies = [
  "anyhow",
  "clap",
@@ -774,9 +774,9 @@ dependencies = [
 
 [[package]]
 name = "osmio"
-version = "0.8.1"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef304c46f8dce693d350b2ae08ce8858320d452b1cc029d001be6b7ada1f000c"
+checksum = "08d9bb19cb4c487e0109ac31caaedbcfacc8104e4cc63a91705adcc64e6210ed"
 dependencies = [
  "anyhow",
  "byteorder",

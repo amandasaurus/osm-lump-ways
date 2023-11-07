@@ -13,6 +13,19 @@ pub trait NodeIdPosition: std::fmt::Debug + std::marker::Send + std::marker::Syn
     /// Set this position
     fn insert(&mut self, node_id: i64, pos: (f64, f64));
 
+    /// Set this position (f64 explict)
+    fn insert_f64(&mut self, node_id: i64, pos: (f64, f64)) {
+        self.insert(node_id, pos);
+    }
+    /// Set this position if already have explicit inner format
+    fn insert_i32(&mut self, node_id: i64, pos: (i32, i32)) {
+        let pos: (f64, f64) = (
+            Lat::from_inner(pos.0).degrees(),
+            Lon::from_inner(pos.1).degrees(),
+        );
+        self.insert_f64(node_id, pos);
+    }
+
     fn contains_key(&self, node_id: &i64) -> bool {
         self.get(node_id).is_some()
     }
@@ -56,12 +69,16 @@ impl NodeIdPosition for NodeIdPositionMap {
         }
     }
 
+    fn insert_i32(&mut self, node_id: i64, pos: (i32, i32)) {
+        self.inner.insert(node_id, pos);
+    }
+
     fn insert(&mut self, node_id: i64, pos: (f64, f64)) {
         let pos = (
             Lat::try_from(pos.0).unwrap().inner(),
             Lon::try_from(pos.1).unwrap().inner(),
         );
-        self.inner.insert(node_id, pos);
+        self.insert_i32(node_id, pos);
     }
 
     fn contains_key(&self, node_id: &i64) -> bool {
@@ -183,6 +200,10 @@ impl NodeIdPosition for NodeIdPositionBucket {
             Lat::try_from(pos.0).unwrap().inner(),
             Lon::try_from(pos.1).unwrap().inner(),
         );
+        self.insert_i32(nid, pos);
+    }
+
+    fn insert_i32(&mut self, nid: i64, pos: (i32, i32)) {
         self.warm_cache(nid);
         let (_bucket_id, local_index) = self.nodeid_bucket_local(nid);
 

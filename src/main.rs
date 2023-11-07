@@ -232,25 +232,23 @@ fn main() -> Result<()> {
             .with_message("Re-reading file to save node locations")
             .with_style(style.clone()),
     );
-    let mut reader = osmio::read_pbf(&args.input_filename)?;
-    let (sender, receiver) = std::sync::mpsc::channel();
+    let mut reader = osmio::stringpbf::PBFNodePositionReader::from_filename(args.input_filename)?;
+    let mut nodeid_pos = Arc::new(Mutex::new(nodeid_pos));
     reader
-        .objects()
-        .take_while(|o| o.is_node())
+        .into_iter()
         .par_bridge()
-        .filter_map(|o| o.into_node())
-        .filter(|n| nodeid_wayids.contains_nid(&n.id()))
-        .map(|n| {
-            let ll = n.lat_lon_f64().unwrap();
-            (n.id(), (ll.1, ll.0))
-        })
-        .for_each_with(sender, |sender, x| sender.send(x).unwrap());
+        .filter(|(nid, _pos)| nodeid_wayids.contains_nid(nid))
+        .map(|(nid, pos)| (nid, (pos.1.inner(), pos.0.inner())))        // WTF do I have lat & lon
+                                                                        // mixed up??
+        .for_each_with(nodeid_pos.clone(), |nodeid_pos, (nid, pos)| {
+            setting_node_pos.inc(1);
+            nodeid_pos.lock().unwrap().insert_i32(nid, pos);
+        });
 
-    for (nid, pos) in receiver.iter() {
-        setting_node_pos.inc(1);
-        nodeid_pos.insert(nid, pos);
-    }
-    let nodeid_pos = nodeid_pos;
+    let nodeid_pos = Arc::try_unwrap(nodeid_pos)
+        .unwrap()
+        .into_inner()
+        .unwrap();
 
     setting_node_pos.finish();
     progress_bars.remove(&setting_node_pos);
