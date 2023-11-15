@@ -272,27 +272,27 @@ impl NodeIdPosition for NodeIdPositionBucket {
 // First i64 has the i-th bit set if there is a node at position i
 // then there are all lat's delta encoded & varint encoded. then all the lng's
 // TODO this could return an iterator
-fn bucket_bytes_read(bucket_size: i64, bytes: &[u8]) -> impl Iterator<Item=Option<(i32, i32)>> {
+fn bucket_bytes_read(bucket_size: i64, bytes: &[u8]) -> impl Iterator<Item=Option<(i32, i32)>> + '_ {
     assert!(bucket_size <= 6); // only support i64
-    let mut result = vec![None; 2_i32.pow(bucket_size as u32) as usize];
     let (mask, bytes) = vartyint::read_i64(bytes).expect("");
-    let mut nums: Vec<i32> = vartyint::read_many(bytes)
-        .collect::<Result<_, _>>()
-        .unwrap();
 
-    let mut curr_0 = 0;
-    let mut curr_1 = 0;
-    for i in 0..2_i32.pow(bucket_size as u32) {
-        if (mask >> i) & 1 == 1 {
-            let p0 = curr_0 + nums.remove(0);
-            let p1 = curr_1 + nums.remove(0);
-            result[i as usize] = Some((p0, p1));
-            curr_0 = p0;
-            curr_1 = p1;
-        }
-    }
+    (0..2_i32.pow(bucket_size as u32))
+        .scan((0i32, 0i32, bytes), move |(curr_0, curr_1, bytes), i| {
+            if (mask >> i) & 1 == 1 {
+                let (n, new_bytes) = vartyint::read_i32(bytes).unwrap();
+                *bytes = new_bytes;
+                let p0 = *curr_0 + n;
 
-    result.into_iter()
+                let (n, new_bytes) = vartyint::read_i32(bytes).unwrap();
+                *bytes = new_bytes;
+                let p1 = *curr_1 + n;
+                *curr_0 = p0;
+                *curr_1 = p1;
+                Some(Some((p0, p1)))
+            } else {
+                Some(None)
+            }
+        })
 }
 
 /// Store the node positions
