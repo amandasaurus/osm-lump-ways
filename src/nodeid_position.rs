@@ -167,25 +167,30 @@ impl NodeIdPositionBucket {
     /// Set the cache to be the value for this node id
     fn warm_cache(&mut self, nid: i64) {
         let (bucket_id, _local_index) = self.nodeid_bucket_local(nid);
+        let bucket_shift = self.bucket_shift();
 
         // Do we have a cache that isn't for this node id? If so, write that out
-        if let Some(cache) = &self.cache {
+        if let Some(cache) = &mut self.cache {
             if cache.0 != bucket_id {
-                // store the current cache in the inner
+                // store the current cache in the inner (ie go from cache → real store )
                 let mut bytes = vec![];
-                bucket_bytes_write(self.bucket_shift(), &cache.1, &mut bytes);
+                bucket_bytes_write(bucket_shift, &cache.1, &mut bytes);
                 self.inner.insert(cache.0, bytes);
-                self.cache = None;
-            }
-        }
 
-        // Now set the cache to the required value
-        if self.cache.is_none() {
+                // now take from the real store to the cache.
+                let bytes: &[u8] = self.inner.entry(bucket_id).or_insert_with(|| vec![0]);
+                cache.0 = bucket_id;
+                cache.1.truncate(0);
+                cache.1.extend(bucket_bytes_read(bucket_shift, bytes));
+            }
+        } else {
+            // no cache, so store it
             // Read from the inner data
             let bytes: &[u8] = self.inner.entry(bucket_id).or_insert_with(|| vec![0]);
             let latlngs = bucket_bytes_read(self.bucket_shift, bytes).collect::<Vec<_>>();
             self.cache = Some((bucket_id, latlngs));
         }
+
     }
 }
 
