@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* Refactor to use less memory by not storing data longer than we need it
+
 ## v0.14.0 (2023-11-15)
 
 * Massive speed improvements to the “reorder data internally”.
