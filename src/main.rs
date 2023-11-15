@@ -39,6 +39,7 @@ use way_group::WayGroup;
 mod nodeid_position;
 use nodeid_position::NodeIdPosition;
 mod nodeid_wayids;
+use nodeid_wayids::NodeIdWayIds;
 
 fn main() -> Result<()> {
     let logger =
