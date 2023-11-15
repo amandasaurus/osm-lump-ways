@@ -436,7 +436,7 @@ fn main() -> Result<()> {
     progress_bars.remove(&reorder_segments_bar);
 
     // ↓ Split into paths if needed
-    way_groups.into_par_iter()
+    let files_data: HashMap<_, _> = way_groups.into_par_iter()
     .flat_map(|way_group| {
         let new_way_groups = if !args.split_into_single_paths {
             vec![way_group]
@@ -532,9 +532,9 @@ fn main() -> Result<()> {
                 }
                 acc
             }
-    )
-    .into_par_iter()
+    );
 
+    files_data.into_par_iter()
     .update(|(_filename, way_groups)| {
         debug!("sorting ways by length & truncating");
         // in calc dist to longer, we need this sorted too
