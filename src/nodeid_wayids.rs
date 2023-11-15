@@ -32,6 +32,8 @@ pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
     fn contains_nid(&self, nid: &i64) -> bool;
 
     /// Return all the ways that this node is in.
+    /// Current version of rust can't support returning impl Iterator here, and this is a source of
+    /// lots of allocations. 🙁
     fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = i64> + 'a>;
 }
 
