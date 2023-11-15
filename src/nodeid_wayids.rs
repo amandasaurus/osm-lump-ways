@@ -36,9 +36,9 @@ pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
 }
 
 /// Some standard struct for doing this.
-pub(crate) fn default() -> Box<dyn NodeIdWayIds> {
+pub(crate) fn default() -> impl NodeIdWayIds {
     //Box::new(NodeIdWayIdsMultiMap::new())
-    Box::new(NodeIdWayIdsAuto::new())
+    NodeIdWayIdsAuto::new()
 }
 
 /// Very simple BTreeMaps of nodeids:wayids
