@@ -8,4 +8,6 @@
 /blog-posts/*
 /target
 /water
+/dhat.out.*
 /heaptrack.*
+/perf.data*
