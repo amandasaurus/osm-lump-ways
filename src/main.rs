@@ -299,7 +299,7 @@ fn main() -> Result<()> {
             .with_style(style.clone()),
     );
 
-    group_wayid_nodes.into_par_iter()
+    let way_groups = group_wayid_nodes.into_par_iter()
     .flat_map(|(group, wayid_nodes)| {
         // Actually do the breath first search
         // TODO this is single threaded...
@@ -364,13 +364,16 @@ fn main() -> Result<()> {
             way_groups.len().to_formatted_string(&Locale::en),
             group
         );
-        grouping.finish();
-        progress_bars.remove(&grouping);
-        progress_bars.remove(&total_groups_found);
-        way_groups.into_par_iter()
-    })
-    // ↑ The breath first search is done
 
+        way_groups
+    })
+    .collect::<Vec<WayGroup>>();
+    // ↑ The breath first search is done
+    grouping.finish();
+    progress_bars.remove(&grouping);
+    progress_bars.remove(&total_groups_found);
+
+    let way_groups: Vec<_> = way_groups.into_par_iter()
     // ↓ now do other processing on the groups
     .filter(|way_group| {
         if args.only_these_way_groups.is_empty() {
