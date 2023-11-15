@@ -190,7 +190,6 @@ impl NodeIdPositionBucket {
             let latlngs = bucket_bytes_read(self.bucket_shift, bytes).collect::<Vec<_>>();
             self.cache = Some((bucket_id, latlngs));
         }
-
     }
 }
 
@@ -239,7 +238,9 @@ impl NodeIdPosition for NodeIdPositionBucket {
         self.inner
             .get(&bucket_id)
             .and_then(|bytes| {
-                bucket_bytes_read(self.bucket_shift, bytes).nth(local_index).unwrap()
+                bucket_bytes_read(self.bucket_shift, bytes)
+                    .nth(local_index)
+                    .unwrap()
             })
             .map(|(lat_i32, lng_i32)| {
                 (
@@ -277,12 +278,16 @@ impl NodeIdPosition for NodeIdPositionBucket {
 // First i64 has the i-th bit set if there is a node at position i
 // then there are all lat's delta encoded & varint encoded. then all the lng's
 // TODO this could return an iterator
-fn bucket_bytes_read(bucket_size: i64, bytes: &[u8]) -> impl Iterator<Item=Option<(i32, i32)>> + '_ {
+fn bucket_bytes_read(
+    bucket_size: i64,
+    bytes: &[u8],
+) -> impl Iterator<Item = Option<(i32, i32)>> + '_ {
     assert!(bucket_size <= 6); // only support i64
     let (mask, bytes) = vartyint::read_i64(bytes).expect("");
 
-    (0..2_i32.pow(bucket_size as u32))
-        .scan((0i32, 0i32, bytes), move |(curr_0, curr_1, bytes), i| {
+    (0..2_i32.pow(bucket_size as u32)).scan(
+        (0i32, 0i32, bytes),
+        move |(curr_0, curr_1, bytes), i| {
             if (mask >> i) & 1 == 1 {
                 let (n, new_bytes) = vartyint::read_i32(bytes).unwrap();
                 *bytes = new_bytes;
@@ -297,7 +302,8 @@ fn bucket_bytes_read(bucket_size: i64, bytes: &[u8]) -> impl Iterator<Item=Optio
             } else {
                 Some(None)
             }
-        })
+        },
+    )
 }
 
 /// Store the node positions
