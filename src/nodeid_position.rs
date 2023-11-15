@@ -183,7 +183,7 @@ impl NodeIdPositionBucket {
         if self.cache.is_none() {
             // Read from the inner data
             let bytes: &[u8] = self.inner.entry(bucket_id).or_insert_with(|| vec![0]);
-            let latlngs = bucket_bytes_read(self.bucket_shift, bytes);
+            let latlngs = bucket_bytes_read(self.bucket_shift, bytes).collect::<Vec<_>>();
             self.cache = Some((bucket_id, latlngs));
         }
     }
@@ -234,8 +234,7 @@ impl NodeIdPosition for NodeIdPositionBucket {
         self.inner
             .get(&bucket_id)
             .and_then(|bytes| {
-                let latlngs = bucket_bytes_read(self.bucket_shift, bytes);
-                latlngs[local_index]
+                bucket_bytes_read(self.bucket_shift, bytes).nth(local_index).unwrap()
             })
             .map(|(lat_i32, lng_i32)| {
                 (
@@ -273,7 +272,7 @@ impl NodeIdPosition for NodeIdPositionBucket {
 // First i64 has the i-th bit set if there is a node at position i
 // then there are all lat's delta encoded & varint encoded. then all the lng's
 // TODO this could return an iterator
-fn bucket_bytes_read(bucket_size: i64, bytes: &[u8]) -> Vec<Option<(i32, i32)>> {
+fn bucket_bytes_read(bucket_size: i64, bytes: &[u8]) -> impl Iterator<Item=Option<(i32, i32)>> {
     assert!(bucket_size <= 6); // only support i64
     let mut result = vec![None; 2_i32.pow(bucket_size as u32) as usize];
     let (mask, bytes) = vartyint::read_i64(bytes).expect("");
@@ -293,7 +292,7 @@ fn bucket_bytes_read(bucket_size: i64, bytes: &[u8]) -> Vec<Option<(i32, i32)>> 
         }
     }
 
-    result
+    result.into_iter()
 }
 
 /// Store the node positions
@@ -343,7 +342,7 @@ mod test {
                 let mut output = vec![];
                 bucket_bytes_write(bucket_shift, &input, &mut output);
                 //dbg!(&output);
-                let result = bucket_bytes_read(bucket_shift, &output);
+                let result = bucket_bytes_read(bucket_shift, &output).collect::<Vec<_>>();
 
                 assert_eq!(
                     result, input,
