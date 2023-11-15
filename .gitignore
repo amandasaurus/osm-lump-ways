@@ -8,6 +8,9 @@
 /blog-posts/*
 /target
 /water
+
+/cachegrind.*
+/callgrind.*
 /dhat.out.*
 /heaptrack.*
 /perf.data*
