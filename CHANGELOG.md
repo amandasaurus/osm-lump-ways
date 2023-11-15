@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.14.0 (2023-11-15)
 
 * Massive speed improvements to the “reorder data internally”.
 * Upgrade file reading library, which speeds up processing.
