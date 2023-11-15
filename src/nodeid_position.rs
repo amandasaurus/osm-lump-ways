@@ -173,7 +173,7 @@ impl NodeIdPositionBucket {
         if let Some(cache) = &mut self.cache {
             if cache.0 != bucket_id {
                 // store the current cache in the inner (ie go from cache → real store )
-                let mut bytes = vec![];
+                let mut bytes = Vec::with_capacity(8 + 2 * cache.1.len());
                 bucket_bytes_write(bucket_shift, &cache.1, &mut bytes);
                 self.inner.insert(cache.0, bytes);
 
@@ -181,6 +181,7 @@ impl NodeIdPositionBucket {
                 let bytes: &[u8] = self.inner.entry(bucket_id).or_insert_with(|| vec![0]);
                 cache.0 = bucket_id;
                 cache.1.truncate(0);
+                cache.1.reserve(2_usize.pow(bucket_shift as u32));
                 cache.1.extend(bucket_bytes_read(bucket_shift, bytes));
             }
         } else {
@@ -316,6 +317,7 @@ fn bucket_bytes_write(bucket_size: i64, pos: &[Option<(i32, i32)>], output: &mut
     assert_eq!(pos.len(), 2_i32.pow(bucket_size as u32) as usize);
     assert!(bucket_size <= 6); // only support i64
     output.truncate(0);
+    output.reserve(8 + 2*pos.len());
 
     // Node id mask
     let mut mask = 0i64;
