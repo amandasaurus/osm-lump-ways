@@ -3,6 +3,7 @@
 ## Unreleased
 
 * Refactor to use less memory by not storing data longer than we need it
+* Speed improvements by refactoring
 
 ## v0.14.0 (2023-11-15)
 
