@@ -534,153 +534,217 @@ fn main() -> Result<()> {
             }
     );
 
-    files_data.into_par_iter()
-    .update(|(_filename, way_groups)| {
-        debug!("sorting ways by length & truncating");
-        // in calc dist to longer, we need this sorted too
-        way_groups.par_sort_by(|a, b| a.length_m.unwrap().total_cmp(&b.length_m.unwrap()).reverse());
-    })
-    .update(|(_filename, way_groups)| {
-        if let Some(limit) = args.only_longest_n_per_file {
-            debug!("Truncating files by longest");
-            way_groups.truncate(limit);
-        }
-    })
-    .update(|(_filename, way_groups)| {
-        if args.incl_dist_to_longer {
-            debug!("Calculating the distance to the nearest longer object per way");
-
-            let mut points_distance_idx = KdTree::new(2);
-
-            let prog = progress_bars.add(
-                ProgressBar::new(way_groups.iter().map(|wg| wg.num_nodeids() as u64).sum())
-                    .with_message("Calc distance to longer: Indexing data")
-                    .with_style(style.clone()
-                                ));
-
-            for (wg_id, coords) in way_groups.iter().enumerate().flat_map(|(wg_id, wg)| wg.coords_iter_seq().map(move |coords| (wg_id, coords)) ) {
-                points_distance_idx.add(coords, wg_id).unwrap();
-                prog.inc(1);
+    files_data
+        .into_par_iter()
+        .update(|(_filename, way_groups)| {
+            debug!("sorting ways by length & truncating");
+            // in calc dist to longer, we need this sorted too
+            way_groups.par_sort_by(|a, b| {
+                a.length_m
+                    .unwrap()
+                    .total_cmp(&b.length_m.unwrap())
+                    .reverse()
+            });
+        })
+        .update(|(_filename, way_groups)| {
+            if let Some(limit) = args.only_longest_n_per_file {
+                debug!("Truncating files by longest");
+                way_groups.truncate(limit);
             }
-            prog.finish();
+        })
+        .update(|(_filename, way_groups)| {
+            if args.incl_dist_to_longer {
+                debug!("Calculating the distance to the nearest longer object per way");
 
-            let prog = progress_bars.add(
-                ProgressBar::new(way_groups.par_iter().map(|wg| wg.num_nodeids() as u64).sum::<u64>())
+                let mut points_distance_idx = KdTree::new(2);
+
+                let prog = progress_bars.add(
+                    ProgressBar::new(way_groups.iter().map(|wg| wg.num_nodeids() as u64).sum())
+                        .with_message("Calc distance to longer: Indexing data")
+                        .with_style(style.clone()),
+                );
+
+                for (wg_id, coords) in way_groups
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(wg_id, wg)| wg.coords_iter_seq().map(move |coords| (wg_id, coords)))
+                {
+                    points_distance_idx.add(coords, wg_id).unwrap();
+                    prog.inc(1);
+                }
+                prog.finish();
+
+                let prog = progress_bars.add(
+                    ProgressBar::new(
+                        way_groups
+                            .par_iter()
+                            .map(|wg| wg.num_nodeids() as u64)
+                            .sum::<u64>(),
+                    )
                     .with_message("Calc distance to longer")
-                    .with_style(style.clone()));
-            // dist to larger
-            let longers = way_groups.par_iter().enumerate()
-                .map(|(wg_id, wg)| {
-
-                    // for each point what's the nearest other point that's in a longer other wayid
-                    let min = wg.coords_iter_par().map(|coord: [f64;2]| -> Option<(f64, i64)> {
-                        let nearest_longer = points_distance_idx.iter_nearest(&coord, &haversine::haversine_m_arr).unwrap()
-                            .filter(|(_dist, other_wg_id)| **other_wg_id != wg_id).find(|(_dist, other_wg_id)| way_groups[**other_wg_id].length_m > way_groups[wg_id].length_m);
-                        prog.inc(1);
-                        nearest_longer.map(|(dist, wgid)| (dist, way_groups[*wgid].root_wayid))
+                    .with_style(style.clone()),
+                );
+                // dist to larger
+                let longers = way_groups
+                    .par_iter()
+                    .enumerate()
+                    .map(|(wg_id, wg)| {
+                        // for each point what's the nearest other point that's in a longer other wayid
+                        let min = wg
+                            .coords_iter_par()
+                            .map(|coord: [f64; 2]| -> Option<(f64, i64)> {
+                                let nearest_longer = points_distance_idx
+                                    .iter_nearest(&coord, &haversine::haversine_m_arr)
+                                    .unwrap()
+                                    .filter(|(_dist, other_wg_id)| **other_wg_id != wg_id)
+                                    .find(|(_dist, other_wg_id)| {
+                                        way_groups[**other_wg_id].length_m
+                                            > way_groups[wg_id].length_m
+                                    });
+                                prog.inc(1);
+                                nearest_longer
+                                    .map(|(dist, wgid)| (dist, way_groups[*wgid].root_wayid))
+                            })
+                            .filter_map(|x| x)
+                            .min_by(|a, b| (a.0).total_cmp(&b.0));
+                        min
                     })
-                    .filter_map(|x| x)
-                    .min_by(|a, b| (a.0).total_cmp(&b.0));
-                    min
-                })
-                .collect::<Vec<_>>();
-            prog.finish();
+                    .collect::<Vec<_>>();
+                prog.finish();
 
-            // set the longer distance
-            way_groups.par_iter_mut().zip(longers)
-                .for_each(|(wg, longer)| {
-                    wg.extra_json_props["dist_to_longer_m"] = longer.map(|(dist, _)| dist).into();
-                    wg.extra_json_props["nearest_longer_waygroup"] = longer.map(|(_dist, wgid)| wgid).into();
-                });
+                // set the longer distance
+                way_groups
+                    .par_iter_mut()
+                    .zip(longers)
+                    .for_each(|(wg, longer)| {
+                        wg.extra_json_props["dist_to_longer_m"] =
+                            longer.map(|(dist, _)| dist).into();
+                        wg.extra_json_props["nearest_longer_waygroup"] =
+                            longer.map(|(_dist, wgid)| wgid).into();
+                    });
 
-            // remove any that are too short
-            // TODO this can prob. be done faster in the above line, where er 
-            if let Some(min_dist_to_longer_m) = args.min_dist_to_longer_m {
-                way_groups.retain(|wg|
-                                wg.extra_json_props["dist_to_longer_m"].as_f64().map_or(true, |d| d >= min_dist_to_longer_m) )
+                // remove any that are too short
+                // TODO this can prob. be done faster in the above line, where er
+                if let Some(min_dist_to_longer_m) = args.min_dist_to_longer_m {
+                    way_groups.retain(|wg| {
+                        wg.extra_json_props["dist_to_longer_m"]
+                            .as_f64()
+                            .map_or(true, |d| d >= min_dist_to_longer_m)
+                    })
+                }
             }
-        }
-    })
-    .update(|(_filename, way_groups)| {
-        let mut feature_ranks = Vec::with_capacity(way_groups.len());
+        })
+        .update(|(_filename, way_groups)| {
+            let mut feature_ranks = Vec::with_capacity(way_groups.len());
 
-        // calc longest lengths
-        // (length of way group, idx of this way group in way_groups, rank)
-        way_groups.par_iter().enumerate()
-            .map(|(i, wg)| (wg.length_m.unwrap(), i, 0))
-            .collect_into_vec(&mut feature_ranks);
-        // sort by longest first
-        feature_ranks.par_sort_unstable_by(|a, b| a.0.total_cmp(&b.0).reverse());
-        // update feature_ranks to store the local rank
-        feature_ranks.par_iter_mut().enumerate().for_each(|(rank, (_len, _idx, new_rank))| {
-            *new_rank = rank;
-        });
-        // sort back by way_groups idx
-        feature_ranks.par_sort_unstable_by_key(|(_len, wg_idx, _rank)| *wg_idx);
-        // now update the way_groups
-        let way_groups_len = way_groups.len();
-        let way_groups_len_f = way_groups_len as f64;
-        way_groups.par_iter_mut().zip(feature_ranks.par_iter()).for_each(|(wg, (_len, _wg_idx, rank))| {
-            wg.extra_json_props["length_desc_rank"] = (*rank).into();
-            wg.extra_json_props["length_desc_rank_perc"] = ((*rank as f64)/way_groups_len_f).into();
-            wg.extra_json_props["length_asc_rank"] = (way_groups_len - *rank).into();
-            wg.extra_json_props["length_asc_rank_perc"] = ((way_groups_len - *rank) as f64/way_groups_len_f).into();
-        });
-
-        if args.split_into_single_paths {
-            // dist between ends
-            feature_ranks.truncate(0);
-
+            // calc longest lengths
             // (length of way group, idx of this way group in way_groups, rank)
-            way_groups.par_iter().enumerate()
-                .map(|(i, wg)| (wg.extra_json_props["dist_ends_m"].as_f64().unwrap(), i, 0)).collect_into_vec(&mut feature_ranks);
+            way_groups
+                .par_iter()
+                .enumerate()
+                .map(|(i, wg)| (wg.length_m.unwrap(), i, 0))
+                .collect_into_vec(&mut feature_ranks);
             // sort by longest first
             feature_ranks.par_sort_unstable_by(|a, b| a.0.total_cmp(&b.0).reverse());
             // update feature_ranks to store the local rank
-            feature_ranks.par_iter_mut().enumerate().for_each(|(rank, (_len, _idx, new_rank))| {
-                *new_rank = rank;
-            });
+            feature_ranks
+                .par_iter_mut()
+                .enumerate()
+                .for_each(|(rank, (_len, _idx, new_rank))| {
+                    *new_rank = rank;
+                });
             // sort back by way_groups idx
             feature_ranks.par_sort_unstable_by_key(|(_len, wg_idx, _rank)| *wg_idx);
             // now update the way_groups
-            way_groups.par_iter_mut().zip(feature_ranks.par_iter()).for_each(|(wg, (_len, _wg_idx, rank))| {
-                wg.extra_json_props["dist_ends_desc_rank"] = (*rank).into();
-                wg.extra_json_props["dist_ends_asc_rank"] = (way_groups_len - *rank).into();
-            });
+            let way_groups_len = way_groups.len();
+            let way_groups_len_f = way_groups_len as f64;
+            way_groups
+                .par_iter_mut()
+                .zip(feature_ranks.par_iter())
+                .for_each(|(wg, (_len, _wg_idx, rank))| {
+                    wg.extra_json_props["length_desc_rank"] = (*rank).into();
+                    wg.extra_json_props["length_desc_rank_perc"] =
+                        ((*rank as f64) / way_groups_len_f).into();
+                    wg.extra_json_props["length_asc_rank"] = (way_groups_len - *rank).into();
+                    wg.extra_json_props["length_asc_rank_perc"] =
+                        ((way_groups_len - *rank) as f64 / way_groups_len_f).into();
+                });
 
-        }
+            if args.split_into_single_paths {
+                // dist between ends
+                feature_ranks.truncate(0);
 
-    })
-
-    // ↓ convert to json objs
-    .map(|(filename, way_groups)| {
-        debug!("Convert to GeoJSON (ish)");
-        let features = way_groups.into_par_iter().map(|mut w| {
-            let mut properties = json!({
-                "root_wayid": w.root_wayid,
-                "root_wayid_120": w.root_wayid  % 120,
-            });
-            if let Some(_l) = w.length_m {
-                properties["length_m"] = w.length_m.into();
+                // (length of way group, idx of this way group in way_groups, rank)
+                way_groups
+                    .par_iter()
+                    .enumerate()
+                    .map(|(i, wg)| (wg.extra_json_props["dist_ends_m"].as_f64().unwrap(), i, 0))
+                    .collect_into_vec(&mut feature_ranks);
+                // sort by longest first
+                feature_ranks.par_sort_unstable_by(|a, b| a.0.total_cmp(&b.0).reverse());
+                // update feature_ranks to store the local rank
+                feature_ranks.par_iter_mut().enumerate().for_each(
+                    |(rank, (_len, _idx, new_rank))| {
+                        *new_rank = rank;
+                    },
+                );
+                // sort back by way_groups idx
+                feature_ranks.par_sort_unstable_by_key(|(_len, wg_idx, _rank)| *wg_idx);
+                // now update the way_groups
+                way_groups
+                    .par_iter_mut()
+                    .zip(feature_ranks.par_iter())
+                    .for_each(|(wg, (_len, _wg_idx, rank))| {
+                        wg.extra_json_props["dist_ends_desc_rank"] = (*rank).into();
+                        wg.extra_json_props["dist_ends_asc_rank"] = (way_groups_len - *rank).into();
+                    });
             }
-            if args.incl_wayids {
-                properties["all_wayids"] = w.way_ids.iter().map(|wid| format!("w{}", wid)).collect::<Vec<String>>().into();
-            }
+        })
+        // ↓ convert to json objs
+        .map(|(filename, way_groups)| {
+            debug!("Convert to GeoJSON (ish)");
+            let features = way_groups
+                .into_par_iter()
+                .map(|mut w| {
+                    let mut properties = json!({
+                        "root_wayid": w.root_wayid,
+                        "root_wayid_120": w.root_wayid  % 120,
+                    });
+                    if let Some(_l) = w.length_m {
+                        properties["length_m"] = w.length_m.into();
+                    }
+                    if args.incl_wayids {
+                        properties["all_wayids"] = w
+                            .way_ids
+                            .iter()
+                            .map(|wid| format!("w{}", wid))
+                            .collect::<Vec<String>>()
+                            .into();
+                    }
 
-            properties.as_object_mut().unwrap().append(w.extra_json_props.as_object_mut().unwrap());
+                    properties
+                        .as_object_mut()
+                        .unwrap()
+                        .append(w.extra_json_props.as_object_mut().unwrap());
 
-            (properties, w.coords.unwrap())
-            }).collect::<Vec<_>>();
+                    (properties, w.coords.unwrap())
+                })
+                .collect::<Vec<_>>();
 
-        (filename, features)
-    })
-    .try_for_each(|(filename, features)| {
-        debug!("Writing data to file(s)...");
-        // Write the files
-        match std::fs::File::create(&filename) {
-            Ok(f) => {
-                let mut f = std::io::BufWriter::new(f);
-                let num_written = write_geojson_features_directly(&features, &mut f, args.save_as_linestrings, &output_format)
+            (filename, features)
+        })
+        .try_for_each(|(filename, features)| {
+            debug!("Writing data to file(s)...");
+            // Write the files
+            match std::fs::File::create(&filename) {
+                Ok(f) => {
+                    let mut f = std::io::BufWriter::new(f);
+                    let num_written = write_geojson_features_directly(
+                        &features,
+                        &mut f,
+                        args.save_as_linestrings,
+                        &output_format,
+                    )
                     .with_context(|| {
                         format!(
                             "Writing {} features to filename {:?}",
@@ -688,16 +752,20 @@ fn main() -> Result<()> {
                             filename
                         )
                     })?;
-                info!("Wrote {} feature(s) to {}", num_written.to_formatted_string(&Locale::en), filename);
-                total_features_written.fetch_add(num_written, atomic_Ordering::SeqCst);
-                total_files_written.fetch_add(1, atomic_Ordering::SeqCst);
+                    info!(
+                        "Wrote {} feature(s) to {}",
+                        num_written.to_formatted_string(&Locale::en),
+                        filename
+                    );
+                    total_features_written.fetch_add(num_written, atomic_Ordering::SeqCst);
+                    total_files_written.fetch_add(1, atomic_Ordering::SeqCst);
+                }
+                Err(e) => {
+                    warn!("Couldn't open filename {:?}: {}", filename, e);
+                }
             }
-            Err(e) => {
-                warn!("Couldn't open filename {:?}: {}", filename, e);
-            }
-        }
-        Ok(()) as Result<()>
-    })?;
+            Ok(()) as Result<()>
+        })?;
 
     let total_files_written = total_files_written.into_inner();
     let total_features_written = total_features_written.into_inner();
