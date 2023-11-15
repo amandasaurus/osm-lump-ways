@@ -376,6 +376,7 @@ fn main() -> Result<()> {
     grouping.finish();
     progress_bars.remove(&grouping);
     progress_bars.remove(&total_groups_found);
+    drop(nodeid_wayids);
 
     let way_groups: Vec<_> = way_groups
         .into_par_iter()
@@ -403,36 +404,39 @@ fn main() -> Result<()> {
         })
         .collect();
 
-    way_groups.into_par_iter()
-    .update(|way_group| {
-        trace!("Reducing the number of inner segments");
-        way_group.reorder_segments(20, &reorder_segments_bar);
-    })
-    .update(|way_group| {
-        trace!("Saving coordinates for all ways");
-        way_group.set_coords(&nodeid_pos);
-    })
-    .update(|way_group| {
-        trace!("Calculating all lengths");
-        way_group.calculate_length();
-    })
-    // apply min length filter
-    // This is before any possible splitting. If an unsplitted way_group has total len ≤ the min
-    // len, then splitting won't make it be included.
-    // This reduces the amount of splitting we have to do.
-    .filter(|way_group|
-        match args.min_length_m {
+    let way_groups: Vec<_> = way_groups
+        .into_par_iter()
+        .update(|way_group| {
+            trace!("Reducing the number of inner segments");
+            way_group.reorder_segments(20, &reorder_segments_bar);
+        })
+        .update(|way_group| {
+            trace!("Saving coordinates for all ways");
+            way_group.set_coords(&nodeid_pos);
+        })
+        .update(|way_group| {
+            trace!("Calculating all lengths");
+            way_group.calculate_length();
+        })
+        // apply min length filter
+        // This is before any possible splitting. If an unsplitted way_group has total len ≤ the min
+        // len, then splitting won't make it be included.
+        // This reduces the amount of splitting we have to do.
+        .filter(|way_group| match args.min_length_m {
             None => true,
             Some(min_len) => way_group.length_m.unwrap() >= min_len,
-        }
-    )
-    .inspect(|way_group| {
-        if args.split_into_single_paths {
-            splitter.inc_length(way_group.num_nodeids() as u64);
-        }
-    })
+        })
+        .inspect(|way_group| {
+            if args.split_into_single_paths {
+                splitter.inc_length(way_group.num_nodeids() as u64);
+            }
+        })
+        .collect();
+    reorder_segments_bar.finish();
+    progress_bars.remove(&reorder_segments_bar);
 
     // ↓ Split into paths if needed
+    way_groups.into_par_iter()
     .flat_map(|way_group| {
         let new_way_groups = if !args.split_into_single_paths {
             vec![way_group]
