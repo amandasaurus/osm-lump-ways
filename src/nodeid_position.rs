@@ -317,7 +317,7 @@ fn bucket_bytes_write(bucket_size: i64, pos: &[Option<(i32, i32)>], output: &mut
     assert_eq!(pos.len(), 2_i32.pow(bucket_size as u32) as usize);
     assert!(bucket_size <= 6); // only support i64
     output.truncate(0);
-    output.reserve(8 + 2*pos.len());
+    output.reserve(8 + 2 * pos.len());
 
     // Node id mask
     let mut mask = 0i64;
