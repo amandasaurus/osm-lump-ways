@@ -48,15 +48,12 @@ impl WayGroup {
         if self.coords.is_some() {
             return;
         }
-        let nodeid_pos = Arc::new(Mutex::new(nodeid_pos));
         self.coords = Some(
             self.nodeids
                 .par_iter()
                 .map(|nids| {
                     let mut poses = vec![(-200., -200.); nids.len()];
                     nodeid_pos
-                        .lock()
-                        .unwrap()
                         .get_many_unwrap(nids, poses.as_mut_slice());
                     poses
                 })
