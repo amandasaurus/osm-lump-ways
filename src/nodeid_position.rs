@@ -32,6 +32,18 @@ pub trait NodeIdPosition: std::fmt::Debug + std::marker::Send + std::marker::Syn
     /// Return the location for this node id
     fn get(&self, node_id: &i64) -> Option<(f64, f64)>;
 
+    fn get_many_unwrap(&self, nids: &[i64], output: &mut [(f64, f64)]) {
+        for (nid, output) in nids.iter().zip(output.iter_mut()) {
+            *output = self.get(nid).unwrap();
+        }
+    }
+
+    fn get_many(&self, nids: &[i64], output: &mut [Option<(f64, f64)>]) {
+        for i in 0..nids.len() {
+            output[i] = self.get(&nids[i]);
+        }
+    }
+
     /// Number of nodes inside
     fn len(&self) -> usize;
 
