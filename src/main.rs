@@ -65,7 +65,7 @@ fn main() -> Result<()> {
     info!("Starting osm-lump-ways v{}", std::env!("CARGO_PKG_VERSION"));
 
     let reader = read_progress::BufReaderWithSize::from_path(&args.input_filename)?;
-    let mut reader = osmio::pbf::PBFReader::new(reader);
+    let mut reader = osmio::stringpbf::PBFReader::new(reader);
 
     if args.split_files_by_group && !args.output_filename.contains("%s") {
         error!("No %s found in output filename ({})", args.output_filename);
