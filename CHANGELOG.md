@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* Refactoring to speed up processing (speed up `WayGroup::set_coords`)
+
 ## v0.15.0 (2023-11-16)
 
 * Refactor to use less memory by not storing data longer than we need it
