@@ -126,7 +126,9 @@ fn main() -> Result<()> {
 
     info!("Starting to read {:?}", &args.input_filename);
     info!("Tag filter(s) in operation: {:?}", args.tag_filter);
-    info!("Tag grouping(s) in operation: {:?}", args.tag_group_k);
+    if !args.tag_group_k.is_empty() {
+        info!("Tag grouping(s) in operation: {:?}", args.tag_group_k);
+    }
     if !args.only_these_way_groups.is_empty() {
         info!(
             "Only keeping groups which include the following ways: {:?}",
