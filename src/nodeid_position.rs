@@ -278,6 +278,65 @@ impl NodeIdPosition for NodeIdPositionBucket {
             })
     }
 
+    fn get_many_unwrap(&self, nids: &[i64], output: &mut [(f64, f64)]) {
+        assert_eq!(nids.len(), output.len());
+        if nids.is_empty() {
+            return;
+        }
+        let mut bucket_id;
+        let mut new_bucket_id;
+        let mut bucket_latlngs_i32s: Vec<Option<(i32, i32)>>;
+        let mut local_index;
+        let mut new_local_index;
+        (bucket_id, local_index) = self.nodeid_bucket_local(nids[0]);
+
+        bucket_latlngs_i32s = self
+            .inner
+            .get(&bucket_id)
+            .map(|bytes| bucket_bytes_read(self.bucket_shift, bytes).collect::<Vec<_>>())
+            .unwrap();
+        assert!(
+            bucket_latlngs_i32s[local_index].is_some(),
+            "Node {} does not have a position",
+            nids[0]
+        );
+        output[0] = bucket_latlngs_i32s[local_index]
+            .map(|(lat_i32, lng_i32)| {
+                (
+                    Lat::from_inner(lat_i32).degrees(),
+                    Lon::from_inner(lng_i32).degrees(),
+                )
+            })
+            .unwrap();
+
+        for (nid, output_el) in nids[1..].iter().zip(output[1..].iter_mut()) {
+            (new_bucket_id, new_local_index) = self.nodeid_bucket_local(*nid);
+            if new_bucket_id != bucket_id {
+                // switch to new bucket if needed
+                bucket_latlngs_i32s = self
+                    .inner
+                    .get(&new_bucket_id)
+                    .map(|bytes| bucket_bytes_read(self.bucket_shift, bytes).collect::<Vec<_>>())
+                    .unwrap();
+                bucket_id = new_bucket_id;
+            }
+            local_index = new_local_index;
+            assert!(
+                bucket_latlngs_i32s[local_index].is_some(),
+                "Node {nid} does not have a position"
+            );
+
+            *output_el = bucket_latlngs_i32s[local_index]
+                .map(|(lat_i32, lng_i32)| {
+                    (
+                        Lat::from_inner(lat_i32).degrees(),
+                        Lon::from_inner(lng_i32).degrees(),
+                    )
+                })
+                .unwrap_or_else(|| panic!("unable to get position for nid {nid}"));
+        }
+    }
+
     fn len(&self) -> usize {
         self.num_nodes
     }
