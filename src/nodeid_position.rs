@@ -444,7 +444,6 @@ mod test {
                 let bucket_shift: i64 = $bucket_shift;
                 let mut output = vec![];
                 bucket_bytes_write(bucket_shift, &input, &mut output);
-                //dbg!(&output);
                 let result = bucket_bytes_read(bucket_shift, &output).collect::<Vec<_>>();
 
                 assert_eq!(
