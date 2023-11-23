@@ -1,8 +1,9 @@
 # Changelog
 
-## Unreleased
+## v0.16.0 (2023-11-23)
 
 * Refactoring to speed up processing (speed up `WayGroup::set_coords`, use stringpbf)
+* Use new osmio version which speeds up file reading
 
 ## v0.15.0 (2023-11-16)
 
