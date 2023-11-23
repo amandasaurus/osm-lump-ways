@@ -166,6 +166,17 @@ impl NodeIdPositionBucket {
         (bucket, local_index)
     }
 
+    /// Write the contents of the cache to the inner
+    fn write_out_cache(&mut self) {
+        let bucket_shift = self.bucket_shift();
+        if let Some(cache) = &mut self.cache {
+            // store the current cache in the inner (ie go from cache → real store )
+            let mut bytes = Vec::with_capacity(8 + 2 * cache.1.len());
+            bucket_bytes_write(bucket_shift, &cache.1, &mut bytes);
+            self.inner.insert(cache.0, bytes);
+        }
+    }
+
     /// Set the cache to be the value for this node id
     fn warm_cache(&mut self, nid: i64) {
         let (bucket_id, _local_index) = self.nodeid_bucket_local(nid);
@@ -174,11 +185,13 @@ impl NodeIdPositionBucket {
         // Do we have a cache that isn't for this node id? If so, write that out
         if let Some(cache) = &mut self.cache {
             if cache.0 != bucket_id {
-                // store the current cache in the inner (ie go from cache → real store )
-                let mut bytes = Vec::with_capacity(8 + 2 * cache.1.len());
-                bucket_bytes_write(bucket_shift, &cache.1, &mut bytes);
-                self.inner.insert(cache.0, bytes);
+                self.write_out_cache();
+            }
+        }
 
+        // Have to duplicate it for lifetime reasons
+        if let Some(cache) = &mut self.cache {
+            if cache.0 != bucket_id {
                 // now take from the real store to the cache.
                 let bytes: &[u8] = self.inner.entry(bucket_id).or_insert_with(|| vec![0]);
                 cache.0 = bucket_id;
