@@ -527,7 +527,11 @@ fn main() -> Result<()> {
             |mut acc, curr| {
                 trace!("Merging files down again");
                 for (filename, wgs) in curr.into_iter() {
-                    acc.entry(filename).or_default().extend(wgs.into_iter())
+                    if !acc.contains_key(&filename) {
+                        acc.insert(filename, wgs);
+                    } else {
+                        acc.get_mut(&filename).unwrap().extend(wgs.into_iter());
+                    }
                 }
                 acc
             }
