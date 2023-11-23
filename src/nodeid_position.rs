@@ -289,6 +289,10 @@ impl NodeIdPosition for NodeIdPositionBucket {
         ));
         output
     }
+
+    fn finished_inserting(&mut self) {
+        self.write_out_cache();
+    }
 }
 
 // First i64 has the i-th bit set if there is a node at position i
