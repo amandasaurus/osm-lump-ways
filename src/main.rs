@@ -42,12 +42,11 @@ mod nodeid_wayids;
 use nodeid_wayids::NodeIdWayIds;
 
 fn main() -> Result<()> {
-
     let args = cli_args::Args::parse();
 
-    let logger =
-        env_logger::Builder::new().filter_level(args.verbose.log_level_filter())
-            .build();
+    let logger = env_logger::Builder::new()
+        .filter_level(args.verbose.log_level_filter())
+        .build();
     let progress_bars = indicatif::MultiProgress::new();
     LogWrapper::new(progress_bars.clone(), logger)
         .try_init()

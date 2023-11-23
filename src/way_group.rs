@@ -53,8 +53,7 @@ impl WayGroup {
                 .par_iter()
                 .map(|nids| {
                     let mut poses = vec![(-200., -200.); nids.len()];
-                    nodeid_pos
-                        .get_many_unwrap(nids, poses.as_mut_slice());
+                    nodeid_pos.get_many_unwrap(nids, poses.as_mut_slice());
                     poses
                 })
                 .collect::<Vec<_>>(),
