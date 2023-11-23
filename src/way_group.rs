@@ -53,18 +53,12 @@ impl WayGroup {
             self.nodeids
                 .par_iter()
                 .map(|nids| {
-                    nids.par_iter()
-                        .map_with(nodeid_pos.clone(),
-                              |nodeid_pos, nid| nodeid_pos.lock().unwrap().get(nid).map_or_else(
-                                || {
-                                    error!("Cannot find position for node id {}, way_group root_wayid {}. Skipping this node", nid, self.root_wayid);
-                                    None
-                                },
-                                |p| Some(p.to_owned())
-                                )
-                            )
-                        .filter_map(|p| p)
-                        .collect::<Vec<(f64, f64)>>()
+                    let mut poses = vec![(-200., -200.); nids.len()];
+                    nodeid_pos
+                        .lock()
+                        .unwrap()
+                        .get_many_unwrap(nids, poses.as_mut_slice());
+                    poses
                 })
                 .collect::<Vec<_>>(),
         );
