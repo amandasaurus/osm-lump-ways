@@ -42,20 +42,16 @@ mod nodeid_wayids;
 use nodeid_wayids::NodeIdWayIds;
 
 fn main() -> Result<()> {
+
+    let args = cli_args::Args::parse();
+
     let logger =
-        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
+        env_logger::Builder::new().filter_level(args.verbose.log_level_filter())
             .build();
     let progress_bars = indicatif::MultiProgress::new();
     LogWrapper::new(progress_bars.clone(), logger)
         .try_init()
         .unwrap();
-
-    let args = cli_args::Args::parse();
-
-    if std::env::var("RUST_LOG").is_err() {
-        // now we use the -v/-q args to change the level
-        log::set_max_level(args.verbose.log_level_filter());
-    }
     let show_progress_bars = args.verbose.log_level_filter() >= log::Level::Info;
     if !show_progress_bars {
         progress_bars.set_draw_target(ProgressDrawTarget::hidden());
