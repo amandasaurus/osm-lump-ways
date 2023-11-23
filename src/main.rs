@@ -786,7 +786,8 @@ fn main() -> Result<()> {
     } else {
         info!(
             "Wrote {} feature(s) to {} file(s)",
-            total_features_written, total_files_written
+            total_features_written.to_formatted_string(&Locale::en),
+            total_files_written
         );
     }
 
