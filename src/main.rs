@@ -248,7 +248,9 @@ fn main() -> Result<()> {
             nodeid_pos.lock().unwrap().insert_i32(nid, pos);
         });
 
-    let nodeid_pos = Arc::try_unwrap(nodeid_pos).unwrap().into_inner().unwrap();
+    let mut nodeid_pos = Arc::try_unwrap(nodeid_pos).unwrap().into_inner().unwrap();
+    nodeid_pos.finished_inserting();
+    let nodeid_pos = nodeid_pos;
 
     setting_node_pos.finish();
     progress_bars.remove(&setting_node_pos);

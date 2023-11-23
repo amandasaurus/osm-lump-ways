@@ -47,6 +47,8 @@ pub trait NodeIdPosition: std::fmt::Debug + std::marker::Send + std::marker::Syn
     fn detailed_size(&self) -> String;
 
     fn shrink_to_fit(&mut self) {}
+
+    fn finished_inserting(&mut self) {}
 }
 
 /// A default good value
