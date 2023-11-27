@@ -259,8 +259,7 @@ impl NodeIdWayIdsBucketWayIndex {
         bucket
     }
 
-
-    fn ways_for_nid<'a>(&'a self, nid: &i64) -> impl Iterator<Item=i64> +'a {
+    fn ways_for_nid<'a>(&'a self, nid: &i64) -> impl Iterator<Item = i64> + 'a {
         let nid = *nid;
         let bucketid = self.nodeid_bucket(nid);
         self.nodeid_bucket_wayid
@@ -342,7 +341,7 @@ impl NodeIdWayIds for NodeIdWayIdsBucketWayIndex {
 
     /// Return all the ways that this node is in.
     fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = i64> + 'a> {
-        Box::new( self.ways_for_nid(nid))
+        Box::new(self.ways_for_nid(nid))
     }
 }
 
