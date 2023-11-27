@@ -286,16 +286,15 @@ impl NodeIdPosition for NodeIdPositionBucket {
         }
         let mut bucket_id;
         let mut new_bucket_id;
-        let mut bucket_latlngs_i32s: Vec<Option<(i32, i32)>>;
+        let mut bucket_latlngs_i32s: Vec<Option<(i32, i32)>> = Vec::new();
+        let mut new_bucket_value;
         let mut local_index;
         let mut new_local_index;
         (bucket_id, local_index) = self.nodeid_bucket_local(nids[0]);
 
-        bucket_latlngs_i32s = self
-            .inner
-            .get(&bucket_id)
-            .map(|bytes| bucket_bytes_read(self.bucket_shift, bytes).collect::<Vec<_>>())
-            .unwrap();
+        bucket_latlngs_i32s.truncate(0);
+        new_bucket_value = self.inner.get(&bucket_id).unwrap();
+        bucket_latlngs_i32s.extend(bucket_bytes_read(self.bucket_shift, new_bucket_value));
         assert!(
             bucket_latlngs_i32s[local_index].is_some(),
             "Node {} does not have a position",
@@ -314,11 +313,9 @@ impl NodeIdPosition for NodeIdPositionBucket {
             (new_bucket_id, new_local_index) = self.nodeid_bucket_local(*nid);
             if new_bucket_id != bucket_id {
                 // switch to new bucket if needed
-                bucket_latlngs_i32s = self
-                    .inner
-                    .get(&new_bucket_id)
-                    .map(|bytes| bucket_bytes_read(self.bucket_shift, bytes).collect::<Vec<_>>())
-                    .unwrap();
+                new_bucket_value = self.inner.get(&new_bucket_id).unwrap();
+                bucket_latlngs_i32s.truncate(0);
+                bucket_latlngs_i32s.extend(bucket_bytes_read(self.bucket_shift, new_bucket_value));
                 bucket_id = new_bucket_id;
             }
             local_index = new_local_index;
