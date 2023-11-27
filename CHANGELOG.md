@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.17.0 (2023-11-27)
 
 * Refactor to speed up processing
 * Upgrade software libraries to speed up processing
