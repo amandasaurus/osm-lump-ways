@@ -258,6 +258,21 @@ impl NodeIdWayIdsBucketWayIndex {
             .expect("Node id >> by WAY_INDEX_BUCKET_SHIFT is too large to fit in i32. This tool uses optimizations which assume wayid < 2³²");
         bucket
     }
+
+
+    fn ways_for_nid<'a>(&'a self, nid: &i64) -> impl Iterator<Item=i64> +'a {
+        let nid = *nid;
+        let bucketid = self.nodeid_bucket(nid);
+        self.nodeid_bucket_wayid
+            .get(&bucketid)
+            .into_iter()
+            .flat_map(|wids| wids.iter())
+            .filter(move |wid| {
+                self.get_nodeids_for_wayid_iter(**wid)
+                    .any(|this_nid| this_nid == nid)
+            })
+            .map(|wid| (*wid).into())
+    }
 }
 
 impl NodeIdWayIds for NodeIdWayIdsBucketWayIndex {
@@ -322,35 +337,12 @@ impl NodeIdWayIds for NodeIdWayIdsBucketWayIndex {
     }
 
     fn nid_is_in_many(&self, nid: &i64) -> bool {
-        let nid = *nid;
-        let bucketid = self.nodeid_bucket(nid);
-        self.nodeid_bucket_wayid
-            .get(&bucketid)
-                .into_iter()    // loop over all ways in the bucket
-                .flat_map(|wids| wids.iter())
-                .flat_map(move |wid| self.get_nodeids_for_wayid_iter(*wid))     // all nodes in all
-                                                                                // ways in this
-                                                                                // bucket
-                .filter(|this_nid| *this_nid == nid)    // Just keep the copies of this nid
-                .nth(1)         // get the second result
-                .is_some()      // … if it (the second) exists, then >1
+        self.ways_for_nid(nid).nth(1).is_some()
     }
 
     /// Return all the ways that this node is in.
     fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = i64> + 'a> {
-        let nid = *nid;
-        let bucketid = self.nodeid_bucket(nid);
-        Box::new(
-            self.nodeid_bucket_wayid
-                .get(&bucketid)
-                .into_iter()
-                .flat_map(|wids| wids.iter())
-                .filter(move |wid| {
-                    self.get_nodeids_for_wayid_iter(**wid)
-                        .any(|this_nid| this_nid == nid)
-                })
-                .map(|wid| (*wid).into()),
-        )
+        Box::new( self.ways_for_nid(nid))
     }
 }
 
