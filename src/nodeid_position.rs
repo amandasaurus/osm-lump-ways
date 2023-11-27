@@ -304,8 +304,8 @@ impl NodeIdPosition for NodeIdPositionBucket {
         output[0] = bucket_latlngs_i32s[local_index]
             .map(|(lat_i32, lng_i32)| {
                 (
-                    Lat::from_inner(lat_i32).degrees(),
-                    Lon::from_inner(lng_i32).degrees(),
+                    osmio::lat_lon_inner_to_degrees(lat_i32),
+                    osmio::lat_lon_inner_to_degrees(lng_i32),
                 )
             })
             .unwrap();
@@ -330,8 +330,8 @@ impl NodeIdPosition for NodeIdPositionBucket {
             *output_el = bucket_latlngs_i32s[local_index]
                 .map(|(lat_i32, lng_i32)| {
                     (
-                        Lat::from_inner(lat_i32).degrees(),
-                        Lon::from_inner(lng_i32).degrees(),
+                        osmio::lat_lon_inner_to_degrees(lat_i32),
+                        osmio::lat_lon_inner_to_degrees(lng_i32),
                     )
                 })
                 .unwrap_or_else(|| panic!("unable to get position for nid {nid}"));
