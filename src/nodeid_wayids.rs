@@ -35,6 +35,9 @@ pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
     /// Current version of rust can't support returning impl Iterator here, and this is a source of
     /// lots of allocations. 🙁
     fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = i64> + 'a>;
+
+    // returns true iff this node id is in >1 way
+    fn nid_is_in_many(&self, nid: &i64) -> bool;
 }
 
 /// Some standard struct for doing this.
@@ -101,6 +104,10 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
     /// How many nodes have been saved
     fn len(&self) -> usize {
         self.singles.len() + self.multiples.len()
+    }
+
+    fn nid_is_in_many(&self, nid: &i64) -> bool {
+        self.multiples.contains_key(nid)
     }
 
     fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = i64> + 'a> {
@@ -314,6 +321,21 @@ impl NodeIdWayIds for NodeIdWayIdsBucketWayIndex {
         }
     }
 
+    fn nid_is_in_many(&self, nid: &i64) -> bool {
+        let nid = *nid;
+        let bucketid = self.nodeid_bucket(nid);
+        self.nodeid_bucket_wayid
+            .get(&bucketid)
+                .into_iter()    // loop over all ways in the bucket
+                .flat_map(|wids| wids.iter())
+                .flat_map(move |wid| self.get_nodeids_for_wayid_iter(*wid))     // all nodes in all
+                                                                                // ways in this
+                                                                                // bucket
+                .filter(|this_nid| *this_nid == nid)    // Just keep the copies of this nid
+                .nth(1)         // get the second result
+                .is_some()      // … if it (the second) exists, then >1
+    }
+
     /// Return all the ways that this node is in.
     fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = i64> + 'a> {
         let nid = *nid;
@@ -418,6 +440,13 @@ impl NodeIdWayIds for NodeIdWayIdsAuto {
         match self {
             Self::MultiMap(x) => x.contains_nid(nid),
             Self::BucketMap(x) => x.contains_nid(nid),
+        }
+    }
+
+    fn nid_is_in_many(&self, nid: &i64) -> bool {
+        match self {
+            Self::MultiMap(x) => x.nid_is_in_many(nid),
+            Self::BucketMap(x) => x.nid_is_in_many(nid),
         }
     }
 
