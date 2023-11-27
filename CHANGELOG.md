@@ -3,6 +3,7 @@
 ## Unreleased
 
 * Refactor to speed up processing
+* Upgrade software libraries to speed up processing
 
 ## v0.16.0 (2023-11-23)
 
