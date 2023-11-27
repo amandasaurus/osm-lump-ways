@@ -182,11 +182,11 @@ impl NodeIdPositionBucket {
     fn write_out_cache(&mut self) {
         let bucket_shift = self.bucket_shift();
         if let Some(cache) = &mut self.cache {
-            let mut inner_entry = self
+            let inner_entry = self
                 .inner
                 .entry(cache.0)
                 .or_insert_with(|| Vec::with_capacity(8 + 2 * cache.1.len()));
-            bucket_bytes_write(bucket_shift, &cache.1, &mut inner_entry);
+            bucket_bytes_write(bucket_shift, &cache.1, inner_entry);
         }
     }
 
