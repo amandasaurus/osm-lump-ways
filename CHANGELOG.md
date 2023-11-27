@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* Refactor to speed up processing
+
 ## v0.16.0 (2023-11-23)
 
 * Refactoring to speed up processing (speed up `WayGroup::set_coords`, use stringpbf)

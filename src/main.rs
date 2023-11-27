@@ -344,6 +344,9 @@ fn main() -> Result<()> {
                             // find all other ways which are connected to wid, and add them to this_group
                             for other_wayid in wayid_nodes[&wid]
                                 .iter()
+                                .filter(|nid| nodeid_wayids.nid_is_in_many(nid))    // only look at
+                                                                                    // nodes in >1
+                                                                                    // ways
                                 .flat_map(|nid| nodeid_wayids.ways(nid))
                             {
                                 // If this other way hasn't been processed yet, then add to this group.
