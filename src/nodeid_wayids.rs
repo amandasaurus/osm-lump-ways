@@ -177,8 +177,7 @@ impl NodeIdWayIdsBucketWayIndex {
     }
 
     fn set_nodeid_for_wayid(&mut self, wayid: i64, new_nodeid: i64) {
-        let mut nodeids: Vec<i64> = self
-            .get_nodeids_for_wayid(wayid);
+        let mut nodeids: Vec<i64> = self.get_nodeids_for_wayid(wayid);
         let old_num_nodes = nodeids.len();
         let wayid: i32 = wayid.try_into().expect("way id is too large for i32");
         nodeids.push(new_nodeid);
@@ -200,8 +199,7 @@ impl NodeIdWayIdsBucketWayIndex {
     }
 
     fn set_nodeids_for_wayid(&mut self, wayid: i64, new_nodeids: &[i64]) {
-        let mut nodeids: Vec<i64> = self
-            .get_nodeids_for_wayid(wayid);
+        let mut nodeids: Vec<i64> = self.get_nodeids_for_wayid(wayid);
         nodeids.reserve(new_nodeids.len());
         let old_num_nodes = nodeids.len();
         nodeids.extend(new_nodeids);
@@ -257,8 +255,8 @@ impl NodeIdWayIdsBucketWayIndex {
             .flat_map(|wids| wids.iter())
             .filter(move |wid| {
                 self.get_nodeids_for_wayid_iter(**wid)
-                    .take_while(|this_nid| *this_nid <= nid)     // stored in order, so early exit
-                                                                 // possible
+                    .take_while(|this_nid| *this_nid <= nid) // stored in order, so early exit
+                                                             // possible
                     .any(|this_nid| this_nid == nid)
             })
             .map(|wid| (*wid).into())
@@ -321,6 +319,8 @@ impl NodeIdWayIds for NodeIdWayIdsBucketWayIndex {
             None => false,
             Some(wids) => wids.iter().any(|wid| {
                 self.get_nodeids_for_wayid_iter(*wid)
+                    .take_while(|this_nid| this_nid <= nid) // stored in order, so early exit
+                                                            // possible
                     .any(|w_nid| w_nid == *nid)
             }),
         }
