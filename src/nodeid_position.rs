@@ -292,11 +292,10 @@ impl NodeIdPosition for NodeIdPositionBucket {
         let mut new_local_index;
         (bucket_id, local_index) = self.nodeid_bucket_local(nids[0]);
 
-        bucket_latlngs_i32s = buckets.entry(bucket_id)
-            .or_insert_with(|| {
-                let new_bucket_value = self.inner.get(&bucket_id).unwrap();
-                bucket_bytes_read(self.bucket_shift, new_bucket_value).collect::<Vec<_>>()
-            });
+        bucket_latlngs_i32s = buckets.entry(bucket_id).or_insert_with(|| {
+            let new_bucket_value = self.inner.get(&bucket_id).unwrap();
+            bucket_bytes_read(self.bucket_shift, new_bucket_value).collect::<Vec<_>>()
+        });
         assert!(
             bucket_latlngs_i32s[local_index].is_some(),
             "Node {} does not have a position",
@@ -314,11 +313,10 @@ impl NodeIdPosition for NodeIdPositionBucket {
         for (nid, output_el) in nids[1..].iter().zip(output[1..].iter_mut()) {
             (new_bucket_id, new_local_index) = self.nodeid_bucket_local(*nid);
             if new_bucket_id != bucket_id {
-                bucket_latlngs_i32s = buckets.entry(new_bucket_id)
-                    .or_insert_with(|| {
-                        let new_bucket_value = self.inner.get(&new_bucket_id).unwrap();
-                        bucket_bytes_read(self.bucket_shift, new_bucket_value).collect::<Vec<_>>()
-                    });
+                bucket_latlngs_i32s = buckets.entry(new_bucket_id).or_insert_with(|| {
+                    let new_bucket_value = self.inner.get(&new_bucket_id).unwrap();
+                    bucket_bytes_read(self.bucket_shift, new_bucket_value).collect::<Vec<_>>()
+                });
                 bucket_id = new_bucket_id;
             }
             local_index = new_local_index;
