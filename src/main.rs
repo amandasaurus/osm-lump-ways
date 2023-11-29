@@ -136,6 +136,9 @@ fn main() -> Result<()> {
             args.only_these_way_groups_nodeid
         );
     }
+    if std::env::var("OSM_LUMP_WAYS_FINISH_AFTER_READ").is_ok() {
+        warn!("Programme will exit after reading & parsing input");
+    }
 
     // For each group, a hashmap of wayid:nodes in that way
     let group_wayid_nodes: HashMap<Vec<Option<String>>, HashMap<i64, Vec<i64>>> = HashMap::new();
@@ -264,6 +267,10 @@ fn main() -> Result<()> {
         "All data has been loaded in {}. Started processing...",
         format_duration(Instant::now() - global_start)
     );
+
+    if std::env::var("OSM_LUMP_WAYS_FINISH_AFTER_READ").is_ok() {
+        return Ok(());
+    }
     info!(
         "Starting the breathfirst search. There are {} groups",
         group_wayid_nodes.len()
