@@ -13,4 +13,4 @@
 /callgrind.*
 /dhat.out.*
 /heaptrack.*
-/perf.data*
+/perf.*
