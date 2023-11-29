@@ -178,8 +178,7 @@ impl NodeIdWayIdsBucketWayIndex {
 
     fn set_nodeid_for_wayid(&mut self, wayid: i64, new_nodeid: i64) {
         let mut nodeids: Vec<i64> = self
-            .get_nodeids_for_wayid(wayid)
-            .unwrap_or_else(|| Vec::with_capacity(1));
+            .get_nodeids_for_wayid(wayid);
         let old_num_nodes = nodeids.len();
         let wayid: i32 = wayid.try_into().expect("way id is too large for i32");
         nodeids.push(new_nodeid);
@@ -202,8 +201,8 @@ impl NodeIdWayIdsBucketWayIndex {
 
     fn set_nodeids_for_wayid(&mut self, wayid: i64, new_nodeids: &[i64]) {
         let mut nodeids: Vec<i64> = self
-            .get_nodeids_for_wayid(wayid)
-            .unwrap_or_else(|| Vec::with_capacity(new_nodeids.len()));
+            .get_nodeids_for_wayid(wayid);
+        nodeids.reserve(new_nodeids.len());
         let old_num_nodes = nodeids.len();
         nodeids.extend(new_nodeids);
         nodeids.sort();
@@ -228,18 +227,8 @@ impl NodeIdWayIdsBucketWayIndex {
         }
     }
 
-    fn get_nodeids_for_wayid(&self, wayid: impl Into<i64>) -> Option<Vec<i64>> {
-        let wayid: i64 = wayid.into();
-        let wayid: i32 = wayid.try_into().expect(
-            "way id is too large for i32. This tool uses optimizations which assume wayid < 2³²",
-        );
-        match self.ways.get(&wayid) {
-            None => None,
-            Some(nodeid_bytes) => {
-                let nodeids: Vec<i64> = vartyint::read_many_delta_new(nodeid_bytes).unwrap();
-                Some(nodeids)
-            }
-        }
+    fn get_nodeids_for_wayid(&self, wayid: impl Into<i64>) -> Vec<i64> {
+        self.get_nodeids_for_wayid_iter(wayid).collect::<Vec<_>>()
     }
     fn get_nodeids_for_wayid_iter(&self, wayid: impl Into<i64>) -> impl Iterator<Item = i64> + '_ {
         let wayid: i64 = wayid.into();
