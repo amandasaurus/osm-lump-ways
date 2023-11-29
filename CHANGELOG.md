@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.18.0 (2023-11-29)
+
+* Roll back osmio library upgrade due to performance degregation
+* Minor performance tweaks
+
 ## v0.17.0 (2023-11-27)
 
 * Refactor to speed up processing
