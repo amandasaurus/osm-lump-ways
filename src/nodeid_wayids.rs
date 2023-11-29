@@ -257,8 +257,8 @@ impl NodeIdWayIdsBucketWayIndex {
             .flat_map(|wids| wids.iter())
             .filter(move |wid| {
                 self.get_nodeids_for_wayid_iter(**wid)
-                    .take_while(|this_nid| *this_nid <= nid)     // stored in order, so eary exit
-                                                                // possible
+                    .take_while(|this_nid| *this_nid <= nid)     // stored in order, so early exit
+                                                                 // possible
                     .any(|this_nid| this_nid == nid)
             })
             .map(|wid| (*wid).into())
