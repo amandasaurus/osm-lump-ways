@@ -2,7 +2,6 @@
 
 ![Crates.io](https://img.shields.io/crates/d/osm-lump-ways)
 
-
 > Answer questions about OSM data like:
 >
 > * “What's the longest Main Street?”
@@ -10,7 +9,6 @@
 > * “How long is the M1 motorway?”
 > * “Are these rivers connected?”
 > * “What's the river drainage basins?”
-
 
 # Usage
 
@@ -24,12 +22,11 @@ To group based on the river's name:
 
 To find long streets and assemble them into connected (Multi)LineStrings:
 
-	osm-lump-ways -i path/to/region-latest.osm.pbf -o region-rivers.geojson -f highway -g name
+	osm-lump-ways -i path/to/region-latest.osm.pbf -o long-streets.geojson -f highway -g name
 
 # Installation
 
 	cargo install osm-lump-ways
-
 
 # Background
 
@@ -42,14 +39,12 @@ be mapped as many different ways. `osm-lump-ways` will assemble them all togethe
 
 Run with `--help` to see all options.
 
-
 # Examples of usage
 
 * [WaterwayMap.org](https://waterwaymap.org)
 * [Longest O'Connell Street in Ireland](https://en.osm.town/@amapanda/110270516183776589)
 * [Road most split in UK&Irl](https://en.osm.town/@amapanda/110762435236476901)
 * Your project here!
-
 
 # Todos
 
@@ -65,11 +60,9 @@ This software isn't finished, here's what I'd like to add. Feel free to send a p
   q](https://en.osm.town/@grischard/110763741292331075)). (“Group by all tags
   the same” might do it)
 
-
 # External Mentions
 
 *TBC*
-
 
 # Copyright & Licence
 
