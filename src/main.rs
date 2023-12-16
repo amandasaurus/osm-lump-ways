@@ -57,7 +57,7 @@ fn main() -> Result<()> {
     }
 
     let global_start = Instant::now();
-    info!("Starting osm-lump-ways v{}", std::env!("CARGO_PKG_VERSION"));
+    info!("osm-lump-ways v{}", std::env!("CARGO_PKG_VERSION"));
 
     let reader = read_progress::BufReaderWithSize::from_path(&args.input_filename)?;
     let mut reader = osmio::stringpbf::PBFReader::new(reader);
@@ -119,7 +119,7 @@ fn main() -> Result<()> {
         anyhow::ensure!(a > b);
     }
 
-    info!("Starting to read {:?}", &args.input_filename);
+    info!("Input file: {:?}", &args.input_filename);
     info!("Tag filter(s) in operation: {:?}", args.tag_filter);
     if !args.tag_group_k.is_empty() {
         info!("Tag grouping(s) in operation: {:?}", args.tag_group_k);
@@ -792,6 +792,8 @@ fn main() -> Result<()> {
         if args.only_these_way_groups.is_empty() && args.only_these_way_groups_nodeid.is_empty() {
             warn!("No files have been written.");
         }
+    } else if total_files_written == 1 {
+        // don't print anything, it'll have been printed once above
     } else {
         info!(
             "Wrote {} feature(s) to {} file(s)",
