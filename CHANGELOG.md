@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* Minor improvements to output logging messages
+
 ## v0.18.0 (2023-11-29)
 
 * Roll back osmio library upgrade due to performance degregation

@@ -59,8 +59,23 @@ fn main() -> Result<()> {
     let global_start = Instant::now();
     info!("osm-lump-ways v{}", std::env!("CARGO_PKG_VERSION"));
 
-    let reader = read_progress::BufReaderWithSize::from_path(&args.input_filename)?;
-    let mut reader = osmio::stringpbf::PBFReader::new(reader);
+    let style = ProgressStyle::with_template(
+        "[{elapsed_precise}] {percent:>3}% done. eta {eta:>4} {bar:10.cyan/blue} {pos:>7}/{len:7} {per_sec:>12} {msg}",
+    ).unwrap();
+    let file_reading_style =
+                ProgressStyle::with_template(
+        "[{elapsed_precise}] {percent:>3}% done. eta {eta:>4} {bar:10.cyan/blue} {bytes:>7}/{total_bytes:7} {per_sec:>12} {msg}",
+            ).unwrap();
+    let input_fp = std::fs::File::open(&args.input_filename)?;
+    let input_bar = progress_bars.add(
+        ProgressBar::new(input_fp.metadata()?.len())
+            .with_message("Reading input file")
+            .with_style(file_reading_style.clone()),
+    );
+    let rdr = input_bar.wrap_read(input_fp);
+
+    //let reader = read_progress::BufReaderWithSize::from_path(&args.input_filename)?;
+    let mut reader = osmio::stringpbf::PBFReader::new(rdr);
 
     if args.split_files_by_group && !args.output_filename.contains("%s") {
         error!("No %s found in output filename ({})", args.output_filename);
@@ -149,18 +164,6 @@ fn main() -> Result<()> {
     let nodeid_wayids = nodeid_wayids::default();
     let nodeid_wayids = Arc::new(Mutex::new(nodeid_wayids));
 
-    let style = ProgressStyle::with_template(
-        "[{elapsed_precise}] {percent:>3}% done. eta {eta:>4} {bar:10.cyan/blue} {pos:>7}/{len:7} {per_sec:>12} {msg}",
-    )
-    .unwrap();
-    let obj_reader = progress_bars.add(
-        ProgressBar::new_spinner().with_style(
-            ProgressStyle::with_template(
-                "[{elapsed_precise}] {human_pos} OSM objects read {per_sec:>20} obj/sec",
-            )
-            .unwrap(),
-        ),
-    );
     let ways_added = progress_bars.add(
         ProgressBar::new_spinner().with_style(
             ProgressStyle::with_template(
@@ -173,7 +176,6 @@ fn main() -> Result<()> {
     reader
         .ways()
         .par_bridge()
-        .inspect(|_| obj_reader.inc(1))
         .filter(|w| args.tag_filter.par_iter().all(|tf| tf.filter(w)))
         .map(|w| {
             let group = args
@@ -204,10 +206,14 @@ fn main() -> Result<()> {
                 ways_added.inc(1);
             },
         );
-    obj_reader.finish();
-    progress_bars.remove(&obj_reader);
+    info!(
+        "Finished reading file. {} ways read.",
+        ways_added.position().to_formatted_string(&Locale::en)
+    );
     ways_added.finish();
     progress_bars.remove(&ways_added);
+    input_bar.finish();
+    progress_bars.remove(&input_bar);
     let nodeid_wayids = Arc::try_unwrap(nodeid_wayids)
         .unwrap()
         .into_inner()
@@ -225,20 +231,28 @@ fn main() -> Result<()> {
 
     debug!("{}", nodeid_wayids.detailed_size());
 
+    let input_fp = std::fs::File::open(&args.input_filename)?;
+    let input_bar = progress_bars.add(
+        ProgressBar::new(input_fp.metadata()?.len())
+            .with_message("Re-reading file to save node locations")
+            .with_style(file_reading_style.clone()),
+    );
+    let rdr = input_bar.wrap_read(input_fp);
+
     debug!("Re-reading file to read all nodes");
     let setting_node_pos = progress_bars.add(
         ProgressBar::new(nodeid_wayids.len() as u64)
-            .with_message("Re-reading file to save node locations")
+            .with_message("Nodes read")
             .with_style(style.clone()),
     );
-    let reader = osmio::stringpbf::PBFNodePositionReader::from_filename(args.input_filename)?;
+    let reader = osmio::stringpbf::PBFNodePositionReader::from_reader(input_fp);
     let nodeid_pos = Arc::new(Mutex::new(nodeid_pos));
     reader
         .into_iter()
         .par_bridge()
         .filter(|(nid, _pos)| nodeid_wayids.contains_nid(nid))
-        .map(|(nid, pos)| (nid, (pos.1.inner(), pos.0.inner())))        // WTF do I have lat & lon
-                                                                        // mixed up??
+        .map(|(nid, pos)| (nid, (pos.1.inner(), pos.0.inner()))) // WTF do I have lat & lon
+        // mixed up??
         .for_each_with(nodeid_pos.clone(), |nodeid_pos, (nid, pos)| {
             setting_node_pos.inc(1);
             nodeid_pos.lock().unwrap().insert_i32(nid, pos);
@@ -272,7 +286,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
     info!(
-        "Starting the breathfirst search. There are {} groups",
+        "Starting the breath-first search. There are {} group(s)",
         group_wayid_nodes.len()
     );
     let grouping = progress_bars.add(
@@ -968,9 +982,13 @@ pub fn format_duration_human(duration: &std::time::Duration) -> String {
 }
 
 fn format_duration(d: std::time::Duration) -> String {
-    format!(
-        "{} ( {:>.1}sec )",
-        format_duration_human(&d),
-        d.as_secs_f32()
-    )
+    if d.as_secs_f32() < 60. {
+        format!("{:>.1}sec", d.as_secs_f32())
+    } else {
+        format!(
+            "{} ( {:>.1}sec )",
+            format_duration_human(&d),
+            d.as_secs_f32()
+        )
+    }
 }
