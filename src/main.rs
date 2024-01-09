@@ -231,13 +231,14 @@ fn main() -> Result<()> {
 
     debug!("{}", nodeid_wayids.detailed_size());
 
-    let input_fp = std::fs::File::open(&args.input_filename)?;
-    let input_bar = progress_bars.add(
-        ProgressBar::new(input_fp.metadata()?.len())
-            .with_message("Re-reading file to save node locations")
-            .with_style(file_reading_style.clone()),
-    );
-    let rdr = input_bar.wrap_read(input_fp);
+    //let input_fp = std::fs::File::open(&args.input_filename)?;
+    //let input_bar = progress_bars.add(
+    //    ProgressBar::new(input_fp.metadata()?.len())
+    //        .with_message("Re-reading file to save node locations")
+    //        .with_style(file_reading_style.clone()),
+    //);
+    //let rdr = input_bar.wrap_read(input_fp);
+    //let reader = osmio::stringpbf::PBFNodePositionReader::from_reader(input_fp);
 
     debug!("Re-reading file to read all nodes");
     let setting_node_pos = progress_bars.add(
@@ -245,7 +246,7 @@ fn main() -> Result<()> {
             .with_message("Nodes read")
             .with_style(style.clone()),
     );
-    let reader = osmio::stringpbf::PBFNodePositionReader::from_reader(input_fp);
+    let reader = osmio::stringpbf::PBFNodePositionReader::from_filename(&args.input_filename)?;
     let nodeid_pos = Arc::new(Mutex::new(nodeid_pos));
     reader
         .into_iter()
