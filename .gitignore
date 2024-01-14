@@ -1,9 +1,10 @@
 /*.geojson
 /*.geojsons
+/*.gpkg
 /*.mbtiles
+/*.osm.pbf
 /*.pmtiles
 /*.pmtiles-journal
-/*.osm.pbf
 /*.qgz
 /blog-posts/*
 /target
@@ -14,3 +15,6 @@
 /dhat.out.*
 /heaptrack.*
 /perf.*
+/stats
+/*.prom
+/*.csv
