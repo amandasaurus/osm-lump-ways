@@ -256,7 +256,7 @@ impl NodeIdWayIdsBucketWayIndex {
             .filter(move |wid| {
                 self.get_nodeids_for_wayid_iter(**wid)
                     .take_while(|this_nid| *this_nid <= nid) // stored in order, so early exit
-                                                             // possible
+                    // possible
                     .any(|this_nid| this_nid == nid)
             })
             .map(|wid| (*wid).into())
@@ -320,7 +320,7 @@ impl NodeIdWayIds for NodeIdWayIdsBucketWayIndex {
             Some(wids) => wids.iter().any(|wid| {
                 self.get_nodeids_for_wayid_iter(*wid)
                     .take_while(|this_nid| this_nid <= nid) // stored in order, so early exit
-                                                            // possible
+                    // possible
                     .any(|w_nid| w_nid == *nid)
             }),
         }

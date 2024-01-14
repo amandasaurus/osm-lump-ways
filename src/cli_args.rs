@@ -134,4 +134,27 @@ pub(crate) struct Args {
 
     #[command(flatten)]
     pub verbose: Verbosity<clap_verbosity_flag::InfoLevel>,
+
+    /// Only include (in the output) lines which have this much upstream
+    #[arg(long, value_name = "NUMBER")]
+    pub min_upstream_m: Option<f64>,
+
+    /// Path to store CSV of statistics
+    /// CSV file with 4 columns.
+    /// • `timestamp`: unix epoch timestamp of data age (integer)
+    /// • `iso_timestamp`: ISO8601/RFC3339 string of data age same second as timestamp. (string)
+    /// • `area` Name of the area (string). Many rows per loop. Possible values:
+    ///    • `planet` for everything in the file
+    ///    • A region code from the country-boundaries crate
+    ///    • `terranullis` if it doesn't match any area in country-boundaries
+    /// • `metric` String name of the metric. Current values:
+    ///     • `loops_count`: Number of loops in this region (integer)
+    ///     • `loops_length_m`: Total length, in metres, of all loops in this region (float)
+    /// • `value` The value of the metric.
+    #[arg(long, value_name = "FILENAME.csv")]
+    pub csv_stats_file: Option<PathBuf>,
+
+    /// Path to store OpenMetrics/Prometheus metrics
+    #[arg(long, value_name = "FILENAME.prom")]
+    pub openmetrics: Option<PathBuf>,
 }

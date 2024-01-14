@@ -154,6 +154,7 @@ impl WayGroup {
         &mut self,
         max_rounds: impl Into<Option<usize>>,
         reorder_segments_bar: &ProgressBar,
+        can_reverse_ways: bool,
     ) {
         let max_rounds = max_rounds.into();
         let old_num_nodeids = self.nodeids.len();
@@ -241,7 +242,7 @@ impl WayGroup {
                     graph_modified = true;
                     reorder_segments_bar.inc(1);
                     seg_i.extend(seg_j.drain(..).skip(1));
-                } else if seg_i.last() == seg_j.last() {
+                } else if can_reverse_ways && seg_i.last() == seg_j.last() {
                     graph_modified = true;
                     reorder_segments_bar.inc(1);
                     seg_i.extend(seg_j.drain(..).rev().skip(1));
@@ -250,7 +251,7 @@ impl WayGroup {
                     reorder_segments_bar.inc(1);
                     seg_i.reverse();
                     seg_i.extend(seg_j.drain(..).skip(1));
-                } else if seg_i.first() == seg_j.last() {
+                } else if can_reverse_ways && seg_i.first() == seg_j.last() {
                     graph_modified = true;
                     reorder_segments_bar.inc(1);
                     seg_i.reverse();
@@ -286,6 +287,17 @@ impl WayGroup {
             self.nodeids.len() / 1_000,
             old_num_nodeids.abs_diff(self.nodeids.len()) / 1_000,
         );
+    }
+
+    pub fn as_directed_graph(&self) -> graph::DirectedAdjGraph<i64, u8> {
+        let mut graph = graph::DirectedAdjGraph::new();
+        for segment in self.nodeids.iter() {
+            for window in segment.windows(2) {
+                graph.set(&window[0], &window[1], 0);
+            }
+        }
+
+        graph
     }
 }
 

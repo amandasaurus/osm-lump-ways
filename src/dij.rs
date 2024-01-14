@@ -319,3 +319,73 @@ fn dij_single(
 
     results
 }
+
+///// Return the first cycle we find, starting at this vertex
+//pub fn look_for_loop(start_vertex: i64, g: &DirectedGraph2) -> Option<Vec<i64>> {
+//    trace!(
+//        "dij_single started. start_vertex {} g.len() {:?}",
+//        start_vertex,
+//        g.len()
+//    );
+//    let mut prev_dist = HashMap::new();
+//    prev_dist.insert(start_vertex, (None, 0));
+//
+//    let mut frontier = BinaryHeap::new();
+//    // hack to just store negative distance so the shortest distance is the largest number
+//    frontier.push((-0_i64, start_vertex));
+//
+//    let mut this_dist;
+//    while let Some((mut curr_dist, curr_id)) = frontier.pop() {
+//        curr_dist *= -1;
+//        //trace!(
+//        //    "Current frontier. id {:>13} curr dist {:>8}, currently shortest known: {:>10} frontier.len() {:>3}",
+//        //    curr_id,
+//        //    curr_dist,
+//        //    prev_dist[&curr_id].1,
+//        //    frontier.len()
+//        //);
+//        if curr_dist > prev_dist[&curr_id].1 {
+//            // already found a shorter
+//            continue;
+//        }
+//
+//        for neighbor in g.neighbors(&curr_id) {
+//            if *neighbor == start_vertex {
+//                // found a cycle!
+//                // build the cycle (but backwards)
+//                let mut cycle_path = Vec::with_capacity(curr_dist as usize + 1);
+//                cycle_path.push(*neighbor);
+//                let mut path_id = curr_id;
+//                cycle_path.push(path_id);
+//                loop {
+//                    cycle_path.push(path_id);
+//                    if path_id == start_vertex {
+//                        break;
+//                    }
+//                    path_id = prev_dist[&path_id].0.unwrap();
+//                }
+//                cycle_path.reverse();
+//
+//                return Some(cycle_path);
+//            }
+//            this_dist = curr_dist + 1;
+//            prev_dist
+//                .entry(*neighbor)
+//                .and_modify(|(prev_id, dist)| {
+//                    if this_dist < *dist {
+//                        *prev_id = Some(curr_id);
+//                        *dist = this_dist;
+//                        frontier.push((-this_dist, *neighbor));
+//                    }
+//                })
+//                .or_insert_with(|| {
+//                    frontier.push((-this_dist, *neighbor));
+//                    (Some(curr_id), this_dist)
+//                });
+//            //trace!("Now prev_dist.len {}", prev_dist.len());
+//        }
+//    }
+//
+//    // gotten to here without anything
+//    None
+//}

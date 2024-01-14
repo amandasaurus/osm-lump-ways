@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use anyhow::{Context, Result};
 use clap::Parser;
 use get_size::GetSize;
@@ -40,6 +41,8 @@ mod nodeid_position;
 use nodeid_position::NodeIdPosition;
 mod nodeid_wayids;
 use nodeid_wayids::NodeIdWayIds;
+mod btreemapsplitkey;
+mod kosaraju;
 
 fn main() -> Result<()> {
     let args = cli_args::Args::parse();
@@ -366,9 +369,9 @@ fn main() -> Result<()> {
                             // find all other ways which are connected to wid, and add them to this_group
                             for other_wayid in wayid_nodes[&wid]
                                 .iter()
-                                .filter(|nid| nodeid_wayids.nid_is_in_many(nid))    // only look at
-                                                                                    // nodes in >1
-                                                                                    // ways
+                                .filter(|nid| nodeid_wayids.nid_is_in_many(nid)) // only look at
+                                // nodes in >1
+                                // ways
                                 .flat_map(|nid| nodeid_wayids.ways(nid))
                             {
                                 // If this other way hasn't been processed yet, then add to this group.
@@ -431,7 +434,7 @@ fn main() -> Result<()> {
         .into_par_iter()
         .update(|way_group| {
             trace!("Reducing the number of inner segments");
-            way_group.reorder_segments(20, &reorder_segments_bar);
+            way_group.reorder_segments(20, &reorder_segments_bar, true);
         })
         .update(|way_group| {
             trace!("Saving coordinates for all ways");
