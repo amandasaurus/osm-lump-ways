@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use super::*;
 
 #[derive(Debug, Clone)]
@@ -68,10 +67,6 @@ impl WayGroup {
         self.nodeids.par_iter().flat_map(|nids| nids.par_iter())
     }
 
-    pub fn nodeids_iter_seq(&self) -> impl Iterator<Item = i64> + '_ {
-        self.nodeids.iter().flat_map(|nids| nids.iter().copied())
-    }
-
     pub fn coords_iter_par(&self) -> impl rayon::prelude::ParallelIterator<Item = [f64; 2]> + '_ {
         self.coords
             .as_ref()
@@ -115,37 +110,6 @@ impl WayGroup {
             .flat_map(|ns| ns.par_iter())
             .min()
             .unwrap_or(&0);
-    }
-
-    pub fn distance_m(&self, other: &WayGroup) -> Option<f64> {
-        if self.coords.is_none() || other.coords.is_none() {
-            return None;
-        }
-
-        // Attempted shortcut. If they share a nodeid, then shortest distance is 0
-        if self
-            .nodeids_iter()
-            .any(|n1| other.nodeids_iter().any(|n2| n1 == n2))
-        {
-            return Some(0.);
-        }
-
-        self.coords
-            .as_ref()
-            .unwrap()
-            .par_iter()
-            .flat_map(|cs| cs.par_iter())
-            .flat_map(|c1| {
-                other
-                    .coords
-                    .as_ref()
-                    .unwrap()
-                    .par_iter()
-                    .flat_map(|cs| cs.par_iter())
-                    .map(move |c2| (c1, c2))
-            })
-            .map(|(c1, c2)| haversine_m(c1.0, c1.1, c2.0, c2.1))
-            .min_by(|d1, d2| d1.total_cmp(d2))
     }
 
     /// Try to reduce the number of inner segments, by merging segments which are end to end
@@ -289,16 +253,6 @@ impl WayGroup {
         );
     }
 
-    pub fn as_directed_graph(&self) -> graph::DirectedAdjGraph<i64, u8> {
-        let mut graph = graph::DirectedAdjGraph::new();
-        for segment in self.nodeids.iter() {
-            for window in segment.windows(2) {
-                graph.set(&window[0], &window[1], 0);
-            }
-        }
-
-        graph
-    }
 }
 
 impl PartialEq for WayGroup {

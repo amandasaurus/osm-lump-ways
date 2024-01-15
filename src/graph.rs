@@ -185,6 +185,7 @@ pub(crate) struct UndirectedAdjGraph<V, E> {
     edges: BTreeMap<V, BTreeMap<V, (E, Vec<V>)>>,
 }
 
+#[allow(dead_code)]
 impl<V, E> UndirectedAdjGraph<V, E>
 where
     V: std::hash::Hash + Eq + Copy + Ord + Send + std::fmt::Debug,
@@ -404,106 +405,6 @@ where
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct DirectedAdjGraph<V, E> {
-    edges: BTreeMap<V, BTreeMap<V, E>>,
-}
-
-impl<V, E> DirectedAdjGraph<V, E>
-where
-    V: std::hash::Hash + Eq + Copy + Ord + Send + std::fmt::Debug,
-    E: Copy + Clone + std::fmt::Debug + std::ops::Add<Output = E> + std::cmp::PartialEq,
-{
-    pub fn new() -> Self {
-        Self {
-            edges: BTreeMap::new(),
-        }
-    }
-
-    pub fn set(&mut self, i: &V, j: &V, val: E) {
-        self.edges.entry(*i).or_default().insert(*j, val);
-    }
-
-    //pub fn get(&self, i: &V, j: &V) -> Option<&E> {
-    //    self.edges.get(i).and_then(|from_i| from_i.get(j))
-    //}
-
-    ///// Number of neighbours for this vertex.
-    //pub fn num_neighbors(&self, i: &V) -> usize {
-    //    self.edges.get(i).map_or(0, |es| es.len())
-    //}
-
-    //fn neighbours(&self, i: &V) -> impl Iterator<Item = (&V, &E)> {
-    //    self.edges.get(i).into_iter().flat_map(|edge| edge.iter())
-    //}
-
-    //pub fn num_edges(&self) -> usize {
-    //    self.edges
-    //        .values()
-    //        .map(|from_i| from_i.len())
-    //        .sum::<usize>()
-    //}
-
-    //pub fn is_empty(&self) -> bool {
-    //    self.edges.is_empty()
-    //}
-    //pub fn num_vertexes(&self) -> usize {
-    //    self.edges.len()
-    //}
-    //pub fn pretty_print(&self, _fmt: &dyn Fn(&E) -> String, _col_join: &str) -> String {
-    //    String::new()
-    //}
-
-    //pub fn vertexes(&self) -> impl Iterator<Item = &V> {
-    //    self.edges.keys()
-    //}
-
-    //pub fn vertexes_iter(&self) -> impl Iterator<Item = (&V, &V, &E)> {
-    //    self.edges
-    //        .iter()
-    //        .flat_map(|(i, from_i)| from_i.iter().map(move |(j, edge)| (i, j, edge)))
-    //}
-
-    //pub fn remove_edge(&mut self, i: &V, j: &V) {
-    //    if let Some(from_i) = self.edges.get_mut(i) {
-    //        from_i.remove(j);
-    //        if from_i.is_empty() {
-    //            self.edges.remove(i);
-    //        }
-    //    }
-    //}
-
-    //pub fn remove_many_non_cycles(&mut self) -> usize {
-    //    //let mut total_edges_removed = 0;
-    //    //let num_vertexes = self.num_vertexes();
-    //    //debug!("At the start there are {} vertexes", num_vertexes);
-    //    //
-
-    //    //let mut sorted_vertexes: Vec<&V> = Vec::with_capacity(num_vertexes);
-    //    //let mut num_incoming_edges: HashMap<&V, u8> = HashMap::with_capacity(num_vertexes);
-    //    //for (from, to, _weight) in self.vertexes_iter() {
-    //    //    if !num_incoming_edges.contains_key(from) {
-    //    //        num_incoming_edges.insert(from, 0);
-    //    //    }
-    //    //    num_incoming_edges.insert(to, num_incoming_edges.get(to).unwrap_or(&0).checked_add(1).expect("Integer overflow number of incoming edges"));
-    //    //}
-
-    //    //let mut vertexs_wo_incoming: BTreeSet<&V> = num_incoming_edges.iter().filter_map(|(vertex, num)| if *num == 0 { Some(*vertex) } else { None }).collect();
-    //    //debug!("Starting with {num_vertexes}. {} have no incoming edges", vertexs_wo_incoming.len());
-
-    //    //while let Some(vertex) = vertexs_wo_incoming.pop_first() {
-    //    //    sorted_vertexes.push(vertex);
-    //    //    for (neighbour_j, _weight) in self.neighbours(vertex) {
-    //    //        self.remove_edge(vertex, neighbour_j);
-
-    //    //    }
-
-    //    //}
-
-    //    todo!()
-    //}
-}
-
 pub trait DirectedGraphTrait: Send {
     /// Add many vertexes & edges
     fn add_edge_chain(&mut self, vertexes: &[i64]) -> bool {
@@ -569,7 +470,6 @@ pub struct DirectedGraph2 {
     // value.0 is list of incoming vertexes  (ie there's an edge from something → key)
     // value.1 is list of outgoing vertexes (ie there's an edge from key → something)
     edges: BTreeMapSplitKey<(SmallNidVec, SmallNidVec)>,
-    //edges: BTreeMap<i64, (SmallNidVec, SmallNidVec)>,
 }
 
 impl DirectedGraph2 {
@@ -602,11 +502,6 @@ impl DirectedGraph2 {
             .into_iter()
             .flat_map(|(ins, _outs)| ins.iter())
             .copied()
-    }
-
-    /// True iff this vertex is in this graph
-    pub fn contains_vertex(&self, vid: &i64) -> bool {
-        self.edges.contains_key(vid)
     }
 
     /// Number of in edges to this vertex. (None iff this vertex isn't in the graph)

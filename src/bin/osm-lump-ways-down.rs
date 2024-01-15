@@ -1,19 +1,15 @@
-#![allow(unreachable_code, warnings)]
 use anyhow::Result;
 use clap::Parser;
 use get_size::GetSize;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressIterator, ProgressStyle};
 use indicatif_log_bridge::LogWrapper;
-#[allow(unused_imports)]
 use log::{
-    debug, error, info, log, log_enabled, trace, warn,
-    Level::{Debug, Trace},
+    debug, error, info, trace, warn,
 };
 use osmio::prelude::*;
 use osmio::OSMObjBase;
 use rayon::prelude::*;
 
-use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::io::Write;
 use std::path::Path;
@@ -37,14 +33,9 @@ mod tagfilter;
 use haversine::haversine_m;
 //#[path = "../dij.rs"]
 //mod dij;
-#[path = "../fw.rs"]
-mod fw;
 #[path = "../graph.rs"]
 mod graph;
 use graph::DirectedGraphTrait;
-#[path = "../way_group.rs"]
-mod way_group;
-use way_group::WayGroup;
 #[path = "../nodeid_position.rs"]
 mod nodeid_position;
 use nodeid_position::NodeIdPosition;
@@ -626,7 +617,7 @@ fn main() -> Result<()> {
         args.output_filename.replace("%s", "upstreams")
     );
 
-    let mut nids_wo_outgoing: BTreeSet<_> = g.vertexes_wo_outgoing_jumbled().collect();
+    let nids_wo_outgoing: BTreeSet<_> = g.vertexes_wo_outgoing_jumbled().collect();
     // look for where it ends
     let end_points = nids_wo_outgoing
         .into_iter()
@@ -752,9 +743,8 @@ enum OutputFormat {
     GeoJSONSeq,
 }
 
-#[allow(dead_code)]
 #[derive(PartialEq, Eq, Debug)]
-enum OutputGeometryType {
+pub enum OutputGeometryType {
     MultiLineString,
     LineString,
     MultiPoint,

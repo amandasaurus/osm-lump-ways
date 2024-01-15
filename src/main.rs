@@ -1,12 +1,10 @@
-#![allow(dead_code)]
 use anyhow::{Context, Result};
 use clap::Parser;
 use get_size::GetSize;
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use indicatif_log_bridge::LogWrapper;
-#[allow(unused_imports)]
 use log::{
-    debug, error, info, log, log_enabled, trace, warn,
+    debug, error, info, log, trace, warn,
     Level::{Debug, Trace},
 };
 use osmio::prelude::*;
@@ -33,7 +31,6 @@ mod haversine;
 mod tagfilter;
 use haversine::haversine_m;
 mod dij;
-mod fw;
 mod graph;
 mod way_group;
 use way_group::WayGroup;

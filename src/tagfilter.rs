@@ -1,5 +1,4 @@
-#[allow(unused_imports)]
-use log::{debug, error, info, log_enabled, trace, warn, Level};
+use log::warn;
 use regex::Regex;
 
 #[derive(Debug, Clone)]

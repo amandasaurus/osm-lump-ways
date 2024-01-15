@@ -2,7 +2,6 @@
 //! i64 key.
 //! Goal: Reduce memory usage of struct, by storing less of the key.
 //! End result: ~5% memory reduction of total programme. Not very impressive.
-#![allow(warnings)]
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Default)]
@@ -10,19 +9,20 @@ pub struct BTreeMapSplitKey<V> {
     inner: BTreeMap<i32, BTreeMap<i32, V>>,
 }
 
-const i32_limit: i64 = i32::MAX as i64;
+const I32_LIMIT: i64 = i32::MAX as i64;
 
 fn split_key(k: &i64) -> [i32; 2] {
     [
-        (k / i32_limit).try_into().expect("Bad presumption for i32"),
-        (k % i32_limit) as i32,
+        (k / I32_LIMIT).try_into().expect("Bad presumption for i32"),
+        (k % I32_LIMIT) as i32,
     ]
 }
 
 fn join_key(ks: &[i32; 2]) -> i64 {
-    (ks[0] as i64 * i32_limit) + (ks[1] as i64)
+    (ks[0] as i64 * I32_LIMIT) + (ks[1] as i64)
 }
 
+#[allow(dead_code)]
 impl<V> BTreeMapSplitKey<V> {
     pub fn new() -> Self {
         BTreeMapSplitKey {
@@ -82,10 +82,10 @@ mod tests {
     use super::*;
 
     #[test] fn split1() { assert_eq!(split_key(&0), [0, 0]); }
-    #[test] fn split2() { assert_eq!(split_key(&i32_limit), [1, 0]); }
-    #[test] fn split3() { assert_eq!(split_key(&(i32_limit + 1)), [1, 1]); }
-    #[test] fn split4() { assert_eq!(split_key(&(i32_limit + 2)), [1, 2]); }
-    #[test] fn split5() { assert_eq!(split_key(&(i32_limit - 1)), [0, 2147483646]); }
+    #[test] fn split2() { assert_eq!(split_key(&I32_LIMIT), [1, 0]); }
+    #[test] fn split3() { assert_eq!(split_key(&(I32_LIMIT + 1)), [1, 1]); }
+    #[test] fn split4() { assert_eq!(split_key(&(I32_LIMIT + 2)), [1, 2]); }
+    #[test] fn split5() { assert_eq!(split_key(&(I32_LIMIT - 1)), [0, 2147483646]); }
     #[test] fn split6() { assert_eq!(split_key(&2147483646), [0, 2147483646]); }
     #[test] fn split7() { assert_eq!(split_key(&(2147483646 + 1)), [1, 0]); }
 
@@ -128,7 +128,7 @@ mod tests {
         *x.entry(1).or_default() = 12_usize;
         assert_eq!(x.len(), 2);
 
-        *x.entry(i32_limit + 2).or_default() = 13_usize;
+        *x.entry(I32_LIMIT + 2).or_default() = 13_usize;
 
         assert_eq!(x.len(), 3);
     }

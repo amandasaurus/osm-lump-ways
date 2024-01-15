@@ -1,4 +1,3 @@
-#![allow(clippy::type_complexity)]
 /// Storing the position of nodes based on their node id
 use super::*;
 use osmio::{Lat, Lon};
