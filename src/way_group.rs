@@ -252,7 +252,6 @@ impl WayGroup {
             old_num_nodeids.abs_diff(self.nodeids.len()) / 1_000,
         );
     }
-
 }
 
 impl PartialEq for WayGroup {

@@ -81,19 +81,55 @@ impl<V> BTreeMapSplitKey<V> {
 mod tests {
     use super::*;
 
-    #[test] fn split1() { assert_eq!(split_key(&0), [0, 0]); }
-    #[test] fn split2() { assert_eq!(split_key(&I32_LIMIT), [1, 0]); }
-    #[test] fn split3() { assert_eq!(split_key(&(I32_LIMIT + 1)), [1, 1]); }
-    #[test] fn split4() { assert_eq!(split_key(&(I32_LIMIT + 2)), [1, 2]); }
-    #[test] fn split5() { assert_eq!(split_key(&(I32_LIMIT - 1)), [0, 2147483646]); }
-    #[test] fn split6() { assert_eq!(split_key(&2147483646), [0, 2147483646]); }
-    #[test] fn split7() { assert_eq!(split_key(&(2147483646 + 1)), [1, 0]); }
+    #[test]
+    fn split1() {
+        assert_eq!(split_key(&0), [0, 0]);
+    }
+    #[test]
+    fn split2() {
+        assert_eq!(split_key(&I32_LIMIT), [1, 0]);
+    }
+    #[test]
+    fn split3() {
+        assert_eq!(split_key(&(I32_LIMIT + 1)), [1, 1]);
+    }
+    #[test]
+    fn split4() {
+        assert_eq!(split_key(&(I32_LIMIT + 2)), [1, 2]);
+    }
+    #[test]
+    fn split5() {
+        assert_eq!(split_key(&(I32_LIMIT - 1)), [0, 2147483646]);
+    }
+    #[test]
+    fn split6() {
+        assert_eq!(split_key(&2147483646), [0, 2147483646]);
+    }
+    #[test]
+    fn split7() {
+        assert_eq!(split_key(&(2147483646 + 1)), [1, 0]);
+    }
 
-    #[test] fn join1() { assert_eq!(join_key(&[0, 0]), 0); }
-    #[test] fn join2() { assert_eq!(join_key(&[1, 0]), 2147483647); }
-    #[test] fn join3() { assert_eq!(join_key(&[1, 1]), 2147483648); }
-    #[test] fn join4() { assert_eq!(join_key(&[1, 2]), 2147483649); }
-    #[test] fn join5() { assert_eq!(join_key(&[0, 2147483646]), 2147483646); }
+    #[test]
+    fn join1() {
+        assert_eq!(join_key(&[0, 0]), 0);
+    }
+    #[test]
+    fn join2() {
+        assert_eq!(join_key(&[1, 0]), 2147483647);
+    }
+    #[test]
+    fn join3() {
+        assert_eq!(join_key(&[1, 1]), 2147483648);
+    }
+    #[test]
+    fn join4() {
+        assert_eq!(join_key(&[1, 2]), 2147483649);
+    }
+    #[test]
+    fn join5() {
+        assert_eq!(join_key(&[0, 2147483646]), 2147483646);
+    }
 
     #[test]
     fn simple1() {

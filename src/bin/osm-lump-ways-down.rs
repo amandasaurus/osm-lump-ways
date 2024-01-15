@@ -3,9 +3,7 @@ use clap::Parser;
 use get_size::GetSize;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressIterator, ProgressStyle};
 use indicatif_log_bridge::LogWrapper;
-use log::{
-    debug, error, info, trace, warn,
-};
+use log::{debug, error, info, trace, warn};
 use osmio::prelude::*;
 use osmio::OSMObjBase;
 use rayon::prelude::*;
