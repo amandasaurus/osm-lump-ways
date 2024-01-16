@@ -15,7 +15,7 @@ clap-verbosity-flag = "2.0.1"
 country-boundaries = "1.2.0"
 csv = "1.3.0"
 env_logger = "0.10.0"
-get-size = { version = "0.1.3", features = ["derive"] }
+get-size = { version = "0.1.4", features = ["derive"] }
 indicatif = "0.17.2"
 indicatif-log-bridge = "0.2.2"
 kdtree = "0.7.0"
@@ -29,7 +29,7 @@ read-progress = "0.5.0"
 regex = "1.7.0"
 serde = "1.0.150"
 serde_json = "1.0.89"
-smallvec = { git = "https://github.com/amandasaurus/rust-smallvec.git", rev = "b6b55c0eee3d94dda87f0ec25d8e245bcd06e6ba", features = ["get-size", "union"] }
+smallvec = { git="https://github.com/servo/rust-smallvec.git", rev = "v1.13.0", features = ["get-size"] }
 vartyint = "0.3.0"
 
 [profile.dev]
