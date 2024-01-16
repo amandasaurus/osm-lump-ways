@@ -3,8 +3,9 @@
 //! Goal: Reduce memory usage of struct, by storing less of the key.
 //! End result: ~5% memory reduction of total programme. Not very impressive.
 use std::collections::BTreeMap;
+use get_size::GetSize;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, GetSize)]
 pub struct BTreeMapSplitKey<V> {
     inner: BTreeMap<i32, BTreeMap<i32, V>>,
 }

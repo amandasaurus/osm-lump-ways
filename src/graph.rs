@@ -464,7 +464,7 @@ pub trait DirectedGraphTrait: Send {
 pub type SmallNidVec = SmallVec<[i64; 1]>;
 
 /// A graph which stores a list of all incoming and outgoing edges
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, GetSize)]
 pub struct DirectedGraph2 {
     // key is vertex id
     // value.0 is list of incoming vertexes  (ie there's an edge from something → key)
