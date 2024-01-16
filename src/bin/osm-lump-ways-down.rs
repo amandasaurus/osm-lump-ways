@@ -1,4 +1,4 @@
-#![allow(warnings)]
+#![allow(dead_code)]
 use anyhow::Result;
 use clap::Parser;
 use get_size::GetSize;
