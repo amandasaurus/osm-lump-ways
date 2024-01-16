@@ -488,6 +488,7 @@ fn main() -> Result<()> {
         &progress_bars,
         &mut g,
     )?;
+    info!("Re-read nodes with replacements. Have size: {}", g.detailed_size());
 
     // TODO do we need to sort topologically? Why not just calc lengths from upstreams
     let sorting_nodes_bar = progress_bars.add(
@@ -518,6 +519,7 @@ fn main() -> Result<()> {
         &progress_bars,
         &mut g,
     )?;
+    info!("Re-read nodes, but unidirecetd. Have size: {}", g.detailed_size());
 
     let setting_node_pos = progress_bars.add(
         ProgressBar::new(g.num_vertexes() as u64)
