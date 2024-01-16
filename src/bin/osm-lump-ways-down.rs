@@ -551,7 +551,7 @@ fn main() -> Result<()> {
             .with_style(style.clone()),
     );
 
-    let mut length_upstream: BTreeMap<i64, f64> = BTreeMap::new();
+    let mut length_upstream: BTreeMapSplitKey<f64> = BTreeMapSplitKey::new();
     info_memory_used!();
     let (mut curr_upstream, mut num_outs, mut per_downstream, mut curr_pos);
     let (mut other_pos, mut this_edge_len);
@@ -583,12 +583,12 @@ fn main() -> Result<()> {
         .edges_iter()
         .filter(|(from_nid, _to_nid)| {
             args.min_upstream_m
-                .map_or(true, |min| length_upstream[&from_nid] >= min)
+                .map_or(true, |min| length_upstream.get(&from_nid).unwrap() >= &min)
         })
         .map(|(from_nid, to_nid)| {
             (
                 serde_json::json!({
-                    "from_upstream_m": length_upstream[&from_nid],
+                    "from_upstream_m": length_upstream.get(&from_nid).unwrap(),
                     //"to_upstream_m": length_upstream[&to_nid],
                 }),
                 vec![vec![
@@ -627,8 +627,8 @@ fn main() -> Result<()> {
     // look for where it ends
     let end_points = nids_wo_outgoing
         .into_iter()
-        .map(|v| (v, length_upstream[&v]))
-        .filter(|(_v, len)| args.min_upstream_m.map_or(true, |min| len >= &min))
+        .map(|v| (v, length_upstream.get(&v).unwrap()))
+        .filter(|(_v, len)| args.min_upstream_m.map_or(true, |min| len >= &&min))
         .map(|(v, len)| {
             (
                 serde_json::json!({"upstream_m": len}),
