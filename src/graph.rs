@@ -909,58 +909,13 @@ impl DirectedGraphTrait for DirectedGraph2 {
     }
 
     fn detailed_size(&self) -> String {
-        let mut in_lens: BTreeMap<usize, usize> = BTreeMap::new();
-        let mut out_lens: BTreeMap<usize, usize> = BTreeMap::new();
-        let mut ins_spilled: BTreeMap<bool, usize> = BTreeMap::new();
-        let mut outs_spilled: BTreeMap<bool, usize> = BTreeMap::new();
-        for (_v, (ins, outs)) in self.edges.iter() {
-            *in_lens.entry(ins.len()).or_default() += 1;
-            *out_lens.entry(outs.len()).or_default() += 1;
-            *ins_spilled.entry(ins.spilled()).or_default() += 1;
-            *outs_spilled.entry(ins.spilled()).or_default() += 1;
-        }
         let mut s = format!(
             "DirectedGraph2: num_vertexes {} num_edges {}",
             self.num_vertexes(),
             self.num_edges(),
         );
-        let ins_total: usize = in_lens.values().sum();
-        let outs_total: usize = out_lens.values().sum();
-        for (in_len, count) in in_lens.iter() {
-            s.push_str(&format!(
-                "\n  ins: len {} count {} ({}%)",
-                in_len,
-                count,
-                ((count * 100) / ins_total)
-            ));
-        }
-        for (in_spilled, count) in ins_spilled.iter() {
-            s.push_str(&format!(
-                "\n  ins: spilled {} count {} ({}%)",
-                in_spilled,
-                count,
-                ((count * 100) / ins_total)
-            ));
-        }
-        for (out_len, count) in out_lens.iter() {
-            s.push_str(&format!(
-                "\n  outs: len {} count {} ({}%)",
-                out_len,
-                count,
-                ((count * 100) / outs_total)
-            ));
-        }
-        for (out_spilled, count) in outs_spilled.iter() {
-            s.push_str(&format!(
-                "\n  outs: spilled {} count {} ({}%)",
-                out_spilled,
-                count,
-                ((count * 100) / outs_total)
-            ));
-        }
-
         s.push_str(&format!(
-            "\nSize of graph: {} = {} bytes.\nbytes/vertex = {:>.2}\nbytes/edge = {:>.2}",
+            "\nSize of graph: {} = {} bytes.\nbytes/vertex = {:>.5}\nbytes/edge = {:>.5}",
             self.get_size(),
             self.get_size().to_formatted_string(&Locale::en),
             self.get_size() as f64 / self.num_vertexes() as f64,
@@ -974,7 +929,7 @@ impl DirectedGraphTrait for DirectedGraph2 {
 /// A graph which stores a list of only the outgoing edges
 /// Practically the same as the DirectedGraph2, but exists to use less memory for later processing
 /// steps when we don't need the in edges of a graph
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, GetSize)]
 pub struct UniDirectedGraph {
     // key is vertex id
     // value is list of outgoing vertexes (ie there's an edge from key → something)
@@ -1040,11 +995,20 @@ impl DirectedGraphTrait for UniDirectedGraph {
     }
 
     fn detailed_size(&self) -> String {
-        format!(
+        let mut s = format!(
             "UndirectedAdjGraph: num_vertexes {} num_edges {}",
             self.num_vertexes(),
             self.num_edges(),
-        )
+        );
+        s.push_str(&format!(
+            "\nSize of graph: {} = {} bytes.\nbytes/vertex = {:>.5}\nbytes/edge = {:>.5}",
+            self.get_size(),
+            self.get_size().to_formatted_string(&Locale::en),
+            self.get_size() as f64 / self.num_vertexes() as f64,
+            self.get_size() as f64 / self.num_edges() as f64,
+        ));
+
+        s
     }
 }
 
