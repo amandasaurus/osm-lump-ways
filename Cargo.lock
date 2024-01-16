@@ -783,7 +783,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "smallvec 1.12.0 (git+https://github.com/amandasaurus/rust-smallvec.git?rev=be4a1697087fdaa79b19d746557efdfe0d080c35)",
+ "smallvec 1.12.0 (git+https://github.com/amandasaurus/rust-smallvec.git?rev=b6b55c0eee3d94dda87f0ec25d8e245bcd06e6ba)",
  "vartyint",
 ]
 
@@ -1046,7 +1046,7 @@ checksum = "2593d31f82ead8df961d8bd23a64c2ccf2eb5dd34b0a34bfb4dd54011c72009e"
 [[package]]
 name = "smallvec"
 version = "1.12.0"
-source = "git+https://github.com/amandasaurus/rust-smallvec.git?rev=be4a1697087fdaa79b19d746557efdfe0d080c35#be4a1697087fdaa79b19d746557efdfe0d080c35"
+source = "git+https://github.com/amandasaurus/rust-smallvec.git?rev=b6b55c0eee3d94dda87f0ec25d8e245bcd06e6ba#b6b55c0eee3d94dda87f0ec25d8e245bcd06e6ba"
 dependencies = [
  "get-size",
 ]
