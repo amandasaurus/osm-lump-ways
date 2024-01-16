@@ -503,10 +503,12 @@ fn main() -> Result<()> {
     sorting_nodes_bar.finish();
     progress_bars.remove(&sorting_nodes_bar);
     info!(
-        "All {} nodes have been sorted topographically",
+        "All {} nodes have been sorted topographically. Size of sorted nodes: {} bytes = {}",
         topologically_sorted_nodes
             .len()
-            .to_formatted_string(&Locale::en)
+            .to_formatted_string(&Locale::en),
+        topologically_sorted_nodes.get_size(),
+        topologically_sorted_nodes.get_size().to_formatted_string(&Locale::en),
     );
 
     // eh, this assert fails?! TODO fix
