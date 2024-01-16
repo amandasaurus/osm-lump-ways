@@ -267,6 +267,7 @@ fn main() -> Result<()> {
         "All data has been loaded in {}. Started processing...",
         format_duration(Instant::now() - global_start)
     );
+    info!("{}", g.detailed_size());
 
     if g.is_empty() {
         info!("No ways in the file matched your filters. Nothing to do");
