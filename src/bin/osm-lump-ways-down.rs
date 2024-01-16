@@ -40,6 +40,7 @@ mod nodeid_position;
 use nodeid_position::NodeIdPosition;
 #[path = "../btreemapsplitkey.rs"]
 mod btreemapsplitkey;
+use btreemapsplitkey::BTreeMapSplitKey;
 #[path = "../kosaraju.rs"]
 mod kosaraju;
 
