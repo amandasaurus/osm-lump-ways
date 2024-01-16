@@ -550,7 +550,7 @@ fn main() -> Result<()> {
             .with_style(style.clone()),
     );
 
-    let mut length_upstream: HashMap<i64, f64> = HashMap::with_capacity(g.num_vertexes());
+    let mut length_upstream: BTreeMap<i64, f64> = BTreeMap::new();
     info_memory_used!();
     let (mut curr_upstream, mut num_outs, mut per_downstream, mut curr_pos);
     let (mut other_pos, mut this_edge_len);
