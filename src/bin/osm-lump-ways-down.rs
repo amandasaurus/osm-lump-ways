@@ -285,7 +285,9 @@ fn main() -> Result<()> {
 
     // We need to keep track of which vertexes don't have outgoing nodes, so that we can remember
     // to save their position.
+    info!("Recording which nodes we need to keep track of later...");
     let mut nids_we_need: BTreeSet<_> = g.vertexes_wo_outgoing_jumbled().collect();
+    info!("Remembered {} nodes we need later", nids_we_need.len().to_formatted_string(&Locale::en));
 
     info!("Splitting this large graph into many smaller non-connected graphs...");
     let splitting_graphs_bar = progress_bars.add(
