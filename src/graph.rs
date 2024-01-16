@@ -959,6 +959,14 @@ impl DirectedGraphTrait for DirectedGraph2 {
             ));
         }
 
+        s.push_str(&format!(
+            "\nSize of graph: {} = {} bytes.\nbytes/vertex = {:>.2}\nbytes/edge = {:>.2}",
+            self.get_size(),
+            self.get_size().to_formatted_string(&Locale::en),
+            self.get_size() as f64 / self.num_vertexes() as f64,
+            self.get_size() as f64 / self.num_edges() as f64,
+        ));
+
         s
     }
 }
