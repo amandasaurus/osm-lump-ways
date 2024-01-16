@@ -597,9 +597,10 @@ fn main() -> Result<()> {
         })
         .map(|(from_nid, to_nid)| {
             (
+                // Round the upstream to only output 1 decimal place
                 serde_json::json!({
-                    "from_upstream_m": length_upstream.get(&from_nid).unwrap(),
-                    //"to_upstream_m": length_upstream[&to_nid],
+                    "from_upstream_m": round(length_upstream.get(&from_nid).unwrap(), 1),
+                    //"to_upstream_m": round(length_upstream[&to_nid], 1),
                 }),
                 vec![vec![
                     nodeid_pos.get(&from_nid).unwrap(),
@@ -641,7 +642,8 @@ fn main() -> Result<()> {
         .filter(|(_v, len)| args.min_upstream_m.map_or(true, |min| len >= &&min))
         .map(|(v, len)| {
             (
-                serde_json::json!({"upstream_m": len}),
+                // Round the upstream to only output 1 decimal place
+                serde_json::json!({"upstream_m": round(len, 1)}),
                 vec![vec![nodeid_pos.get(&v).unwrap()]],
             )
         });
@@ -980,4 +982,12 @@ fn multilinestring_length(coords: &Vec<Vec<(f64, f64)>>) -> f64 {
                 .sum::<f64>()
         })
         .sum()
+}
+
+/// Round this float to this many places after the decimal point.
+/// Used to reduce size of output geojson file
+fn round(f: &f64, places: u8) -> f64
+{
+    let places: f64 = 10_u64.pow(places as u32) as f64;
+    (f * places).round() / places
 }
