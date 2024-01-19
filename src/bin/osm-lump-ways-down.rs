@@ -643,7 +643,7 @@ fn main() -> Result<()> {
         .map(|(v, len)| {
             (
                 // Round the upstream to only output 1 decimal place
-                serde_json::json!({"upstream_m": round(len, 1)}),
+                serde_json::json!({"upstream_m": round(len, 1), "nid": v}),
                 vec![vec![nodeid_pos.get(&v).unwrap()]],
             )
         });
