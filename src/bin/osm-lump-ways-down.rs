@@ -449,7 +449,7 @@ fn main() -> Result<()> {
         }
 
         let mut f = std::io::BufWriter::new(std::fs::File::create(
-            args.output_filename.replace("%s", "cycles"),
+            args.output_filename.replace("%s", "loops"),
         )?);
         let num_written = write_geojson_features_directly(
             cycles_output.into_iter(),
@@ -460,7 +460,7 @@ fn main() -> Result<()> {
 
         info!(
             "Wrote {num_written} features to output file {}",
-            args.output_filename.replace("%s", "cycles")
+            args.output_filename.replace("%s", "loops")
         );
     }
 
