@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.19.0 (2024-01-30)
 
 * New binary `osm-lump-ways-down` which does cycle/loop detection and
   calculates upstream lengths
