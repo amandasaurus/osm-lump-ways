@@ -202,7 +202,7 @@ fn main() -> Result<()> {
         info!("Writing CSV stats to file {csv_stats_file:?}");
         if !csv_stats_file.exists() {
             let mut wtr = csv::Writer::from_writer(std::fs::File::create(&csv_stats_file).unwrap());
-            wtr.write_record(&["timestamp", "iso_datetime", "area", "metric", "value"])
+            wtr.write_record(["timestamp", "iso_datetime", "area", "metric", "value"])
                 .unwrap();
             wtr.flush().unwrap();
             drop(wtr);
@@ -653,7 +653,7 @@ fn main() -> Result<()> {
         .edges_iter()
         .filter(|(from_nid, _to_nid)| {
             args.min_upstream_m
-                .map_or(true, |min| length_upstream.get(&from_nid).unwrap() >= &min)
+                .map_or(true, |min| length_upstream.get(from_nid).unwrap() >= &min)
         })
         .map(|(from_nid, to_nid)| {
             (
