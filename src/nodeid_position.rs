@@ -151,6 +151,7 @@ pub struct NodeIdPositionBucket {
     inner: BTreeMap<i32, Vec<u8>>,
 
     /// A local cache of decoded values to make lookup & inserts faster
+    #[allow(clippy::type_complexity)]
     cache: Option<(i32, Vec<Option<(i32, i32)>>)>,
 }
 
