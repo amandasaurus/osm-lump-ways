@@ -289,7 +289,10 @@ fn main() -> Result<()> {
     // to save their position.
     info!("Recording which nodes we need to keep track of later...");
     let mut nids_we_need: BTreeSet<_> = g.vertexes_wo_outgoing_jumbled().collect();
-    info!("Remembered {} nodes we need later", nids_we_need.len().to_formatted_string(&Locale::en));
+    info!(
+        "Remembered {} nodes we need later",
+        nids_we_need.len().to_formatted_string(&Locale::en)
+    );
 
     info!("Splitting this large graph into many smaller non-connected graphs...");
     let splitting_graphs_bar = progress_bars.add(
@@ -588,12 +591,32 @@ fn main() -> Result<()> {
         } else {
             let this_parent_strahlers = parent_strahlers.get(&v).unwrap();
             let max_parent_strahler = this_parent_strahlers.iter().max().unwrap();
-            if this_parent_strahlers.iter().filter(|x| *x == max_parent_strahler).count() == 1 && this_parent_strahlers.iter().filter(|x| *x < max_parent_strahler).count() == this_parent_strahlers.len() - 1 {
-                this_strahler_value =  *max_parent_strahler;
-            } else if this_parent_strahlers.iter().filter(|x| *x == max_parent_strahler).count() >= 2 {
-                this_strahler_value = *max_parent_strahler+1;
+            if this_parent_strahlers
+                .iter()
+                .filter(|x| *x == max_parent_strahler)
+                .count()
+                == 1
+                && this_parent_strahlers
+                    .iter()
+                    .filter(|x| *x < max_parent_strahler)
+                    .count()
+                    == this_parent_strahlers.len() - 1
+            {
+                this_strahler_value = *max_parent_strahler;
+            } else if this_parent_strahlers
+                .iter()
+                .filter(|x| *x == max_parent_strahler)
+                .count()
+                >= 2
+            {
+                this_strahler_value = *max_parent_strahler + 1;
             } else {
-                dbg!(this_strahler_value, max_parent_strahler, v, this_parent_strahlers);
+                dbg!(
+                    this_strahler_value,
+                    max_parent_strahler,
+                    v,
+                    this_parent_strahlers
+                );
                 panic!();
             }
         }
@@ -610,11 +633,11 @@ fn main() -> Result<()> {
             this_edge_len =
                 haversine::haversine_m(curr_pos.0, curr_pos.1, other_pos.0, other_pos.1);
             *length_upstream.entry(other).or_insert(0.) += per_downstream + this_edge_len;
-            parent_strahlers.entry(other).or_default().push(this_strahler_value);
-
+            parent_strahlers
+                .entry(other)
+                .or_default()
+                .push(this_strahler_value);
         }
-
-
     }
     drop(parent_strahlers);
     calc_upstream_bar.finish();
@@ -671,24 +694,20 @@ fn main() -> Result<()> {
         args.output_filename.replace("%s", "upstreams")
     );
 
-
     debug!("Writing strahler number geojson object(s)");
-    let strahler_lines = g
-        .edges_iter()
-        .map(|(from_nid, to_nid)| {
-            (
-                // Round the upstream to only output 1 decimal place
-                serde_json::json!({
-                    "strahler": strahler.get(&from_nid)
-                }),
-                vec![vec![
-                    nodeid_pos.get(&from_nid).unwrap(),
-                    nodeid_pos.get(&to_nid).unwrap(),
-                ]],
-            )
-        });
+    let strahler_lines = g.edges_iter().map(|(from_nid, to_nid)| {
+        (
+            // Round the upstream to only output 1 decimal place
+            serde_json::json!({
+                "strahler": strahler.get(&from_nid)
+            }),
+            vec![vec![
+                nodeid_pos.get(&from_nid).unwrap(),
+                nodeid_pos.get(&to_nid).unwrap(),
+            ]],
+        )
+    });
     info_memory_used!();
-
 
     let writing_upstreams_bar = progress_bars.add(
         ProgressBar::new(g.num_edges() as u64)
@@ -741,7 +760,6 @@ fn main() -> Result<()> {
         num_written.to_formatted_string(&Locale::en),
         args.output_filename.replace("%s", "ends")
     );
-
 
     info!(
         "Finished all in {}",
@@ -1065,8 +1083,7 @@ fn multilinestring_length(coords: &Vec<Vec<(f64, f64)>>) -> f64 {
 
 /// Round this float to this many places after the decimal point.
 /// Used to reduce size of output geojson file
-fn round(f: &f64, places: u8) -> f64
-{
+fn round(f: &f64, places: u8) -> f64 {
     let places: f64 = 10_u64.pow(places as u32) as f64;
     (f * places).round() / places
 }
