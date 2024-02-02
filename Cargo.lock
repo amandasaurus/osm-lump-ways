@@ -783,7 +783,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "smallvec 1.13.0 (git+https://github.com/servo/rust-smallvec.git?rev=v1.13.0)",
+ "smallvec",
  "vartyint",
 ]
 
@@ -853,7 +853,7 @@ checksum = "3f59e109e2f795a5070e69578c4dc101068139f74616778025ae1011d4cd41a8"
 dependencies = [
  "proc-macro2",
  "quote",
- "smallvec 1.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "smallvec",
 ]
 
 [[package]]
@@ -978,7 +978,7 @@ dependencies = [
  "fallible-streaming-iterator",
  "hashlink",
  "libsqlite3-sys",
- "smallvec 1.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "smallvec",
 ]
 
 [[package]]
@@ -1042,14 +1042,6 @@ name = "smallvec"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b187f0231d56fe41bfb12034819dd2bf336422a5866de41bc3fec4b2e3883e8"
-
-[[package]]
-name = "smallvec"
-version = "1.13.0"
-source = "git+https://github.com/servo/rust-smallvec.git?rev=v1.13.0#ff0544479f24899c1ae41e39f987ac7cd824f7a3"
-dependencies = [
- "get-size",
-]
 
 [[package]]
 name = "strsim"
