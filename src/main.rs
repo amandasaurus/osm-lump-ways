@@ -552,6 +552,7 @@ fn main() -> Result<()> {
             |mut acc, curr| {
                 trace!("Merging files down again");
                 for (filename, wgs) in curr.into_iter() {
+                    #[allow(clippy::map_entry)]
                     if !acc.contains_key(&filename) {
                         acc.insert(filename, wgs);
                     } else {
