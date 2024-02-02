@@ -387,6 +387,7 @@ fn main() -> Result<()> {
                     serde_json::json!({
                         "root_nid": cycle.iter().flat_map(|seg| seg.iter()).min().unwrap(),
                         "num_nodes": cycle.len(),
+                        "length_m": round(&node_group_to_length_m(cycle.as_slice(), &nodeid_pos), 1),
                         "nodes": cycle
                     .iter()
                     .flat_map(|seg| seg.iter())
