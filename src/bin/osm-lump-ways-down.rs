@@ -47,18 +47,20 @@ use btreemapsplitkey::BTreeMapSplitKey;
 mod kosaraju;
 
 macro_rules! info_memory_used {
-    () => {
-        info!(
-            "{}:L{} Total memory used: {}",
-            file!(),
-            line!(),
-            memory_stats::memory_stats()
-                .unwrap()
-                .physical_mem
-                .to_formatted_string(&Locale::en)
-        );
-    };
+    () => {};
 }
+//    () => {
+//        info!(
+//            "{}:L{} Total memory used: {}",
+//            file!(),
+//            line!(),
+//            memory_stats::memory_stats()
+//                .unwrap()
+//                .physical_mem
+//                .to_formatted_string(&Locale::en)
+//        );
+//    };
+//}
 
 fn main() -> Result<()> {
     let args = cli_args::Args::parse();
