@@ -1050,7 +1050,6 @@ fn read_node_positions(
 
     let nodeid_pos = Arc::try_unwrap(nodeid_pos).unwrap().into_inner().unwrap();
     nodeid_pos.finished_inserting();
-    let nodeid_pos = nodeid_pos;
 
     setting_node_pos.finish();
 

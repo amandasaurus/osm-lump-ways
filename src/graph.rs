@@ -843,7 +843,7 @@ impl DirectedGraph2 {
     }
 
     /// Iterator over all vertexes
-    pub fn vertexes<'a>(&'a self) -> impl Iterator<Item = i64> + 'a {
+    pub fn vertexes(&self) -> impl Iterator<Item = i64> + '_ {
         self.edges.keys()
     }
 }
@@ -953,7 +953,7 @@ impl DirectedGraphTrait for UniDirectedGraph {
         // assume we never get inconsistant
         self.edges.entry(vertex1).or_default().push(vertex2);
         self.edges.get_mut(&vertex1).unwrap().sort();
-        return false;
+        false
     }
 
     fn out_neighbours(&self, from_vertex: i64) -> impl Iterator<Item = i64> {
