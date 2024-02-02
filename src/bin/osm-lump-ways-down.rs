@@ -389,11 +389,11 @@ fn main() -> Result<()> {
                         "num_nodes": cycle.len(),
                         "length_m": round(&node_group_to_length_m(cycle.as_slice(), &nodeid_pos), 1),
                         "nodes": cycle
-                    .iter()
-                    .flat_map(|seg| seg.iter())
-                    .map(|nid| format!("n{}", nid))
-                    .collect::<Vec<_>>()
-                    .join(","),
+                                    .iter()
+                                    .flat_map(|seg| seg.iter())
+                                    .map(|nid| format!("n{}", nid))
+                                    .collect::<Vec<_>>()
+                                    .join(","),
                     }),
                     node_group_to_lines(cycle.as_slice(), &nodeid_pos),
                 )
