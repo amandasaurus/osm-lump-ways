@@ -698,6 +698,50 @@ fn main() -> Result<()> {
         args.output_filename.replace("%s", "upstreams")
     );
 
+    debug!("Writing upstream geojson points");
+    let upstream_points = g
+        .edges_iter()
+        .filter(|(from_nid, _to_nid)| {
+            args.min_upstream_m
+                .map_or(true, |min| length_upstream.get(from_nid).unwrap() >= &min)
+        })
+        .map(|(from_nid, _to_nid)| {
+            (
+                // Round the upstream to only output 1 decimal place
+                serde_json::json!({
+                    "from_upstream_m": round(length_upstream.get(&from_nid).unwrap(), 1),
+                }),
+                vec![vec![
+                    nodeid_pos.get(&from_nid).unwrap(),
+                ]],
+            )
+        });
+    info_memory_used!();
+
+    let writing_upstreams_bar = progress_bars.add(
+        ProgressBar::new(g.num_edges() as u64)
+            .with_message("Writing upstream points geojson(s) file")
+            .with_style(style.clone()),
+    );
+
+    let upstream_points = upstream_points.progress_with(writing_upstreams_bar);
+
+    let mut f = std::io::BufWriter::new(std::fs::File::create(
+        args.output_filename.replace("%s", "upstream-points"),
+    )?);
+    let num_written = write_geojson_features_directly(
+        upstream_points,
+        &mut f,
+        &output_format,
+        &OutputGeometryType::Point,
+    )?;
+
+    info!(
+        "Wrote {} features to output file {}",
+        num_written.to_formatted_string(&Locale::en),
+        args.output_filename.replace("%s", "upstream-points")
+    );
+
     debug!("Writing strahler number geojson object(s)");
     let strahler_lines = g.edges_iter().map(|(from_nid, to_nid)| {
         (
@@ -1070,6 +1114,16 @@ fn node_group_to_lines(nids: &[[i64; 2]], pos: &impl NodeIdPosition) -> Vec<Vec<
             vec![pos0, pos1]
         })
         .collect()
+}
+
+fn node_group_to_length_m(nids: &[[i64; 2]], pos: &impl NodeIdPosition) -> f64 {
+    nids.iter()
+        .map(|seg| {
+            let pos0 = pos.get(&seg[0]).unwrap();
+            let pos1 = pos.get(&seg[1]).unwrap();
+            haversine_m(pos0.1, pos0.0, pos1.0, pos1.1)
+        })
+        .sum()
 }
 
 fn multilinestring_length(coords: &Vec<Vec<(f64, f64)>>) -> f64 {
