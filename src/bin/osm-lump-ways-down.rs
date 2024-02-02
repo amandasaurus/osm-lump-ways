@@ -377,6 +377,7 @@ fn main() -> Result<()> {
         progress_bars.remove(&setting_node_pos);
         info_memory_used!();
 
+        #[allow(clippy::type_complexity)]
         let cycles_output: Vec<(serde_json::Value, Vec<Vec<(f64, f64)>>)> = cycles
             .par_iter()
             .map(|cycle| {

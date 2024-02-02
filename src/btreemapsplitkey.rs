@@ -36,20 +36,20 @@ impl<V> BTreeMapSplitKey<V> {
             .flat_map(|(k0, i2)| i2.iter().map(|(k1, v)| (join_key(&[*k0, *k1]), v)))
     }
     pub fn get(&self, key: &i64) -> Option<&V> {
-        let k = split_key(&key);
+        let k = split_key(key);
         self.inner.get(&k[0]).and_then(|i2| i2.get(&k[1]))
     }
     pub fn get_mut(&mut self, key: &i64) -> Option<&mut V> {
-        let k = split_key(&key);
+        let k = split_key(key);
         self.inner.get_mut(&k[0]).and_then(|i2| i2.get_mut(&k[1]))
     }
-    pub fn keys<'a>(&'a self) -> impl Iterator<Item = i64> + 'a {
+    pub fn keys(&self) -> impl Iterator<Item = i64> + '_ {
         self.inner
             .iter()
             .flat_map(|(k0, i2)| i2.keys().map(|k1| join_key(&[*k0, *k1])))
     }
     pub fn contains_key(&self, key: &i64) -> bool {
-        let k = split_key(&key);
+        let k = split_key(key);
         self.inner
             .get(&k[0])
             .map_or(false, |i2| i2.contains_key(&k[1]))
@@ -58,7 +58,7 @@ impl<V> BTreeMapSplitKey<V> {
         self.inner.is_empty()
     }
     pub fn remove(&mut self, key: &i64) -> Option<V> {
-        let k = split_key(&key);
+        let k = split_key(key);
         if let Some(i2) = self.inner.get_mut(&k[0]) {
             let res = i2.remove(&k[1]);
             if i2.is_empty() {
