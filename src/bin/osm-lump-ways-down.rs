@@ -711,9 +711,7 @@ fn main() -> Result<()> {
                 serde_json::json!({
                     "from_upstream_m": round(length_upstream.get(&from_nid).unwrap(), 1),
                 }),
-                vec![vec![
-                    nodeid_pos.get(&from_nid).unwrap(),
-                ]],
+                vec![vec![nodeid_pos.get(&from_nid).unwrap()]],
             )
         });
     info_memory_used!();
