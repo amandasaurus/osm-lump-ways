@@ -200,10 +200,10 @@ fn main() -> Result<()> {
         metrics
     });
 
-    let mut csv_stats = args.csv_stats_file.map(|csv_stats_file| {
+    let mut csv_stats = args.csv_stats_file.as_ref().map(|csv_stats_file| {
         info!("Writing CSV stats to file {csv_stats_file:?}");
         if !csv_stats_file.exists() {
-            let mut wtr = csv::Writer::from_writer(std::fs::File::create(&csv_stats_file).unwrap());
+            let mut wtr = csv::Writer::from_writer(std::fs::File::create(csv_stats_file).unwrap());
             wtr.write_record(["timestamp", "iso_datetime", "area", "metric", "value"])
                 .unwrap();
             wtr.flush().unwrap();
@@ -212,7 +212,7 @@ fn main() -> Result<()> {
         csv::Writer::from_writer(std::io::BufWriter::new(
             std::fs::File::options()
                 .append(true)
-                .open(&csv_stats_file)
+                .open(csv_stats_file)
                 .unwrap(),
         ))
     });
@@ -452,6 +452,10 @@ fn main() -> Result<()> {
 
             if let Some(ref mut csv_stats) = csv_stats {
                 csv_stats.flush()?;
+                info!(
+                    "Statistics have been written to file {}",
+                    args.csv_stats_file.unwrap().display()
+                );
             }
         }
 
