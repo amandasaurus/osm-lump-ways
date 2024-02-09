@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+* Length of a loop (in metres) now included as GeoJSON property
+* The upstream lengths is also saved as a points file `upstream-points`.
+
 ## v0.19.0 (2024-01-30)
 
 * New binary `osm-lump-ways-down` which does cycle/loop detection and
