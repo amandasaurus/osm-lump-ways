@@ -128,6 +128,19 @@ fn main() -> Result<()> {
     };
     debug!("Output format: {output_format:?}");
 
+    anyhow::ensure!(
+        args.only_these_way_groups.is_empty(),
+        "Not currently supported on this tool"
+    );
+    anyhow::ensure!(
+        args.only_these_way_groups_nodeid.is_empty(),
+        "Not currently supported on this tool"
+    );
+    anyhow::ensure!(
+        args.only_these_way_groups_divmod.is_none(),
+        "Not currently supported on this tool"
+    );
+
     #[allow(clippy::iter_nth_zero)]
     let only_these_way_groups_divmod: Option<(i64, i64)> =
         args.only_these_way_groups_divmod.map(|s| {
@@ -145,18 +158,7 @@ fn main() -> Result<()> {
     if !args.tag_group_k.is_empty() {
         info!("Tag grouping(s) in operation: {:?}", args.tag_group_k);
     }
-    if !args.only_these_way_groups.is_empty() {
-        info!(
-            "Only keeping groups which include the following ways: {:?}",
-            args.only_these_way_groups
-        );
-    }
-    if !args.only_these_way_groups_nodeid.is_empty() {
-        info!(
-            "Only keeping groups which include the following nodes: {:?}",
-            args.only_these_way_groups_nodeid
-        );
-    }
+
     if std::env::var("OSM_LUMP_WAYS_FINISH_AFTER_READ").is_ok() {
         warn!("Programme will exit after reading & parsing input");
     }
