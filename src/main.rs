@@ -281,7 +281,7 @@ fn main() -> Result<()> {
     let total_features_written = AtomicUsize::new(0);
     info!(
         "All data has been loaded in {}. Started processing...",
-        format_duration(Instant::now() - global_start)
+        format_duration(global_start.elapsed())
     );
 
     if std::env::var("OSM_LUMP_WAYS_FINISH_AFTER_READ").is_ok() {
@@ -470,7 +470,7 @@ fn main() -> Result<()> {
             let started = Instant::now();
             let paths = match dij::into_segments(&way_group, &nodeid_pos, args.min_length_m, args.only_longest_n_splitted_paths, &splitter) {
                 Ok(paths) => {
-                    let duration = (Instant::now() - started).as_secs_f64();
+                    let duration = started.elapsed().as_secs_f64();
                     log!(
                         if paths.len() > 20 || duration > 2. { Debug } else { Trace },
                         "Have generated {} paths from wg:{} ({} nodes) in {:.1} sec. {:.2} nodes/sec",
@@ -821,7 +821,7 @@ fn main() -> Result<()> {
 
     info!(
         "Finished all in {}",
-        format_duration(Instant::now() - global_start)
+        format_duration(global_start.elapsed())
     );
     Ok(())
 }

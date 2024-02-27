@@ -248,7 +248,7 @@ fn main() -> Result<()> {
                 latest_timestamp.fetch_max(t, atomic_Ordering::SeqCst);
             }
         });
-    let way_reading_duration = Instant::now() - start_reading_ways;
+    let way_reading_duration = start_reading_ways.elapsed();
     info!(
         "Finished reading. {} ways read in {}, {} ways/sec",
         ways_added.position().to_formatted_string(&Locale::en),
@@ -272,7 +272,7 @@ fn main() -> Result<()> {
 
     info!(
         "All data has been loaded in {}. Started processing...",
-        format_duration(Instant::now() - global_start)
+        format_duration(global_start.elapsed())
     );
     info!("{}", g.detailed_size());
     info_memory_used!();
@@ -815,7 +815,7 @@ fn main() -> Result<()> {
 
     info!(
         "Finished all in {}",
-        format_duration(Instant::now() - global_start)
+        format_duration(global_start.elapsed())
     );
 
     Ok(())
