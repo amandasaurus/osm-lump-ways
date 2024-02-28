@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* AND'ing filters together now possible with `∧` (`U+2227 LOGICAL AND`):
+
 ## v0.20.0 (2024-02-28)
 
 * Length of a loop (in metres) now included as GeoJSON property

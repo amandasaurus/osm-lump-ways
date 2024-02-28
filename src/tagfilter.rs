@@ -12,6 +12,7 @@ pub enum TagFilter {
     KnotInV(String, Vec<String>),
     KneV(String, String),
     KreV(String, Regex),
+    And(Vec<TagFilter>),
     Or(Vec<TagFilter>),
 }
 
@@ -32,6 +33,11 @@ impl ToString for TagFilter {
                 .map(|tf| tf.to_string())
                 .collect::<Vec<_>>()
                 .join("∨"),
+            TagFilter::And(tfs) => tfs
+                .iter()
+                .map(|tf| tf.to_string())
+                .collect::<Vec<_>>()
+                .join("∧"),
         }
     }
 }
@@ -57,6 +63,7 @@ impl TagFilter {
                 .map_or(true, |tag_value| vs.iter().all(|v| v != tag_value)),
             TagFilter::KreV(k, r) => o.tag(k).map_or(false, |v| r.is_match(v)),
             TagFilter::Or(tfs) => tfs.iter().any(|tf| tf.filter(o)),
+            TagFilter::And(tfs) => tfs.iter().all(|tf| tf.filter(o)),
         }
     }
 }
@@ -75,6 +82,12 @@ impl std::str::FromStr for TagFilter {
                 .map(|tf| tf.parse::<TagFilter>())
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(TagFilter::Or(tfs))
+        } else if s.contains('∧') {
+            let tfs = s
+                .split('∧')
+                .map(|tf| tf.parse::<TagFilter>())
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(TagFilter::And(tfs))
         } else if s.contains('=') {
             let s = s.splitn(2, '=').collect::<Vec<_>>();
             if s[1].contains(',') {
@@ -226,6 +239,14 @@ mod tests {
         assert_eq!(
             "name∨highway".parse::<TagFilter>().unwrap(),
             TagFilter::Or(vec![
+                TagFilter::HasK("name".to_string()),
+                TagFilter::HasK("highway".to_string())
+            ])
+        );
+
+        assert_eq!(
+            "name∧highway".parse::<TagFilter>().unwrap(),
+            TagFilter::And(vec![
                 TagFilter::HasK("name".to_string()),
                 TagFilter::HasK("highway".to_string())
             ])
