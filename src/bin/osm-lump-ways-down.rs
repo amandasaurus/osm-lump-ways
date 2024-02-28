@@ -154,11 +154,18 @@ fn main() -> Result<()> {
     }
 
     info!("Starting to read {:?}", &args.input_filename);
-    info!("Tag filter(s) in operation: {:?}", args.tag_filter);
+    if args.tag_filter.is_empty() {
+        if let Some(ref tff) = args.tag_filter_func {
+            info!("Tag filter function in operation: {:?}", tff);
+        } else {
+            info!("No tag filtering in operation. All ways in the file will be used.");
+        }
+    } else {
+        info!("Tag filter(s) in operation: {:?}", args.tag_filter);
+    }
     if !args.tag_group_k.is_empty() {
         info!("Tag grouping(s) in operation: {:?}", args.tag_group_k);
     }
-
     if std::env::var("OSM_LUMP_WAYS_FINISH_AFTER_READ").is_ok() {
         warn!("Programme will exit after reading & parsing input");
     }
@@ -237,7 +244,7 @@ fn main() -> Result<()> {
         .ways()
         .par_bridge()
         .inspect(|_| obj_reader.inc(1))
-        .filter(|w| args.tag_filter.par_iter().all(|tf| tf.filter(w)))
+        .filter(|w| obj_pass_filters(w, &args.tag_filter, &args.tag_filter_func))
         .inspect(|_| ways_added.inc(1))
         // TODO support grouping by tag value
         .for_each_with(g.clone(), |g, w| {
@@ -503,6 +510,7 @@ fn main() -> Result<()> {
     read_with_node_replacements(
         &args.input_filename,
         &args.tag_filter,
+        &args.tag_filter_func,
         &node_id_replaces,
         &progress_bars,
         &mut g,
@@ -541,6 +549,7 @@ fn main() -> Result<()> {
     read_with_node_replacements(
         &args.input_filename,
         &args.tag_filter,
+        &args.tag_filter_func,
         &node_id_replaces,
         &progress_bars,
         &mut g,
@@ -1019,6 +1028,7 @@ fn format_duration(d: std::time::Duration) -> String {
 fn read_with_node_replacements(
     input_filename: &Path,
     tag_filter: &[tagfilter::TagFilter],
+    tag_filter_func: &Option<tagfilter::TagFilterFunc>,
     node_id_replaces: &HashMap<i64, i64>,
     progress_bars: &MultiProgress,
     graph: &mut impl graph::DirectedGraphTrait,
@@ -1049,7 +1059,7 @@ fn read_with_node_replacements(
         .ways()
         .par_bridge()
         .inspect(|_| obj_reader.inc(1))
-        .filter(|w| tag_filter.par_iter().all(|tf| tf.filter(w)))
+        .filter(|w| obj_pass_filters(w, tag_filter, tag_filter_func))
         .inspect(|_| ways_added.inc(1))
         // TODO support grouping by tag value
         .for_each_with(graph.clone(), |graph, w| {
@@ -1147,4 +1157,19 @@ fn multilinestring_length(coords: &Vec<Vec<(f64, f64)>>) -> f64 {
 fn round(f: &f64, places: u8) -> f64 {
     let places: f64 = 10_u64.pow(places as u32) as f64;
     (f * places).round() / places
+}
+
+fn obj_pass_filters(
+    o: &(impl osmio::OSMObjBase + Sync + Send),
+    tag_filters: &[tagfilter::TagFilter],
+    tag_filter_func: &Option<tagfilter::TagFilterFunc>,
+) -> bool {
+    if !tag_filters.is_empty() {
+        tag_filters.par_iter().all(|tf| tf.filter(o))
+    } else if let Some(ref tff) = tag_filter_func {
+        tff.result(o)
+            .expect("Tag Filter func did not complete. Perhaps missing last element of T or F?")
+    } else {
+        true
+    }
 }
