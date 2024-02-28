@@ -1,6 +1,7 @@
 # `osm-lump-ways` group OSM ways based on topology & shared tags
 
-![Crates.io](https://img.shields.io/crates/d/osm-lump-ways)
+![Crates.io Number of Downloads](https://img.shields.io/crates/d/osm-lump-ways)
+![Crates.io Latest Version](https://img.shields.io/crates/v/osm-lump-ways)
 
 > Answer questions about OSM data like:
 >
