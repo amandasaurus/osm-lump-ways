@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.20.0 (2024-02-28)
+
 * Length of a loop (in metres) now included as GeoJSON property
 * The upstream lengths is also saved as a points file `upstream-points`.
 
