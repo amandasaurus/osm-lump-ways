@@ -52,11 +52,6 @@ Run with `--help` to see all options.
 
 This software isn't finished, here's what I'd like to add. Feel free to send a patch.
 
-* Support outputting GeoJSONSeq instead of one large GeoJSON FeatureCollection
-* The `--split-into-way` uses Floyd–Warshall algorithm to calculate all pairs
-  shortest path. It's incredibly slow on large numbers of points, e.g. >10k. It
-  also single threaded. This should be replaces with something like multiple
-  runs of Dijkstra's Algorithm to speed it up.
 * All tags need to be specified in advance to join on. Perhaps add something to
   match all possible tags? (inspired by [this
   q](https://en.osm.town/@grischard/110763741292331075)). (“Group by all tags
