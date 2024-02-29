@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.21.0 (2024-02-29)
+
 * AND'ing filters together now possible with `∧` (`U+2227 LOGICAL AND`):
 * New “Tag Filter Function” allows much more powerful, and complicated, tag
   filtering
