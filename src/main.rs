@@ -139,7 +139,15 @@ fn main() -> Result<()> {
     }
 
     info!("Input file: {:?}", &args.input_filename);
-    info!("Tag filter(s) in operation: {:?}", args.tag_filter);
+    if args.tag_filter.is_empty() {
+        if let Some(ref tff) = args.tag_filter_func {
+            info!("Tag filter function in operation: {:?}", tff);
+        } else {
+            info!("No tag filtering in operation. All ways in the file will be used.");
+        }
+    } else {
+        info!("Tag filter(s) in operation: {:?}", args.tag_filter);
+    }
     if !args.tag_group_k.is_empty() {
         info!("Tag grouping(s) in operation: {:?}", args.tag_group_k);
     }
@@ -180,7 +188,7 @@ fn main() -> Result<()> {
     reader
         .ways()
         .par_bridge()
-        .filter(|w| args.tag_filter.par_iter().all(|tf| tf.filter(w)))
+        .filter(|w| tagfilter::obj_pass_filters(w, &args.tag_filter, &args.tag_filter_func))
         .map(|w| {
             let group = args
                 .tag_group_k
