@@ -251,7 +251,7 @@ fn main() -> Result<()> {
         .ways()
         .par_bridge()
         .inspect(|_| obj_reader.inc(1))
-        .filter(|w| obj_pass_filters(w, &args.tag_filter, &args.tag_filter_func))
+        .filter(|w| tagfilter::obj_pass_filters(w, &args.tag_filter, &args.tag_filter_func))
         .inspect(|_| ways_added.inc(1))
         // TODO support grouping by tag value
         .for_each_with(g.clone(), |g, w| {
@@ -887,7 +887,7 @@ fn read_with_node_replacements(
         .ways()
         .par_bridge()
         .inspect(|_| obj_reader.inc(1))
-        .filter(|w| obj_pass_filters(w, tag_filter, tag_filter_func))
+        .filter(|w| tagfilter::obj_pass_filters(w, tag_filter, tag_filter_func))
         .inspect(|_| ways_added.inc(1))
         // TODO support grouping by tag value
         .for_each_with(graph.clone(), |graph, w| {
@@ -985,19 +985,4 @@ fn multilinestring_length(coords: &Vec<Vec<(f64, f64)>>) -> f64 {
 fn round(f: &f64, places: u8) -> f64 {
     let places: f64 = 10_u64.pow(places as u32) as f64;
     (f * places).round() / places
-}
-
-fn obj_pass_filters(
-    o: &(impl osmio::OSMObjBase + Sync + Send),
-    tag_filters: &[tagfilter::TagFilter],
-    tag_filter_func: &Option<tagfilter::TagFilterFunc>,
-) -> bool {
-    if !tag_filters.is_empty() {
-        tag_filters.par_iter().all(|tf| tf.filter(o))
-    } else if let Some(ref tff) = tag_filter_func {
-        tff.result(o)
-            .expect("Tag Filter func did not complete. Perhaps missing last element of T or F?")
-    } else {
-        true
-    }
 }

@@ -1,5 +1,6 @@
 use log::warn;
 use regex::Regex;
+use rayon::iter::{ParallelIterator, IntoParallelRefIterator};
 
 #[derive(Debug, Clone)]
 pub enum TagFilter {
@@ -235,6 +236,22 @@ impl TagFilterFunc {
             .map(|tff| tff.result(o))
             .find(|res| res.is_some())
             .flatten()
+    }
+}
+
+
+pub(crate) fn obj_pass_filters(
+    o: &(impl osmio::OSMObjBase + Sync + Send),
+    tag_filters: &[TagFilter],
+    tag_filter_func: &Option<TagFilterFunc>,
+) -> bool {
+    if !tag_filters.is_empty() {
+        tag_filters.par_iter().all(|tf| tf.filter(o))
+    } else if let Some(ref tff) = tag_filter_func {
+        tff.result(o)
+            .expect("Tag Filter func did not complete. Perhaps missing last element of T or F?")
+    } else {
+        true
     }
 }
 
