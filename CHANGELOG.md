@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.22.0 (2024-03-10)
+
 * `osm-lump-ways` can now use the powerful “tag filter function” from
   `osm-lump-ways-down`
 * Internal refactoring to reduce code duplication
