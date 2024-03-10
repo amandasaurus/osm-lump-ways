@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+* `osm-lump-ways` can now use the powerful “tag filter function” from
+  `osm-lump-ways-down`
+* Internal refactoring to reduce code duplication
+
 ## v0.21.0 (2024-02-29)
 
 * AND'ing filters together now possible with `∧` (`U+2227 LOGICAL AND`):
