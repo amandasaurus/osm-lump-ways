@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use super::*;
 use anyhow::{Context, Result};
 use rayon::prelude::ParallelIterator;

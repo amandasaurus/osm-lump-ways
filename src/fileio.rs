@@ -11,7 +11,9 @@ pub(crate) enum OutputFormat {
 pub(crate) enum OutputGeometryType {
     MultiLineString,
     LineString,
+    #[allow(dead_code)]
     MultiPoint,
+    #[allow(dead_code)]
     Point,
 }
 
