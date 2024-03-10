@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 #[derive(Debug, Clone, Hash, serde::Serialize, PartialEq, Eq)]
 pub(crate) struct TagGrouper(Vec<String>);
 
