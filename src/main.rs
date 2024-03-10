@@ -42,6 +42,9 @@ use nodeid_wayids::NodeIdWayIds;
 mod btreemapsplitkey;
 mod kosaraju;
 
+mod fileio;
+use fileio::{OutputFormat};
+
 fn main() -> Result<()> {
     let args = cli_args::Args::parse();
 
@@ -948,12 +951,6 @@ fn write_geojson_feature_directly(
     }
 
     Ok(num_written)
-}
-
-#[derive(PartialEq, Eq, Debug)]
-enum OutputFormat {
-    GeoJSON,
-    GeoJSONSeq,
 }
 
 pub fn format_duration_human(duration: &std::time::Duration) -> String {

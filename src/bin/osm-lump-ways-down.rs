@@ -46,6 +46,10 @@ use btreemapsplitkey::BTreeMapSplitKey;
 #[path = "../kosaraju.rs"]
 mod kosaraju;
 
+#[path = "../fileio.rs"]
+mod fileio;
+use fileio::{OutputFormat, OutputGeometryType};
+
 macro_rules! info_memory_used {
     () => {};
 }
@@ -913,30 +917,6 @@ fn write_geojson_feature_directly(
     Ok(num_written)
 }
 
-#[derive(PartialEq, Eq, Debug)]
-enum OutputFormat {
-    GeoJSON,
-    GeoJSONSeq,
-}
-
-#[derive(PartialEq, Eq, Debug)]
-pub enum OutputGeometryType {
-    MultiLineString,
-    LineString,
-    MultiPoint,
-    Point,
-}
-
-impl OutputGeometryType {
-    fn bytes(&self) -> &'static [u8] {
-        match self {
-            OutputGeometryType::MultiLineString => b"MultiLineString",
-            OutputGeometryType::LineString => b"LineString",
-            OutputGeometryType::MultiPoint => b"MultiPoint",
-            OutputGeometryType::Point => b"Point",
-        }
-    }
-}
 
 fn write_coords(
     f: &mut impl Write,
