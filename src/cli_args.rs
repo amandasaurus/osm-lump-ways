@@ -3,7 +3,7 @@ use clap_verbosity_flag::Verbosity;
 use std::path::PathBuf;
 
 use crate::tagfilter;
-use crate::TagGrouper;
+use crate::taggrouper;
 
 /// Group OSM ways based on shared tags into GeoJSON MultiLineStrings
 ///
@@ -74,7 +74,7 @@ pub(crate) struct Args {
     /// `-g name:en,name` → The grouping key will be the the `name:en` key if it's set, else the
     /// `name` key
     #[arg(short = 'g', long = "tag-group-k", value_name = "key1,key2,…")]
-    pub tag_group_k: Vec<TagGrouper>,
+    pub tag_group_k: Vec<taggrouper::TagGrouper>,
 
     /// If grouping by a key, set this to also include ways where there is any unset tag (default
     /// to require all to be set)

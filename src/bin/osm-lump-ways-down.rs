@@ -45,6 +45,8 @@ mod btreemapsplitkey;
 use btreemapsplitkey::BTreeMapSplitKey;
 #[path = "../kosaraju.rs"]
 mod kosaraju;
+#[path = "../taggrouper.rs"]
+mod taggrouper;
 
 #[path = "../fileio.rs"]
 mod fileio;
@@ -835,22 +837,6 @@ fn main() -> Result<()> {
     );
 
     Ok(())
-}
-
-#[derive(Debug, Clone, Hash, serde::Serialize, PartialEq, Eq)]
-struct TagGrouper(Vec<String>);
-
-impl std::str::FromStr for TagGrouper {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(TagGrouper(s.split(',').map(|s| s.to_string()).collect()))
-    }
-}
-impl std::string::ToString for TagGrouper {
-    fn to_string(&self) -> String {
-        self.0.join(",")
-    }
 }
 
 fn read_with_node_replacements(
