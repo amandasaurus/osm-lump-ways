@@ -1,6 +1,6 @@
 use log::warn;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use regex::Regex;
-use rayon::iter::{ParallelIterator, IntoParallelRefIterator};
 
 #[derive(Debug, Clone)]
 pub enum TagFilter {
@@ -238,7 +238,6 @@ impl TagFilterFunc {
             .flatten()
     }
 }
-
 
 pub(crate) fn obj_pass_filters(
     o: &(impl osmio::OSMObjBase + Sync + Send),
