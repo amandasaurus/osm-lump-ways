@@ -17,7 +17,6 @@ use kdtree::KdTree;
 use serde_json::json;
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap};
-use std::io::Write;
 use std::time::Instant;
 
 use std::sync::atomic::{AtomicUsize, Ordering as atomic_Ordering};
