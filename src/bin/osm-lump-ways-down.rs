@@ -48,7 +48,7 @@ mod kosaraju;
 
 #[path = "../fileio.rs"]
 mod fileio;
-use fileio::{OutputFormat, OutputGeometryType, write_geojson_features_directly};
+use fileio::{write_geojson_features_directly, OutputFormat, OutputGeometryType};
 
 #[path = "../formatting.rs"]
 mod formatting;

@@ -1,5 +1,5 @@
-use std::io::Write;
 use anyhow::Result;
+use std::io::Write;
 
 #[derive(PartialEq, Eq, Debug)]
 pub(crate) enum OutputFormat {
@@ -93,7 +93,6 @@ fn write_geojson_feature_directly(
     Ok(num_written)
 }
 
-
 fn write_coords(
     f: &mut impl Write,
     coords: &[Vec<(f64, f64)>],
@@ -172,4 +171,3 @@ fn write_linestring_coords(f: &mut impl Write, coords: &[Vec<(f64, f64)>]) -> Re
     f.write_all(b"]")?;
     Ok(())
 }
-

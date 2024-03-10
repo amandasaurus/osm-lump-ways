@@ -42,7 +42,7 @@ mod btreemapsplitkey;
 mod kosaraju;
 
 mod fileio;
-use fileio::{OutputFormat};
+use fileio::OutputFormat;
 mod formatting;
 
 fn main() -> Result<()> {
@@ -798,8 +798,7 @@ fn main() -> Result<()> {
                     .with_context(|| {
                         format!(
                             "Writing {} features to filename {:?}",
-                            num_features,
-                            filename
+                            num_features, filename
                         )
                     })?;
                     info!(
