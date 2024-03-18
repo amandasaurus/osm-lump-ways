@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+* When splitting into paths, the sinuosity value of the path is calculated &
+  included in results.
+
 ## v0.22.0 (2024-03-10)
 
 * `osm-lump-ways` can now use the powerful “tag filter function” from

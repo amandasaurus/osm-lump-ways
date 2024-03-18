@@ -544,6 +544,7 @@ fn main() -> Result<()> {
             way_group.extra_json_props["dist_ends_m_int"] = (dist.round() as i64).into();
             way_group.extra_json_props["dist_ends_km"] = (dist/1000.).into();
             way_group.extra_json_props["dist_ends_km_int"] = ((dist/1000.).round() as i64).into();
+            way_group.extra_json_props["sinuosity"] = way_group.length_m.map(|l| l/dist).into();
         }
 
     })
