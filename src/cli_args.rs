@@ -90,6 +90,9 @@ pub(crate) struct Args {
     #[arg(long, value_name = "NUMBER", requires = "incl_dist_to_longer")]
     pub min_dist_to_longer_m: Option<f64>,
 
+    #[arg(long, value_name = "NUMBER", requires = "split_into_single_paths")]
+    pub max_sinuosity: Option<f64>,
+
     /// Per tag group, only include the longest N lines
     #[arg(long, value_name = "N")]
     pub only_longest_n_per_group: Option<usize>,

@@ -4,6 +4,8 @@
 
 * When splitting into paths, the sinuosity value of the path is calculated &
   included in results.
+* New: `--max-sinuosity`: when splitting into paths, only include paths where
+  the sinuosity is below this.
 
 ## v0.22.0 (2024-03-10)
 

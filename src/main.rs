@@ -166,6 +166,15 @@ fn main() -> Result<()> {
     if std::env::var("OSM_LUMP_WAYS_FINISH_AFTER_READ").is_ok() {
         warn!("Programme will exit after reading & parsing input");
     }
+    if let Some(max_sinuosity) = args.max_sinuosity {
+        anyhow::ensure!(
+            max_sinuosity >= 1.0,
+            "It's impossible to have a sinuosity < 1.0. Exiting now without doing anything."
+        );
+        if max_sinuosity == 1.0 {
+            warn!("A max sinuosity of 1.0 will exclude a lot (all?) data");
+        }
+    }
 
     // For each group, a hashmap of wayid:nodes in that way
     let group_wayid_nodes: HashMap<Vec<Option<String>>, HashMap<i64, Vec<i64>>> = HashMap::new();
@@ -479,7 +488,7 @@ fn main() -> Result<()> {
 
             trace!("wg:{} splitting the groups into single paths with Dij algorithm... wg.num_nodeids() = {}", way_group.root_wayid, way_group.num_nodeids());
             let started = Instant::now();
-            let paths = match dij::into_segments(&way_group, &nodeid_pos, args.min_length_m, args.only_longest_n_splitted_paths, &splitter) {
+            let paths = match dij::into_segments(&way_group, &nodeid_pos, args.min_length_m, args.only_longest_n_splitted_paths, args.max_sinuosity, &splitter) {
                 Ok(paths) => {
                     let duration = started.elapsed().as_secs_f64();
                     log!(

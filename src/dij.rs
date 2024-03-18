@@ -18,6 +18,7 @@ pub(crate) fn into_segments(
     nodeid_pos: &(impl NodeIdPosition + std::marker::Send),
     min_length_m: Option<f64>,
     only_longest_n_splitted_paths: Option<usize>,
+    max_sinuosity: Option<f64>,
     splitter: &ProgressBar,
 ) -> Result<Vec<Vec<i64>>> {
     let nodeid_pos = Arc::new(Mutex::new(nodeid_pos));
@@ -65,15 +66,17 @@ pub(crate) fn into_segments(
     }
 
     let old = (edges.num_edges(), edges.num_vertexes());
-    edges.contract_edges();
-    debug!(
-        "wg:{} Post-contraction. Removed {} edges and {} vertexes",
-        wg.root_wayid,
-        old.0 - edges.num_edges(),
-        old.1 - edges.num_vertexes()
-    );
-    // This vertexes are now “done”
-    splitter.inc((old.1 - edges.num_vertexes()) as u64);
+    if max_sinuosity.is_none() {
+        edges.contract_edges();
+        debug!(
+            "wg:{} Post-contraction. Removed {} edges and {} vertexes",
+            wg.root_wayid,
+            old.0 - edges.num_edges(),
+            old.1 - edges.num_vertexes()
+        );
+        // This vertexes are now “done”
+        splitter.inc((old.1 - edges.num_vertexes()) as u64);
+    }
 
     for paths_generated_so_far in 0..only_longest_n_splitted_paths.unwrap_or(1_000_000) {
         if edges.is_empty() {
@@ -119,16 +122,37 @@ pub(crate) fn into_segments(
             );
             // do it single threaded, Can't handle the memory requirements
             let mut this_is_longest;
+            let (mut p1, mut p2);
             for (nid1, results_from_nid1) in edges
                 .vertexes()
                 .map(|nid1| (nid1, dij_single(*nid1, &edges)))
             {
                 this_is_longest = false; // should we save the graph of distances?
-                for (nid2, (prev_nid, dist)) in results_from_nid1.iter() {
-                    if prev_nid.is_some()
-                        && longest_summary
-                            .map_or(true, |(_, _, _, dist2)| dist2 < dist.into_inner())
-                    {
+                p1 = nodeid_pos.lock().unwrap().get(nid1).unwrap();
+                for (nid2, (prev_nid, dist)) in results_from_nid1.iter().filter(|x| x.0 != nid1) {
+                    // TODO continue if nid1 > nid2?
+                    if longest_summary.map_or(false, |(_, _, _, dist_longest_so_far)| {
+                        dist.into_inner() < dist_longest_so_far
+                    }) {
+                        // this path is not longer than the previous longest we've accepted. So
+                        // skip it
+                        continue;
+                    }
+
+                    if let Some(max_sinuosity) = max_sinuosity {
+                        // we only include it if the sinuosity is not too long
+                        // get local id for the node ids
+                        p2 = nodeid_pos.lock().unwrap().get(nid2).unwrap();
+                        let dist_path = dist.into_inner() as f64;
+                        let dist_ends = haversine_m(p1.1, p1.0, p2.1, p2.0);
+                        if (dist_path / dist_ends) <= max_sinuosity {
+                            longest_summary = Some((*nid1, *nid2, *prev_nid, dist_path as f32));
+                            this_is_longest = true;
+                        } else {
+                            // This is path has too high a sinuosity, so skip it
+                        }
+                    } else {
+                        // we don't care about sinuosity, so save it
                         longest_summary = Some((*nid1, *nid2, *prev_nid, dist.into_inner()));
                         this_is_longest = true;
                     }
@@ -151,14 +175,38 @@ pub(crate) fn into_segments(
                 .map(|nid1| (nid1, dij_single(*nid1, &edges)))
                 .for_each_with(sender, |s, x| s.send(x).unwrap());
 
+            // look for the longest distance
+
             let mut this_is_longest: bool;
+            let (mut p1, mut p2);
             for (nid1, results_from_nid1) in receiver.iter() {
-                this_is_longest = false; // should we save the graph of distances?
-                for (nid2, (prev_nid, dist)) in results_from_nid1.iter() {
-                    if prev_nid.is_some()
-                        && longest_summary
-                            .map_or(true, |(_, _, _, dist2)| dist2 < dist.into_inner())
-                    {
+                p1 = nodeid_pos.lock().unwrap().get(nid1).unwrap();
+                this_is_longest = false; // should we save this graph, because it's the longest
+
+                for (nid2, (prev_nid, dist)) in results_from_nid1.iter().filter(|x| x.0 != nid1) {
+                    // TODO continue if nid1 > nid2?
+                    if longest_summary.map_or(false, |(_, _, _, dist_longest_so_far)| {
+                        dist.into_inner() < dist_longest_so_far
+                    }) {
+                        // this path is not longer than the previous longest we've accepted. So
+                        // skip it
+                        continue;
+                    }
+
+                    if let Some(max_sinuosity) = max_sinuosity {
+                        // we only include it if the sinuosity is not too long
+                        // get local id for the node ids
+                        p2 = nodeid_pos.lock().unwrap().get(nid2).unwrap();
+                        let dist_path = dist.into_inner() as f64;
+                        let dist_ends = haversine_m(p1.1, p1.0, p2.1, p2.0);
+                        if (dist_path / dist_ends) <= max_sinuosity {
+                            longest_summary = Some((*nid1, *nid2, *prev_nid, dist_path as f32));
+                            this_is_longest = true;
+                        } else {
+                            // This is path has too high a sinuosity, so skip it
+                        }
+                    } else {
+                        // we don't care about sinuosity, so save it
                         longest_summary = Some((*nid1, *nid2, *prev_nid, dist.into_inner()));
                         this_is_longest = true;
                     }
@@ -232,13 +280,15 @@ pub(crate) fn into_segments(
             old_num_edges
         );
         let old = (edges.num_edges(), edges.num_vertexes());
-        edges.contract_edges();
-        debug!(
-            "wg:{} Post-contraction. Removed {} edges and {} vertexes",
-            wg.root_wayid,
-            old.0 - edges.num_edges(),
-            old.1 - edges.num_vertexes()
-        );
+        if max_sinuosity.is_none() {
+            edges.contract_edges();
+            debug!(
+                "wg:{} Post-contraction. Removed {} edges and {} vertexes",
+                wg.root_wayid,
+                old.0 - edges.num_edges(),
+                old.1 - edges.num_vertexes()
+            );
+        }
 
         results.push(full_path);
     }
