@@ -438,9 +438,6 @@ fn bucket_bytes_write(bucket_size: i64, pos: &[Option<(i32, i32)>], output: &mut
 #[cfg(test)]
 mod test {
     use super::*;
-    fn init() {
-        let _ = env_logger::builder().is_test(true).try_init();
-    }
 
     macro_rules! test_round_trip {
         ( $name:ident, $bucket_shift: expr, $input:expr ) => {
@@ -478,6 +475,9 @@ mod test {
     );
     test_round_trip!(test6, 2, vec![None, None, None, Some((1, 1))]);
 
+    //fn init() {
+    //    let _ = env_logger::builder().is_test(true).try_init();
+    //}
     //#[test]
     //fn real_life() {
     //    init();
