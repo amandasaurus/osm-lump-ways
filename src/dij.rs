@@ -106,7 +106,9 @@ pub(crate) fn into_segments(
             );
         }
 
+        // Current longest route. (startnid, endnid, prevnid, distance)
         let mut longest_summary: Option<(i64, i64, Option<i64>, f32)> = None;
+        // The actual graph of the longest
         let mut longest_graph: Option<HashMap<i64, (Option<i64>, OrderedFloat<f32>)>> = None;
         log!(
             if edges.len() > 10_000 { Debug } else { Trace },
@@ -303,6 +305,9 @@ pub(crate) fn into_segments(
     Ok(results)
 }
 
+/// Does a single Dijkstra search from start_idx to all vertexes.
+/// return a hashmap for each other vertex in the graph, with the previous node to go to (if
+/// applicable) and the total distance.
 fn dij_single(
     start_idx: i64,
     edges: &UndirectedAdjGraph<i64, f32>,
