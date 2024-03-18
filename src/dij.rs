@@ -6,6 +6,26 @@ use ordered_float::OrderedFloat;
 use std::collections::BinaryHeap;
 use way_group::WayGroup;
 
+#[derive(Clone, Debug, Default)]
+pub(crate) enum SplitPathsMethod {
+    #[default]
+    LongestPath,
+    AsCrowFlies,
+}
+
+impl std::str::FromStr for SplitPathsMethod {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.trim();
+        match s {
+            "longest_path" => Ok(SplitPathsMethod::LongestPath),
+            "crow_flies" => Ok(SplitPathsMethod::AsCrowFlies),
+            _ => Err("Unknown value".to_string()),
+        }
+    }
+}
+
 fn min_max<T: PartialOrd>(a: T, b: T) -> (T, T) {
     if a < b {
         (a, b)
@@ -20,6 +40,7 @@ pub(crate) fn into_segments(
     min_length_m: Option<f64>,
     only_longest_n_splitted_paths: Option<usize>,
     max_sinuosity: Option<f64>,
+    split_paths_method: &SplitPathsMethod,
     splitter: &ProgressBar,
 ) -> Result<Vec<Vec<i64>>> {
     let nodeid_pos = Arc::new(Mutex::new(nodeid_pos));
@@ -133,9 +154,17 @@ pub(crate) fn into_segments(
                 this_is_longest = false; // should we save the graph of distances?
                 p1 = nodeid_pos.lock().unwrap().get(nid1).unwrap();
                 for (nid2, (prev_nid, dist)) in results_from_nid1.iter().filter(|x| x.0 != nid1) {
+                    p2 = nodeid_pos.lock().unwrap().get(nid2).unwrap();
+                    let dist_path = dist.into_inner();
+                    let dist_ends = haversine_m(p1.1, p1.0, p2.1, p2.0) as f32;
+                    let relevant_distance = match split_paths_method {
+                        SplitPathsMethod::LongestPath => dist_path,
+                        SplitPathsMethod::AsCrowFlies => dist_ends,
+                    };
+
                     // TODO continue if nid1 > nid2?
                     if longest_summary.map_or(false, |(_, _, _, dist_longest_so_far)| {
-                        dist.into_inner() < dist_longest_so_far
+                        relevant_distance < dist_longest_so_far
                     }) {
                         // this path is not longer than the previous longest we've accepted. So
                         // skip it
@@ -149,14 +178,14 @@ pub(crate) fn into_segments(
                         let dist_path = dist.into_inner() as f64;
                         let dist_ends = haversine_m(p1.1, p1.0, p2.1, p2.0);
                         if (dist_path / dist_ends) <= max_sinuosity {
-                            longest_summary = Some((*nid1, *nid2, *prev_nid, dist_path as f32));
+                            longest_summary = Some((*nid1, *nid2, *prev_nid, relevant_distance));
                             this_is_longest = true;
                         } else {
                             // This is path has too high a sinuosity, so skip it
                         }
                     } else {
                         // we don't care about sinuosity, so save it
-                        longest_summary = Some((*nid1, *nid2, *prev_nid, dist.into_inner()));
+                        longest_summary = Some((*nid1, *nid2, *prev_nid, relevant_distance));
                         this_is_longest = true;
                     }
                 }
@@ -186,10 +215,19 @@ pub(crate) fn into_segments(
                 p1 = nodeid_pos.lock().unwrap().get(nid1).unwrap();
                 this_is_longest = false; // should we save this graph, because it's the longest
 
+                // TODO replace this with one big iterator and use `.max_by()` to get the “longest”
                 for (nid2, (prev_nid, dist)) in results_from_nid1.iter().filter(|x| x.0 != nid1) {
+                    p2 = nodeid_pos.lock().unwrap().get(nid2).unwrap();
+                    let dist_path = dist.into_inner();
+                    let dist_ends = haversine_m(p1.1, p1.0, p2.1, p2.0) as f32;
+                    let relevant_distance = match split_paths_method {
+                        SplitPathsMethod::LongestPath => dist_path,
+                        SplitPathsMethod::AsCrowFlies => dist_ends,
+                    };
+
                     // TODO continue if nid1 > nid2?
                     if longest_summary.map_or(false, |(_, _, _, dist_longest_so_far)| {
-                        dist.into_inner() < dist_longest_so_far
+                        relevant_distance < dist_longest_so_far
                     }) {
                         // this path is not longer than the previous longest we've accepted. So
                         // skip it
@@ -199,18 +237,15 @@ pub(crate) fn into_segments(
                     if let Some(max_sinuosity) = max_sinuosity {
                         // we only include it if the sinuosity is not too long
                         // get local id for the node ids
-                        p2 = nodeid_pos.lock().unwrap().get(nid2).unwrap();
-                        let dist_path = dist.into_inner() as f64;
-                        let dist_ends = haversine_m(p1.1, p1.0, p2.1, p2.0);
-                        if (dist_path / dist_ends) <= max_sinuosity {
-                            longest_summary = Some((*nid1, *nid2, *prev_nid, dist_path as f32));
+                        if (dist_path / dist_ends) <= max_sinuosity as f32 {
+                            longest_summary = Some((*nid1, *nid2, *prev_nid, relevant_distance));
                             this_is_longest = true;
                         } else {
                             // This is path has too high a sinuosity, so skip it
                         }
                     } else {
                         // we don't care about sinuosity, so save it
-                        longest_summary = Some((*nid1, *nid2, *prev_nid, dist.into_inner()));
+                        longest_summary = Some((*nid1, *nid2, *prev_nid, relevant_distance));
                         this_is_longest = true;
                     }
                 }
@@ -308,7 +343,7 @@ pub(crate) fn into_segments(
 
 /// Does a single Dijkstra search from start_idx to all vertexes.
 /// return a hashmap for each other vertex in the graph, with the previous node to go to (if
-/// applicable) and the total distance.
+/// applicable) and the total distance along the path
 fn dij_single(
     start_idx: i64,
     edges: &UndirectedAdjGraph<i64, f32>,

@@ -488,7 +488,7 @@ fn main() -> Result<()> {
 
             trace!("wg:{} splitting the groups into single paths with Dij algorithm... wg.num_nodeids() = {}", way_group.root_wayid, way_group.num_nodeids());
             let started = Instant::now();
-            let paths = match dij::into_segments(&way_group, &nodeid_pos, args.min_length_m, args.only_longest_n_splitted_paths, args.max_sinuosity, &splitter) {
+            let paths = match dij::into_segments(&way_group, &nodeid_pos, args.min_length_m, args.only_longest_n_splitted_paths, args.max_sinuosity, &args.split_into_single_paths_by, &splitter) {
                 Ok(paths) => {
                     let duration = started.elapsed().as_secs_f64();
                     log!(

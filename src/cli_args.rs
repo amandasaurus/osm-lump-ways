@@ -2,6 +2,7 @@ use clap::Parser;
 use clap_verbosity_flag::Verbosity;
 use std::path::PathBuf;
 
+use crate::dij::SplitPathsMethod;
 use crate::tagfilter;
 use crate::taggrouper;
 
@@ -114,6 +115,10 @@ pub(crate) struct Args {
     /// After grouping the ways, split based on longest linear paths
     #[arg(long)]
     pub split_into_single_paths: bool,
+
+    /// After grouping the ways, split based on longest linear paths
+    #[arg(long, default_value = "longest_path")]
+    pub split_into_single_paths_by: SplitPathsMethod,
 
     /// Only procoess way groups which include these way ids
     #[arg(long)]

@@ -6,6 +6,10 @@
   included in results.
 * New: `--max-sinuosity`: when splitting into paths, only include paths where
   the sinuosity is below this.
+* New: `--split-into-single-paths-by crow_flies`: Groups can now be split into
+  single paths based on the longest distance between end points, as well as the
+  older longest path option. This works well for finding the longest path in a
+  motorway network.
 
 ## v0.22.0 (2024-03-10)
 
