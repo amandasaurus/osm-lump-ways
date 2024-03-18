@@ -3,7 +3,10 @@ use clap::Parser;
 use get_size::GetSize;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressIterator, ProgressStyle};
 use indicatif_log_bridge::LogWrapper;
-use log::{debug, error, info, trace, warn};
+use log::{
+    debug, error, info, log, trace, warn,
+    Level::{Debug, Trace},
+};
 use osmio::prelude::*;
 use osmio::OSMObjBase;
 use rayon::prelude::*;
@@ -13,6 +16,7 @@ use std::io::Write;
 use std::path::Path;
 use std::time::Instant;
 
+use std::cmp::Ordering;
 use std::sync::atomic::{AtomicI64, Ordering as atomic_Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -31,8 +35,8 @@ mod haversine;
 #[path = "../tagfilter.rs"]
 mod tagfilter;
 use haversine::haversine_m;
-//#[path = "../dij.rs"]
-//mod dij;
+#[path = "../dij.rs"]
+mod dij;
 #[path = "../graph.rs"]
 mod graph;
 use graph::DirectedGraphTrait;
@@ -46,6 +50,8 @@ use btreemapsplitkey::BTreeMapSplitKey;
 mod kosaraju;
 #[path = "../taggrouper.rs"]
 mod taggrouper;
+#[path = "../way_group.rs"]
+mod way_group;
 
 #[path = "../fileio.rs"]
 mod fileio;

@@ -1,9 +1,10 @@
-#![allow(clippy::type_complexity)]
+#![allow(clippy::type_complexity, dead_code)]
 use super::*;
 use anyhow::Result;
 use graph::UndirectedAdjGraph;
 use ordered_float::OrderedFloat;
 use std::collections::BinaryHeap;
+use way_group::WayGroup;
 
 fn min_max<T: PartialOrd>(a: T, b: T) -> (T, T) {
     if a < b {
