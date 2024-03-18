@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.23.0 (2024-03-18)
+
 * When splitting into paths, the sinuosity value of the path is calculated &
   included in results.
 * New: `--max-sinuosity`: when splitting into paths, only include paths where
