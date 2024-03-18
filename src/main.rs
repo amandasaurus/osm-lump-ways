@@ -548,12 +548,12 @@ fn main() -> Result<()> {
         way_group.extra_json_props["num_nodes"] = way_group.num_nodeids().into();
         if args.split_into_single_paths {
             let line = &way_group.coords.as_ref().unwrap()[0];
-            let dist = haversine_m(line[0].0, line[0].1, line.last().unwrap().0, line.last().unwrap().1);
-            way_group.extra_json_props["dist_ends_m"] = dist.into();
-            way_group.extra_json_props["dist_ends_m_int"] = (dist.round() as i64).into();
-            way_group.extra_json_props["dist_ends_km"] = (dist/1000.).into();
-            way_group.extra_json_props["dist_ends_km_int"] = ((dist/1000.).round() as i64).into();
-            way_group.extra_json_props["sinuosity"] = way_group.length_m.map(|l| l/dist).into();
+            let dist_ends = haversine_m(line[0].0, line[0].1, line.last().unwrap().0, line.last().unwrap().1);
+            way_group.extra_json_props["dist_ends_m"] = dist_ends.into();
+            way_group.extra_json_props["dist_ends_m_int"] = (dist_ends.round() as i64).into();
+            way_group.extra_json_props["dist_ends_km"] = (dist_ends/1000.).into();
+            way_group.extra_json_props["dist_ends_km_int"] = ((dist_ends/1000.).round() as i64).into();
+            way_group.extra_json_props["sinuosity"] = way_group.length_m.map(|l| l/dist_ends).into();
         }
 
     })
