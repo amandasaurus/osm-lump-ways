@@ -138,7 +138,7 @@ pub(crate) struct Args {
     /// that make up this group. Each is a JSON string "w123" (i.e. /^w[0-9]+$/), the same format
     /// `osmium getid` accepts.
     ///
-    #[arg(long, action=clap::ArgAction::SetTrue, default_value = "false", aliases=["incl-way-ids", "include-wayids", "include-way-ids"])]
+    #[arg(long, action=clap::ArgAction::SetTrue, default_value = "false", aliases=["incl-way-ids", "include-wayids", "include-way-ids"], conflicts_with="split_into_single_paths")]
     pub incl_wayids: bool,
 
     /// Rather than save one MultiLineString per group, save it as many smaller linestrings,
