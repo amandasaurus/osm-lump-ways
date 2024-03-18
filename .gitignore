@@ -5,6 +5,8 @@
 /*.osm.pbf
 /*.pmtiles
 /*.pmtiles-journal
+/*.png
+/*.pgw
 /*.qgz
 /blog-posts/*
 /target
