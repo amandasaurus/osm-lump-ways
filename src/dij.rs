@@ -6,24 +6,11 @@ use ordered_float::OrderedFloat;
 use std::collections::BinaryHeap;
 use way_group::WayGroup;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, clap::ValueEnum)]
 pub(crate) enum SplitPathsMethod {
     #[default]
     LongestPath,
     AsCrowFlies,
-}
-
-impl std::str::FromStr for SplitPathsMethod {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = s.trim();
-        match s {
-            "longest_path" => Ok(SplitPathsMethod::LongestPath),
-            "crow_flies" => Ok(SplitPathsMethod::AsCrowFlies),
-            _ => Err("Unknown value".to_string()),
-        }
-    }
 }
 
 fn min_max<T: PartialOrd>(a: T, b: T) -> (T, T) {

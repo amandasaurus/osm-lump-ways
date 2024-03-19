@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* `--split-into-single-paths-by` value changed to `longest-path`, `as-crow-flies`
+
 ## v0.23.0 (2024-03-18)
 
 * When splitting into paths, the sinuosity value of the path is calculated &
