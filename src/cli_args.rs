@@ -116,8 +116,13 @@ pub(crate) struct Args {
     #[arg(long)]
     pub split_into_single_paths: bool,
 
-    /// After grouping the ways, split based on longest linear paths
-    #[arg(long, default_value = "longest_path")]
+    /// When splitting into single paths, how are the “largest” decided
+    /// `longest-path`: Longest path along the graph
+    /// `as-crow-flies`: Path between the 2 points that are furthest apart.
+    /// The `longest-path` for motorways can produce technically correct, but unwanted, results by
+    /// going up one lane of the motorway, and then down the other side. Here, `as-crow-flies` is
+    /// often what people expect.
+    #[arg(long, requires="split_into_single_paths")]
     pub split_into_single_paths_by: SplitPathsMethod,
 
     /// Only procoess way groups which include these way ids
