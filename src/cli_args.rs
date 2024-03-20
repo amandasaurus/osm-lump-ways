@@ -122,7 +122,7 @@ pub(crate) struct Args {
     /// The `longest-path` for motorways can produce technically correct, but unwanted, results by
     /// going up one lane of the motorway, and then down the other side. Here, `as-crow-flies` is
     /// often what people expect.
-    #[arg(long, requires="split_into_single_paths")]
+    #[arg(long, requires = "split_into_single_paths")]
     pub split_into_single_paths_by: SplitPathsMethod,
 
     /// Only procoess way groups which include these way ids
