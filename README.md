@@ -40,6 +40,52 @@ be mapped as many different ways. `osm-lump-ways` will assemble them all togethe
 
 Run with `--help` to see all options.
 
+# Filtering OSM Data
+
+There are 2 ways to select which OSM ways will be used. All relations are currently ignored.
+
+## Tag Filter Rules
+
+* `key` / `∃key`  way has this tag
+* `~key_regex` / `∃~key_regex`  There is a key, which matches this regex.
+* `∄key`  way does not has this key
+* `key=value`  way has this key and this value
+* `key≠value`  way either doesn't have this key, or if it does, it's not equal to value
+* `key∈value1,value2,…`  way has this key and the value is one of these
+* `key∉value1,value2,…`  way either doesn't have this key,
+   or if it does, it's not one of these values
+* `key~regex` way has this key and the value matches this regex.
+* `F1∨F2∨F3…` logical OR of the other tag filters F1, F2, …
+* `F1∧F2∧F3…` logical AND of the other tag filters F1, F2, …
+
+The popular [`regex` crate](https://docs.rs/regex/latest/regex/) is used for
+matching. Regexes, and string comparison, are case sensitive. Add `(?i)` at
+start of regex to switch to case insensitive (e.g. `name~(?i).* street`)
+Regexes match the whole value, `name~[Ss]treet` will match `Street` or
+`street`, but not `Main Street North` nor `Main Street`. Use
+`name~.*[Ss]treet.*` to match all.
+
+## Simple Tag Filtering
+
+The `-f`/`--tag-filter` can be specified one or more times, and an OSM object
+is only included if it matches *all* defined filter's, i.e. a logical
+AND of all filters.
+
+* `-f highway`: Only ways with a `highway` tag are included
+* `-f highway -f name`: Only ways with a `highway` *and* `name` tag are included.
+* `-f highway -f ∄name`: Only ways with a `highway` *and* without a `name` tag are included.
+
+## More complex Tag Filtering Functions
+
+The `-F`/`--tag-filter-func` takes a single ordered list of tag filters (separated by `;`),
+and includes (with `→T`), or excludes (with `→F`), the OSM object based
+on the _first_ filter function which matches. A bare `T` or `F` applies to all.
+
+Example: We want to include all `waterways`. But not `waterway=canal`. But we
+want a `waterway=canal` iff it also has a `lock=yes` tag.
+
+`-F "waterway=canal∧lock=yes→T; waterway=canal→F; waterway→T; F`
+
 # Examples of usage
 
 * [WaterwayMap.org](https://waterwaymap.org)
