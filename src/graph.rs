@@ -330,20 +330,31 @@ where
         assert!(
             self.edges[&a][v].0 + self.edges[v][&b].0 == self.edges[&b][v].0 + self.edges[&v][&a].0
         );
-        let mut edge_a_v = self.edges.get_mut(&a).unwrap().remove(v).unwrap();
+        let edge_a_v = self.edges.get_mut(&a).unwrap().remove(v).unwrap();
         let _edge_b_v = self.edges.get_mut(&b).unwrap().remove(v).unwrap();
         let _edge_v_a = self.edges.get_mut(v).unwrap().remove(&a).unwrap();
         let mut edge_v_b = self.edges.get_mut(v).unwrap().remove(&b).unwrap();
         assert!(self.edges[v].is_empty());
         self.edges.remove(v);
         let new_weight = edge_a_v.0 + edge_v_b.0;
-        let mut a_b_intermediates: Vec<V> = vec![];
-        a_b_intermediates.append(&mut edge_a_v.1);
-        a_b_intermediates.push(*v);
-        a_b_intermediates.append(&mut edge_v_b.1);
-        let new_edge_a_b = (new_weight, a_b_intermediates);
-        let mut new_edge_b_a = new_edge_a_b.clone();
-        new_edge_b_a.1.reverse();
+
+        // We need 2 new Vecs for the a→b & b→a intermediates. Rather than create new Vec, here we
+        // reuse the vecs from a→v & v→b (which we have already `.remove`'ed above). This reduces
+        // allocations, and might speed up the code.
+        let (_weight_a_v, mut new_a_b_intermediates) = edge_a_v;
+        new_a_b_intermediates.reserve(1+edge_v_b.1.len());
+        new_a_b_intermediates.push(*v);
+        new_a_b_intermediates.append(&mut edge_v_b.1);
+
+        let (_weight_v_b, mut new_b_a_intermediates) = edge_v_b;
+        // New b_a Vec needs to be as big as a_b. Resize with default value of v for now (it'll be
+        // overwritten later)
+        new_b_a_intermediates.resize(new_a_b_intermediates.len(), *v);
+        new_b_a_intermediates.copy_from_slice(&new_a_b_intermediates);
+        new_b_a_intermediates.reverse();
+
+        let new_edge_a_b = (new_weight, new_a_b_intermediates);
+        let new_edge_b_a = (new_weight, new_b_a_intermediates);
 
         self.edges.get_mut(&a).unwrap().insert(b, new_edge_a_b);
         self.edges.get_mut(&b).unwrap().insert(a, new_edge_b_a);
