@@ -18,7 +18,7 @@ impl WayGroup {
             group,
             root_wayid: root_wayid.into(),
             extra_json_props: serde_json::from_str("{}").unwrap(),
-            .. Default::default()
+            ..Default::default()
         }
     }
 
