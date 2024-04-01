@@ -32,9 +32,7 @@ pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
     fn contains_nid(&self, nid: &i64) -> bool;
 
     /// Return all the ways that this node is in.
-    /// Current version of rust can't support returning impl Iterator here, and this is a source of
-    /// lots of allocations. 🙁
-    fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = i64> + 'a>;
+    fn ways(&self, nid: &i64) -> impl Iterator<Item = i64>;
 
     // returns true iff this node id is in >1 way
     fn nid_is_in_many(&self, nid: &i64) -> bool;
@@ -110,7 +108,7 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
         self.multiples.contains_key(nid)
     }
 
-    fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = i64> + 'a> {
+    fn ways(&self, nid: &i64) -> Box<dyn Iterator<Item = i64> + '_> {
         if let Some(wid) = self.singles.get(nid) {
             Box::new(std::iter::once(*wid))
         } else if let Some(wids) = self.multiples.get(nid) {
@@ -331,7 +329,7 @@ impl NodeIdWayIds for NodeIdWayIdsBucketWayIndex {
     }
 
     /// Return all the ways that this node is in.
-    fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = i64> + 'a> {
+    fn ways(&self, nid: &i64) -> Box<dyn Iterator<Item = i64> + '_> {
         Box::new(self.ways_for_nid(nid))
     }
 }
@@ -433,7 +431,7 @@ impl NodeIdWayIds for NodeIdWayIdsAuto {
     }
 
     /// Return all the ways that this node is in.
-    fn ways<'a>(&'a self, nid: &i64) -> Box<dyn Iterator<Item = i64> + 'a> {
+    fn ways(&self, nid: &i64) -> Box<dyn Iterator<Item = i64> + '_> {
         match self {
             Self::MultiMap(x) => x.ways(nid),
             Self::BucketMap(x) => x.ways(nid),
