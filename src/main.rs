@@ -266,6 +266,7 @@ fn main() -> Result<()> {
     //let reader = osmio::stringpbf::PBFNodePositionReader::from_reader(input_fp);
 
     debug!("Re-reading file to read all nodes");
+    let started_reading_nodes = Instant::now();
     let setting_node_pos = progress_bars.add(
         ProgressBar::new(nodeid_wayids.len() as u64)
             .with_message("Nodes read")
@@ -290,6 +291,12 @@ fn main() -> Result<()> {
 
     setting_node_pos.finish();
     progress_bars.remove(&setting_node_pos);
+    info!(
+        "Finshed reading all node positions. {} nodes read in {}, {:.3e} nodes/sec",
+        setting_node_pos.position().to_formatted_string(&Locale::en),
+        formatting::format_duration(started_reading_nodes.elapsed()),
+        (setting_node_pos.position() as f64) / started_reading_nodes.elapsed().as_secs_f64(),
+    );
 
     debug!("{}", nodeid_pos.detailed_size());
 
