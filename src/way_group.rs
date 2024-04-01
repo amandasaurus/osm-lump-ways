@@ -68,7 +68,7 @@ impl WayGroup {
     pub fn coords_iter_par(&self) -> impl rayon::prelude::ParallelIterator<Item = [f64; 2]> + '_ {
         self.coords
             .as_ref()
-            .expect("You called WayGroup::coords_iter_seq before you have set the coords for this waygroup")
+            .expect("You called WayGroup::coords_iter_par before you have set the coords for this waygroup")
             .par_iter()
             .flat_map(|coord_string| coord_string.par_iter().map(|c| [c.0, c.1]))
     }
