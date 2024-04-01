@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use super::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct WayGroup {
     pub root_wayid: i64,
     pub way_ids: Vec<i64>,
@@ -15,13 +15,10 @@ pub struct WayGroup {
 impl WayGroup {
     pub fn new(root_wayid: impl Into<i64>, group: Vec<Option<String>>) -> Self {
         WayGroup {
-            root_wayid: root_wayid.into(),
-            way_ids: vec![],
-            nodeids: vec![],
-            length_m: None,
-            coords: None,
-            extra_json_props: serde_json::from_str("{}").unwrap(),
             group,
+            root_wayid: root_wayid.into(),
+            extra_json_props: serde_json::from_str("{}").unwrap(),
+            .. Default::default()
         }
     }
 
