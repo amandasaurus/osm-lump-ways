@@ -194,6 +194,7 @@ fn main() -> Result<()> {
         ),
     );
 
+    let started_reading_ways = Instant::now();
     reader
         .ways()
         .par_bridge()
@@ -227,9 +228,12 @@ fn main() -> Result<()> {
                 ways_added.inc(1);
             },
         );
+    let num_ways_read = ways_added.position();
     info!(
-        "Finished reading file. {} ways read.",
-        ways_added.position().to_formatted_string(&Locale::en)
+        "Finshed first read of file. {} ways read in {}, {:.3e} ways/sec",
+        num_ways_read.to_formatted_string(&Locale::en),
+        formatting::format_duration(started_reading_ways.elapsed()),
+        (num_ways_read as f64) / started_reading_ways.elapsed().as_secs_f64(),
     );
     ways_added.finish();
     progress_bars.remove(&ways_added);
