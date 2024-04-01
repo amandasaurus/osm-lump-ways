@@ -3,6 +3,7 @@
 ## Unreleased
 
 * `--split-into-single-paths-by` value changed to `longest-path`, `as-crow-flies`
+* Internal refactoring to attempt to speed up, and print more statistics.
 
 ## v0.23.0 (2024-03-18)
 
