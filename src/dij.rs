@@ -27,7 +27,7 @@ pub(crate) fn into_segments(
     min_length_m: Option<f64>,
     only_longest_n_splitted_paths: Option<usize>,
     max_sinuosity: Option<f64>,
-    split_paths_method: &SplitPathsMethod,
+    split_paths_method: SplitPathsMethod,
     splitter: &ProgressBar,
 ) -> Result<Vec<Vec<i64>>> {
     let nodeid_pos = Arc::new(Mutex::new(nodeid_pos));

@@ -124,7 +124,7 @@ pub(crate) struct Args {
     /// going up one lane of the motorway, and then down the other side. Here, `as-crow-flies` is
     /// often what people expect.
     #[arg(long, requires = "split_into_single_paths")]
-    pub split_into_single_paths_by: SplitPathsMethod,
+    pub split_into_single_paths_by: Option<SplitPathsMethod>,
 
     /// Only procoess way groups which include these way ids
     #[arg(long)]
