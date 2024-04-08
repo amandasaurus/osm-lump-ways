@@ -342,7 +342,7 @@ where
         // reuse the vecs from a→v & v→b (which we have already `.remove`'ed above). This reduces
         // allocations, and might speed up the code.
         let (_weight_a_v, mut new_a_b_intermediates) = edge_a_v;
-        new_a_b_intermediates.reserve(1+edge_v_b.1.len());
+        new_a_b_intermediates.reserve(1 + edge_v_b.1.len());
         new_a_b_intermediates.push(*v);
         new_a_b_intermediates.append(&mut edge_v_b.1);
 
