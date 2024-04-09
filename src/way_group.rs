@@ -1,5 +1,14 @@
-#![allow(dead_code)]
+#![allow(dead_code, unused_imports)]
 use super::*;
+use geo::algorithm::convex_hull::qhull::quick_hull;
+use geo::{
+    algorithm::convex_hull::ConvexHull,
+    geometry::{Coord, MultiPoint, Point},
+    CoordsIter,
+};
+use graph::UndirectedAdjGraph;
+use ordered_float::OrderedFloat;
+use std::collections::HashSet;
 
 #[derive(Debug, Clone, Default)]
 pub struct WayGroup {
@@ -254,6 +263,101 @@ impl WayGroup {
             old_num_nodeids.abs_diff(self.nodeids.len()) / 1_000,
         );
     }
+
+    /// Calculate the frames for this way group
+    pub fn frames(
+        &self,
+        nodeid_pos: &impl NodeIdPosition,
+        furthest_path_bar: &ProgressBar,
+    ) -> Vec<Vec<(f64, f64)>> {
+        let mut all_nodes_pos: Vec<Coord<f64>> = self
+            .coords_iter_par()
+            .map(|c| Coord { x: c[0], y: c[1] })
+            .collect();
+        all_nodes_pos.dedup();
+        let chull = quick_hull(&mut all_nodes_pos).into_inner();
+        //info!("Calculated convex hull from {} points in total to {} in c. hull (∆ {})", all_nodes_pos.len(), chull.len(), all_nodes_pos.len()-chull.len());
+        drop(all_nodes_pos);
+        let mut chull: Vec<(f64, f64)> = chull.into_iter().map(|c| (c.x, c.y)).collect();
+        chull.sort_by_key(|(x, y)| (OrderedFloat(*x), OrderedFloat(*y)));
+        chull.dedup();
+        furthest_path_bar.inc_length((chull.len() * (chull.len() + 1) / 2) as u64);
+
+        let mut convex_hull_nodes: Vec<_> = self
+            .nodeids_iter()
+            .filter_map(|n| {
+                let p = nodeid_pos.get(n).unwrap();
+                if chull.contains(&p) {
+                    Some((*n, p))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        //assert_eq!(convex_hull_nodes.len(), chull.len());
+        convex_hull_nodes.sort_by_key(|(n, _)| *n);
+
+        let mut edges = UndirectedAdjGraph::new();
+        for node_seq in self.nodeids.iter() {
+            for win in node_seq.windows(2) {
+                edges.set(
+                    &win[0],
+                    &win[1],
+                    haversine::haversine_m_fpair(
+                        nodeid_pos.get(&win[0]).unwrap(),
+                        nodeid_pos.get(&win[1]).unwrap(),
+                    ),
+                );
+            }
+        }
+
+        // Contract edges, but never remove the vertexes that we later want to route on
+        edges.contract_edges_some(|v| !convex_hull_nodes.iter().any(|(n, _)| v == n));
+
+        // path_results is a graph that has a vertex if there is a shortest path that goes this
+        // way.
+        // This is binary. there is or isn't a connection between the 2 nodes. If we stored the
+        // total number (or length) of paths through each vertex, then we can get closer to
+        // Betweenness Centrality. That's a potential task for later.
+        // This saves much less space than storing the full paths for each connection.
+        let path_results = Arc::new(Mutex::new(UndirectedAdjGraph::new()));
+        convex_hull_nodes
+            .par_iter()
+            .enumerate()
+            .for_each(|(i, source)| {
+                let these_results = dij::paths_one_to_many(
+                    *source,
+                    &convex_hull_nodes[(i + 1)..],
+                    nodeid_pos,
+                    &edges,
+                );
+                these_results.for_each_with(path_results.clone(), |path_results, (_ends, path)| {
+                    furthest_path_bar.inc(1);
+                    let mut path_results = path_results.lock().unwrap();
+                    for win in path.windows(2) {
+                        path_results.set(&win[0], &win[1], 0u8);
+                    }
+                });
+            });
+        let mut path_graph = Arc::into_inner(path_results).unwrap().into_inner().unwrap();
+
+        // We have lots of little segments, nid1-nid2. We turn these into sensible lines, by
+        // contracting that graph and then saving all the linestrings that come out of it.
+        path_graph.contract_edges();
+
+        // turn each of the vertexes (in the contracted graph) into a series of lines.
+        let results = path_graph
+            .get_all_contracted_edges()
+            .map(|(_dummy_weight, nids)| {
+                let nids = nids.collect::<Vec<_>>();
+                nids.par_iter()
+                    .map(|nid| nodeid_pos.get(nid).unwrap())
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        results
+    }
 }
 
 impl PartialEq for WayGroup {
@@ -274,5 +378,13 @@ impl Ord for WayGroup {
             (Some(a), Some(b)) => a.total_cmp(&b).reverse(),
             _ => self.root_wayid.cmp(&other.root_wayid),
         }
+    }
+}
+
+fn min_max<T: PartialOrd>(a: T, b: T) -> (T, T) {
+    if a < b {
+        (a, b)
+    } else {
+        (b, a)
     }
 }
