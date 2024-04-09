@@ -244,7 +244,7 @@ impl NodeIdWayIdsBucketWayIndex {
         bucket
     }
 
-    fn ways_for_nid<'a>(&'a self, nid: &i64) -> impl Iterator<Item = i64> + 'a {
+    fn ways_for_nid(&self, nid: &i64) -> impl Iterator<Item = &i32> {
         let nid = *nid;
         let bucketid = self.nodeid_bucket(nid);
         self.nodeid_bucket_wayid
@@ -257,7 +257,6 @@ impl NodeIdWayIdsBucketWayIndex {
                     // possible
                     .any(|this_nid| this_nid == nid)
             })
-            .map(|wid| (*wid).into())
     }
 }
 
@@ -325,12 +324,13 @@ impl NodeIdWayIds for NodeIdWayIdsBucketWayIndex {
     }
 
     fn nid_is_in_many(&self, nid: &i64) -> bool {
+        // Ask for the ways this nid is in, and check there are >1
         self.ways_for_nid(nid).nth(1).is_some()
     }
 
     /// Return all the ways that this node is in.
     fn ways(&self, nid: &i64) -> Box<dyn Iterator<Item = i64> + '_> {
-        Box::new(self.ways_for_nid(nid))
+        Box::new(self.ways_for_nid(nid).map(|wid32| (*wid32).into()))
     }
 }
 
