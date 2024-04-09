@@ -65,6 +65,10 @@ impl WayGroup {
         self.nodeids.par_iter().flat_map(|nids| nids.par_iter())
     }
 
+    pub fn nodeids_iter_seq(&self) -> impl Iterator<Item = &i64> + '_ {
+        self.nodeids.iter().flat_map(|nids| nids.iter())
+    }
+
     pub fn coords_iter_par(&self) -> impl rayon::prelude::ParallelIterator<Item = [f64; 2]> + '_ {
         self.coords
             .as_ref()
