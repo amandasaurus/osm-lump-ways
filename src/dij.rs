@@ -2,6 +2,7 @@
 use super::*;
 use anyhow::Result;
 use graph::UndirectedAdjGraph;
+use haversine::haversine_m_fpair;
 use ordered_float::OrderedFloat;
 use std::collections::BinaryHeap;
 use way_group::WayGroup;
@@ -396,6 +397,143 @@ fn dij_single(
     );
 
     results
+}
+
+/// Does a single A* search from start_idx to a set of other vertexes
+pub(crate) fn paths_one_to_many<'a>(
+    start: (i64, (f64, f64)),
+    targets: &'a [(i64, (f64, f64))],
+    nodeid_pos: &'a impl NodeIdPosition,
+    edges: &'a UndirectedAdjGraph<i64, f64>,
+) -> impl ParallelIterator<Item = ((i64, i64), Vec<i64>)> + 'a {
+    //let mut path_results = HashMap::with_capacity(targets.len());
+    let (start_idx, start_pos) = start;
+
+    assert!(edges.contains_vertex(&start_idx));
+    assert!(targets
+        .par_iter()
+        .map(|(i, _)| i)
+        .all(|i| edges.contains_vertex(i)));
+
+    // TODO keep best_dist_prev between each targetted run
+
+    //let mut results = Vec::with_capacity(targets.len());
+
+    targets.par_iter().map(move |(target_idx, target_pos)| {
+        let mut frontier = BinaryHeap::new();
+        let mut best_dist_prev: HashMap<i64, (OrderedFloat<f64>, i64)> = HashMap::new();
+        best_dist_prev.clear();
+        best_dist_prev.insert(start_idx, (OrderedFloat(0.), start_idx));
+        frontier.clear();
+        frontier.push((
+            OrderedFloat(-haversine_m_fpair(start_pos, *target_pos) + 0.),
+            OrderedFloat(-0.),
+            start_idx,
+            (OrderedFloat(start_pos.0), OrderedFloat(start_pos.1)),
+        ));
+
+        let mut this_luft_dist = Default::default();
+        let mut neighbor_pos_raw = Default::default();
+        let mut neighbor_pos = Default::default();
+        let mut this_path_dist;
+
+        while let Some((_est_dist, mut curr_path_dist, curr_id, curr_pos)) = frontier.pop() {
+            //dbg!(frontier.len()+1);
+            curr_path_dist *= -1.;
+            //info!("Frontier size {}, curr_id {}, est_dist {}, curr_path_dist {}", frontier.len()+1, curr_id, _est_dist, curr_path_dist);
+            if curr_id == *target_idx {
+                assert!(
+                    best_dist_prev.contains_key(target_idx),
+                    "Something went wrong with nid {}",
+                    target_idx
+                );
+                // finished
+                break;
+            }
+            if curr_path_dist > best_dist_prev[&curr_id].0 {
+                //info!("For curr_id {}, the curr_path_dist {} > best_dist_prev {}.", curr_id, curr_path_dist, best_dist_prev[&curr_id].0);
+                // already found a shorter path to this vertex
+                continue;
+            }
+            for (neighbor_idx, edge_len) in edges.neighbors(&curr_id)
+            //.map(|(i, edge_len)| (i, edge_len, nodeid_pos.get(i).unwrap()))
+            {
+                this_path_dist = curr_path_dist + OrderedFloat(*edge_len);
+                //info!("Looking at neighbour id {}, which is {} from start", neighbor_idx, this_path_dist);
+                best_dist_prev
+                    .entry(*neighbor_idx)
+                    .and_modify(|(path_dist, prev_id)| {
+                        //info!("Current best path {}", path_dist);
+                        if this_path_dist < *path_dist {
+                            //info!("This is a shorter path");
+                            *prev_id = curr_id;
+                            *path_dist = this_path_dist;
+                            this_luft_dist = OrderedFloat(haversine_m(
+                                curr_pos.0 .0,
+                                curr_pos.1 .0,
+                                target_pos.0,
+                                target_pos.1,
+                            ));
+                            neighbor_pos_raw = nodeid_pos.get(neighbor_idx).unwrap();
+                            neighbor_pos = (
+                                OrderedFloat(neighbor_pos_raw.0),
+                                OrderedFloat(neighbor_pos_raw.1),
+                            );
+                            frontier.push((
+                                -(this_path_dist + this_luft_dist),
+                                -this_path_dist,
+                                *neighbor_idx,
+                                neighbor_pos,
+                            ));
+                        }
+                    })
+                    .or_insert_with(|| {
+                        //info!("Never seen this neighbour before, adding it to frontier");
+                        this_luft_dist = OrderedFloat(haversine_m(
+                            curr_pos.0 .0,
+                            curr_pos.1 .0,
+                            target_pos.0,
+                            target_pos.1,
+                        ));
+                        neighbor_pos_raw = nodeid_pos.get(neighbor_idx).unwrap();
+                        neighbor_pos = (
+                            OrderedFloat(neighbor_pos_raw.0),
+                            OrderedFloat(neighbor_pos_raw.1),
+                        );
+                        frontier.push((
+                            -(this_path_dist + this_luft_dist),
+                            -this_path_dist,
+                            *neighbor_idx,
+                            neighbor_pos,
+                        ));
+                        (this_path_dist, curr_id)
+                    });
+            }
+        }
+        assert!(
+            best_dist_prev.contains_key(target_idx),
+            "Something went wrong with nid {}",
+            target_idx
+        );
+
+        let mut contracted_path = Vec::new();
+        contracted_path.push(*target_idx);
+        while *contracted_path.last().unwrap() != start_idx {
+            contracted_path.push(best_dist_prev[contracted_path.last().unwrap()].1);
+        }
+        contracted_path.reverse();
+
+        let mut path = Vec::with_capacity(contracted_path.len());
+        path.push(contracted_path[0]);
+        for w in contracted_path.windows(2) {
+            path.extend(edges.get_intermediates(&w[0], &w[1]).unwrap().iter());
+            path.push(w[1]);
+        }
+
+        ((start_idx, *target_idx), path)
+    })
+    //.collect_into_vec(&mut results);
+    //results.into_iter()
 }
 
 ///// Return the first cycle we find, starting at this vertex
