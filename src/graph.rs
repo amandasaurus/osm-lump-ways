@@ -363,6 +363,11 @@ where
     }
 
     pub fn contract_edges(&mut self) {
+        self.contract_edges_some(|_| true)
+    }
+
+    /// Contract the edges, but only contract (remove) vertexes that return true.
+    pub fn contract_edges_some(&mut self, can_contract_vertex: impl Fn(&V) -> bool) {
         let initial_num_edges = self.num_edges();
         let initial_num_vertexes = self.num_vertexes();
         trace!(
@@ -389,6 +394,7 @@ where
             candidate_vertexes.extend(
                 self.iter_vertexes_num_neighbours()
                     .filter_map(|(v, nn)| if nn == 2 { Some(v) } else { None })
+                    .filter(|v| can_contract_vertex(v))
                     .cloned(),
             );
             if candidate_vertexes.is_empty() {
