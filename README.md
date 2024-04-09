@@ -86,6 +86,15 @@ want a `waterway=canal` iff it also has a `lock=yes` tag.
 
 `-F "waterway=canal∧lock=yes→T; waterway=canal→F; waterway→T; F`
 
+# Frames
+
+Here, a “frame” of a grouping is a shortest path through 2 points in the
+grouped together ways. This can be useful for waterways to find where a big
+group is connected.
+
+`--output-frames FILENAME.geojsons` will save these features to a file.
+GeoJSONSeq output format only.
+
 # Examples of usage
 
 * [WaterwayMap.org](https://waterwaymap.org)

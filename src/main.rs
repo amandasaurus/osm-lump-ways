@@ -18,7 +18,8 @@ use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap};
 use std::time::Instant;
 
-use std::sync::atomic::{AtomicUsize, Ordering as atomic_Ordering};
+use std::path::Path;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering as atomic_Ordering};
 use std::sync::{Arc, Mutex};
 
 //use get_size_derive::*;
@@ -125,6 +126,21 @@ fn main() -> Result<()> {
         anyhow::bail!("Unknown output format for file {:?}", args.output_filename);
     };
     debug!("Output format: {output_format:?}");
+
+    if let Some(ref frames_filepath) = args.output_frames {
+        if frames_filepath == Path::new(&args.output_filename) {
+            anyhow::bail!(
+                "Same value given for output filename & output-frames: {}",
+                frames_filepath.display()
+            );
+        }
+        if frames_filepath.exists() && !args.overwrite {
+            anyhow::bail!(
+                "Frames path filename ({}) exists and no --overwrite argument was given",
+                frames_filepath.display()
+            );
+        }
+    }
 
     #[allow(clippy::iter_nth_zero)]
     let only_these_way_groups_divmod: Option<(i64, i64)> =
@@ -489,7 +505,7 @@ fn main() -> Result<()> {
     progress_bars.remove(&reorder_segments_bar);
 
     // ↓ Split into paths if needed
-    let files_data: HashMap<_, _> = way_groups.into_par_iter()
+    let way_groups: Vec<_> = way_groups.into_par_iter()
     .flat_map(|way_group| {
         let new_way_groups = if !args.split_into_single_paths {
             vec![way_group]
@@ -566,32 +582,138 @@ fn main() -> Result<()> {
         }
 
     })
+    .collect();
 
-    // Group into files
-    .fold(
-        || HashMap::new() as HashMap<String, Vec<WayGroup>>,
-        |mut files, way_group| {
-            trace!("Grouping all data into files");
-            files.entry(way_group.filename(&args.output_filename, args.split_files_by_group))
-                .or_default()
-                .push(way_group);
-            files
-    })
-    // We might have many hashmaps now, group down to one
-    .reduce(HashMap::new,
-            |mut acc, curr| {
-                trace!("Merging files down again");
-                for (filename, wgs) in curr.into_iter() {
-                    #[allow(clippy::map_entry)]
-                    if !acc.contains_key(&filename) {
-                        acc.insert(filename, wgs);
-                    } else {
-                        acc.get_mut(&filename).unwrap().extend(wgs.into_iter());
+    if let Some(frames_filepath) = args.output_frames {
+        let skipped_way_groups_count = AtomicUsize::new(0);
+        let skipped_way_groups_length_sum = AtomicU64::new(0);
+
+        let started_frames = Instant::now();
+        info!(
+            "Calculating, for each way group, all the frames (lines through the middle){}",
+            args.frames_group_min_length_m
+                .map_or("".to_string(), |min| format!(
+                    ", and only including way groups longer than {:.3e}",
+                    min
+                ))
+        );
+        let frames_all_nodes_bar = progress_bars.add(
+            ProgressBar::new(
+                way_groups
+                    .par_iter()
+                    .map(|wg| wg.num_nodeids() as u64)
+                    .sum::<u64>(),
+            )
+            .with_message("Processing nodes for Frames")
+            .with_style(style.clone()),
+        );
+        let frames_bar = progress_bars.add(
+            ProgressBar::new(0)
+                .with_message("Calculating Frames")
+                .with_style(style.clone()),
+        );
+        // Calculate all data in parallel
+        let started_frames_calculation = Instant::now();
+        let frames: Vec<_> = way_groups
+            .par_iter()
+            .flat_map_iter(
+                |wg| -> Box<dyn Iterator<Item = (serde_json::Value, Vec<_>)>> {
+                    if let Some(min) = args.frames_group_min_length_m {
+                        if wg.length_m.unwrap() < min {
+                            skipped_way_groups_count.fetch_add(1, atomic_Ordering::SeqCst);
+                            skipped_way_groups_length_sum.fetch_add(
+                                wg.length_m.unwrap().round() as u64,
+                                atomic_Ordering::SeqCst,
+                            );
+                            frames_all_nodes_bar.inc(wg.num_nodeids() as u64);
+                            return Box::new(std::iter::empty());
+                        }
                     }
+                    //let started = Instant::now();
+                    let paths = wg.frames(&nodeid_pos, &frames_bar);
+                    frames_all_nodes_bar.inc(wg.num_nodeids() as u64);
+                    if args.save_as_linestrings {
+                        Box::new(
+                            paths
+                                .into_iter()
+                                .map(|path| (wg.extra_json_props.clone(), vec![path])),
+                        )
+                    } else {
+                        Box::new(std::iter::once((wg.extra_json_props.clone(), paths)))
+                    }
+                },
+            )
+            .collect();
+        info!(
+            "Calculated {} frames in {} ({:.3e} frames/sec)",
+            frames.len().to_formatted_string(&Locale::en),
+            formatting::format_duration(started_frames_calculation.elapsed()),
+            (frames.len() as f64) / started_frames_calculation.elapsed().as_secs_f64(),
+        );
+        if args.frames_group_min_length_m.is_some() {
+            info!(
+                "{} way groups (total length: {:.3e} m) were excluded from frame calculation",
+                skipped_way_groups_count
+                    .into_inner()
+                    .to_formatted_string(&Locale::en),
+                skipped_way_groups_length_sum.into_inner(),
+            )
+        }
+        frames_bar.finish();
+        frames_all_nodes_bar.finish();
+        progress_bars.remove(&frames_bar);
+        progress_bars.remove(&frames_all_nodes_bar);
+
+        // Then write it
+        let frames_writing_bar = progress_bars.add(
+            ProgressBar::new(frames.len() as u64)
+                .with_message(format!("Writing frames to {}", frames_filepath.display()))
+                .with_style(style.clone()),
+        );
+
+        let f = std::fs::File::create(&frames_filepath).unwrap();
+        let mut f = std::io::BufWriter::new(f);
+        let num_written = fileio::write_geojson_features_directly(
+            frames_writing_bar.wrap_iter(frames.into_iter()),
+            &mut f,
+            &OutputFormat::GeoJSONSeq,
+            &fileio::OutputGeometryType::MultiLineString,
+        )?;
+        info!(
+            "Calculated & wrote {} frames to {:?} in {}",
+            num_written.to_formatted_string(&Locale::en),
+            frames_filepath,
+            formatting::format_duration(started_frames.elapsed())
+        );
+    }
+
+    let files_data: HashMap<_, _> = way_groups
+        .into_par_iter()
+        // Group into files
+        .fold(
+            || HashMap::new() as HashMap<String, Vec<WayGroup>>,
+            |mut files, way_group| {
+                trace!("Grouping all data into files");
+                files
+                    .entry(way_group.filename(&args.output_filename, args.split_files_by_group))
+                    .or_default()
+                    .push(way_group);
+                files
+            },
+        )
+        // We might have many hashmaps now, group down to one
+        .reduce(HashMap::new, |mut acc, curr| {
+            trace!("Merging files down again");
+            for (filename, wgs) in curr.into_iter() {
+                #[allow(clippy::map_entry)]
+                if !acc.contains_key(&filename) {
+                    acc.insert(filename, wgs);
+                } else {
+                    acc.get_mut(&filename).unwrap().extend(wgs.into_iter());
                 }
-                acc
             }
-    );
+            acc
+        });
 
     files_data
         .into_par_iter()

@@ -28,7 +28,17 @@ pub(crate) struct Args {
     #[arg(short, long, value_name = "OUTPUT.geojson[s]")]
     pub output_filename: String,
 
-    /// If the output file already exists, overwrite it. By default, exit if the output already
+    /// Calculated Frames to this file. Only GeoJSONSeq output supported.
+    /// Respects the --save-as-linestrings and --frames-group-min-length-m options
+    #[arg(long, value_name = "OUTPUT.geojsons")]
+    pub output_frames: Option<PathBuf>,
+
+    /// Only generate frames for way groups which have a size larger than this length.
+    /// If not specified, the frames for every group is calculated.
+    #[arg(long, value_name = "NUMBER", requires = "output_frames")]
+    pub frames_group_min_length_m: Option<f64>,
+
+    /// If the output file(s) already exists, overwrite it. By default, exit if the output already
     /// exists
     #[arg(long)]
     pub overwrite: bool,

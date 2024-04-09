@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* New feature `--output-frames` which outputs paths through waygroups. Simple
+  way to show possible “choke points”
 * `--split-into-single-paths-by` value changed to `longest-path`, `as-crow-flies`
 * Internal refactoring to attempt to speed up, and print more statistics.
 
