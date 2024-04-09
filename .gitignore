@@ -1,5 +1,6 @@
 /*.geojson
 /*.geojsons
+/*.geojsons.zst
 /*.gpkg
 /*.mbtiles
 /*.osm.pbf
