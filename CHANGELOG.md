@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.24.0 (2024-04-09)
 
 * New feature `--output-frames` which outputs paths through waygroups. Simple
   way to show possible “choke points”
