@@ -312,9 +312,14 @@ impl WayGroup {
         }
 
         // Contract edges, but never remove the vertexes that we later want to route on
+        
+        //let old_num_edges = edges.num_edges();
         edges.contract_edges_some(|v| !convex_hull_nodes.iter().any(|(n, _)| v == n));
-
         edges.remove_spikes(|v| !convex_hull_nodes.iter().any(|(n, _)| v == n));
+        // after spike removal, there might be a few new removable vertexes, so run this again to
+        // be sure.
+        edges.contract_edges_some(|v| !convex_hull_nodes.iter().any(|(n, _)| v == n));
+        //dbg!(old_num_edges - edges.num_edges());
 
         // path_results is a graph that has a vertex if there is a shortest path that goes this
         // way.

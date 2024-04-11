@@ -378,12 +378,15 @@ where
         true
     }
 
-    pub fn contract_edges(&mut self) {
+    /// Returns true iff the graph was modified
+    pub fn contract_edges(&mut self) -> bool {
         self.contract_edges_some(|_| true)
     }
 
     /// Contract the edges, but only contract (remove) vertexes that return true.
-    pub fn contract_edges_some(&mut self, can_contract_vertex: impl Fn(&V) -> bool) {
+    /// Returns true iff the graph was modified
+    pub fn contract_edges_some(&mut self, can_contract_vertex: impl Fn(&V) -> bool) -> bool {
+        let mut graph_has_been_modified = false;
         let initial_num_edges = self.num_edges();
         let initial_num_vertexes = self.num_vertexes();
         trace!(
@@ -392,10 +395,10 @@ where
             initial_num_vertexes
         );
         if initial_num_edges == 1 {
-            return;
+            return false;
         }
 
-        let mut graph_has_been_modified;
+        let mut graph_has_been_modified_this_iteration;
         let mut candidate_vertexes = Vec::new();
         let mut contraction_round = 0;
         let mut this_vertex_contracted;
@@ -418,40 +421,44 @@ where
                 break;
             }
             trace!("There are {} candidate vertexes", candidate_vertexes.len());
-            graph_has_been_modified = false;
+            graph_has_been_modified_this_iteration = false;
             for v in candidate_vertexes.drain(..) {
                 this_vertex_contracted = self.contract_vertex(&v);
                 if this_vertex_contracted {
                     //trace!("Vertex {:?} was contracted", v);
+                    graph_has_been_modified_this_iteration = true;
                     graph_has_been_modified = true;
                 } else {
                     //trace!("Vertex {:?} was not contracted", v);
                 }
             }
 
-            if !graph_has_been_modified {
+            if !graph_has_been_modified_this_iteration {
                 trace!("End of loop, and no changes made → break out");
                 break;
             }
         }
 
         debug!("End of contract_edges there are now {} edges and {} vertexes. Removed {} edges and {} vertexes in {} rounds", self.num_edges(), self.num_vertexes(), initial_num_edges-self.num_edges(), initial_num_vertexes-self.num_vertexes(), contraction_round);
+        graph_has_been_modified
     }
 
 
     /// Spike = vertex with just one neighbour.
-    pub fn remove_spikes(&mut self, can_contract_vertex: impl Fn(&V) -> bool) {
+    /// Returns true iff graph has been modifed
+    pub fn remove_spikes(&mut self, can_contract_vertex: impl Fn(&V) -> bool) -> bool {
         let initial_num_edges = self.num_edges();
-        let initial_num_vertexes = self.num_vertexes();
+        //let initial_num_vertexes = self.num_vertexes();
         if initial_num_edges == 1 {
-            return;
+            return false;
         }
 
-        let mut graph_has_been_modified;
+        let mut graph_has_been_modified = false;
+        let mut graph_has_been_modified_this_iteration;
         let mut candidate_vertexes = Vec::new();
-        let mut contraction_round = 0;
+        //let mut contraction_round = 0;
         loop {
-            contraction_round += 1;
+            //contraction_round += 1;
             candidate_vertexes.extend(
                 self.iter_vertexes_num_neighbours()
                     .filter_map(|(v, nn)| if nn == 1 { Some(v) } else { None })
@@ -464,19 +471,20 @@ where
             }
             //dbg!(candidate_vertexes.len());
             trace!("There are {} candidate vertexes", candidate_vertexes.len());
-            graph_has_been_modified = false;
+            graph_has_been_modified_this_iteration = false;
             for v in candidate_vertexes.drain(..) {
                 self.remove_vertex(&v);
                 graph_has_been_modified = true;
+                graph_has_been_modified_this_iteration = true;
             }
 
-            if !graph_has_been_modified {
+            if !graph_has_been_modified_this_iteration {
                 trace!("End of loop, and no changes made → break out");
                 break;
             }
         }
 
-        debug!("End of contract_edges there are now {} edges and {} vertexes. Removed {} edges and {} vertexes in {} rounds", self.num_edges(), self.num_vertexes(), initial_num_edges-self.num_edges(), initial_num_vertexes-self.num_vertexes(), contraction_round);
+        graph_has_been_modified
     }
 }
 
