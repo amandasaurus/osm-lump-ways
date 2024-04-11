@@ -328,10 +328,18 @@ where
         let a = *self.edges[v].keys().nth(0).unwrap();
         let b = *self.edges[v].keys().nth(1).unwrap();
         assert!(a != b);
-        if self.edges[&a].contains_key(&b) {
-            // there already is an edge from a↔b, so skip this
-            //trace!("v:{:?} There already is an edge from a-b (a={:?} b={:?})", v, a, b);
-            return false;
+        if let Some(weight_a_b) = self.get(&a, &b) {
+            // there already is an edge from a↔b
+            if *weight_a_b <= *self.get(&a, &v).unwrap() + *self.get(&v, &b).unwrap() {
+                // this route via v is longer, so delete v & don't create any new edges
+                self.remove_vertex(v);
+                return true;
+            } else {
+                // this route via v is shorter, so remove the a-b route and let the rest of th
+                // TODO rather than delete and go onwards, just update the a-b vertex instead
+                // (which should save allocations etc)
+                self.remove_edge(&a, &b);
+            }
         }
         assert!(self.edges[&a].contains_key(v));
         assert!(self.edges[&b].contains_key(v));
