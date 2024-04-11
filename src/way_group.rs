@@ -314,6 +314,8 @@ impl WayGroup {
         // Contract edges, but never remove the vertexes that we later want to route on
         edges.contract_edges_some(|v| !convex_hull_nodes.iter().any(|(n, _)| v == n));
 
+        edges.remove_spikes(|v| !convex_hull_nodes.iter().any(|(n, _)| v == n));
+
         // path_results is a graph that has a vertex if there is a shortest path that goes this
         // way.
         // This is binary. there is or isn't a connection between the 2 nodes. If we stored the
