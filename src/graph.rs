@@ -199,8 +199,8 @@ where
     }
 
     pub fn set(&mut self, i: &V, j: &V, val: E) {
-        self.edges.entry(*i).or_default().insert(*j, (val, vec![]));
-        self.edges.entry(*j).or_default().insert(*i, (val, vec![]));
+        self.edges.entry(*i).or_default().insert(*j, (val, Default::default()));
+        self.edges.entry(*j).or_default().insert(*i, (val, Default::default()));
     }
 
     pub fn remove_vertex(&mut self, v: &V) {
