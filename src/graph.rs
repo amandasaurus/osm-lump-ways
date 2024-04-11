@@ -203,6 +203,14 @@ where
         self.edges.entry(*j).or_default().insert(*i, (val, vec![]));
     }
 
+    pub fn remove_vertex(&mut self, v: &V) {
+        while let Some((other_v, (_weight, _intermediaters))) = self.edges.get_mut(v).unwrap().pop_last() {
+            self.edges.get_mut(&other_v).unwrap().remove(v);
+        }
+        assert!(self.edges[v].is_empty());
+        self.edges.remove(v);
+    }
+
     #[allow(unused)]
     pub fn get(&self, i: &V, j: &V) -> Option<&E> {
         self.edges
