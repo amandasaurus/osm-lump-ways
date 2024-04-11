@@ -429,6 +429,47 @@ where
 
         debug!("End of contract_edges there are now {} edges and {} vertexes. Removed {} edges and {} vertexes in {} rounds", self.num_edges(), self.num_vertexes(), initial_num_edges-self.num_edges(), initial_num_vertexes-self.num_vertexes(), contraction_round);
     }
+
+
+    /// Spike = vertex with just one neighbour.
+    pub fn remove_spikes(&mut self, can_contract_vertex: impl Fn(&V) -> bool) {
+        let initial_num_edges = self.num_edges();
+        let initial_num_vertexes = self.num_vertexes();
+        if initial_num_edges == 1 {
+            return;
+        }
+
+        let mut graph_has_been_modified;
+        let mut candidate_vertexes = Vec::new();
+        let mut contraction_round = 0;
+        loop {
+            contraction_round += 1;
+            candidate_vertexes.extend(
+                self.iter_vertexes_num_neighbours()
+                    .filter_map(|(v, nn)| if nn == 1 { Some(v) } else { None })
+                    .filter(|v| can_contract_vertex(v))
+                    .cloned(),
+            );
+            if candidate_vertexes.is_empty() {
+                trace!("No more candidate vertexes");
+                break;
+            }
+            //dbg!(candidate_vertexes.len());
+            trace!("There are {} candidate vertexes", candidate_vertexes.len());
+            graph_has_been_modified = false;
+            for v in candidate_vertexes.drain(..) {
+                self.remove_vertex(&v);
+                graph_has_been_modified = true;
+            }
+
+            if !graph_has_been_modified {
+                trace!("End of loop, and no changes made → break out");
+                break;
+            }
+        }
+
+        debug!("End of contract_edges there are now {} edges and {} vertexes. Removed {} edges and {} vertexes in {} rounds", self.num_edges(), self.num_vertexes(), initial_num_edges-self.num_edges(), initial_num_vertexes-self.num_vertexes(), contraction_round);
+    }
 }
 
 pub trait DirectedGraphTrait: Send {
