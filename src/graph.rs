@@ -190,7 +190,7 @@ pub(crate) struct UndirectedAdjGraph<V, E> {
 impl<V, E> UndirectedAdjGraph<V, E>
 where
     V: std::hash::Hash + Eq + Copy + Ord + Send + std::fmt::Debug,
-    E: Copy + Clone + std::fmt::Debug + std::ops::Add<Output = E> + std::cmp::PartialEq,
+    E: Copy + PartialOrd + Clone + std::fmt::Debug + std::ops::Add<Output = E> + std::cmp::PartialEq,
 {
     pub fn new() -> Self {
         Self {
