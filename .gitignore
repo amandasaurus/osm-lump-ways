@@ -21,3 +21,4 @@
 /stats
 /*.prom
 /*.csv
+flamegraph.svg
