@@ -182,8 +182,10 @@ where
     }
 }
 
+type SmallVecIntermediates<V> = SmallVec<[V; 1]>;
+
 pub(crate) struct UndirectedAdjGraph<V, E> {
-    edges: BTreeMap<V, BTreeMap<V, (E, Vec<V>)>>,
+    edges: BTreeMap<V, BTreeMap<V, (E, SmallVecIntermediates<V>)>>,
 }
 
 #[allow(dead_code)]
@@ -218,7 +220,7 @@ where
             .and_then(|from_i| from_i.get(j).map(|(e, _intermediates)| e))
     }
 
-    pub fn get_all(&self, i: &V, j: &V) -> Option<&(E, Vec<V>)> {
+    pub fn get_all(&self, i: &V, j: &V) -> Option<&(E, SmallVecIntermediates<V>)> {
         self.edges.get(i).and_then(|from_i| from_i.get(j))
     }
 
