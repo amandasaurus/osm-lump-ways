@@ -191,12 +191,12 @@ pub(crate) struct UndirectedAdjGraph<V, E> {
 #[allow(dead_code)]
 impl<V, E> UndirectedAdjGraph<V, E>
 where
-    V: std::hash::Hash + Eq + Copy + Ord + Send + std::fmt::Debug,
-    E: Copy + PartialOrd + Clone + std::fmt::Debug + std::ops::Add<Output = E> + std::cmp::PartialEq,
+    V: std::hash::Hash + Eq + Copy + Ord + Send + std::fmt::Debug + Default,
+    E: Copy + PartialOrd + Clone + std::fmt::Debug + std::ops::Add<Output = E> + std::cmp::PartialEq + Default,
 {
     pub fn new() -> Self {
         Self {
-            edges: BTreeMap::new(),
+            edges: Default::default()
         }
     }
 
