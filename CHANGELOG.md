@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* `--tag-filter-func` now recogises a `@` at the start as the filename to read the argument from.
+
 ## v0.24.0 (2024-04-09)
 
 * New feature `--output-frames` which outputs paths through waygroups. Simple

@@ -75,7 +75,8 @@ pub(crate) struct Args {
         short = 'F',
         long = "tag-filter-func",
         value_name = "FILTER_FUNC",
-        conflicts_with = "tag_filter"
+        conflicts_with = "tag_filter",
+        value_parser=opt_read_file::<tagfilter::TagFilterFunc>,
     )]
     pub tag_filter_func: Option<tagfilter::TagFilterFunc>,
 
@@ -195,4 +196,19 @@ pub(crate) struct Args {
     /// Path to store OpenMetrics/Prometheus metrics
     #[arg(long, value_name = "FILENAME.prom")]
     pub openmetrics: Option<PathBuf>,
+}
+
+/// CLI arg parser. If the value starts with @, the rest is assumed to be a filename, the contents
+/// of which are parsed to type T
+fn opt_read_file<T>(arg_val: &str) -> Result<T, String>
+where
+    T: std::str::FromStr<Err = String>,
+{
+    if let Some(filename) = arg_val.strip_prefix('@') {
+        let val = std::fs::read_to_string(filename)
+            .map_err(|e| format!("Couldn't read filename {}: {}", filename, e))?;
+        T::from_str(&val)
+    } else {
+        T::from_str(arg_val)
+    }
 }
