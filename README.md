@@ -11,23 +11,9 @@
 > * “Are these rivers connected?”
 > * “What's the river drainage basins?”
 
-# Usage
-
-Generate river drainage basins
-
-	osm-lump-ways -i path/to/region-latest.osm.pbf -o region-rivers.geojson -f waterway=river
-
-To group based on the river's name:
-
-	osm-lump-ways -i path/to/region-latest.osm.pbf -o region-rivers.geojson -f waterway=river -g name
-
-To find long streets and assemble them into connected (Multi)LineStrings:
-
-	osm-lump-ways -i path/to/region-latest.osm.pbf -o long-streets.geojson -f highway -g name
-
-# Installation
-
-	cargo install osm-lump-ways
+2 similar programmes are included: `osm-lump-ways`, which ignores the direction
+of the OSM way, and `osm-lump-ways-down`, which uses direction of OSM ways to
+produce data, incl. QA suitable files. Both share similarities.
 
 # Background
 
@@ -35,10 +21,6 @@ OSM linear features (eg roads, rivers, walls) are stored as [way
 object](https://wiki.openstreetmap.org/wiki/Way). The [OSM tagging
 model](https://wiki.openstreetmap.org/wiki/Tags) often requires one feature to
 be mapped as many different ways. `osm-lump-ways` will assemble them all together.
-
-# Full Options
-
-Run with `--help` to see all options.
 
 # Filtering OSM Data
 
@@ -86,6 +68,43 @@ want a `waterway=canal` iff it also has a `lock=yes` tag.
 
 `-F "waterway=canal∧lock=yes→T; waterway=canal→F; waterway→T; F`
 
+If the argument to `-F`/`--tag-filter-func` starts with `@`, the rest is a
+filename containing the tag filter func code. e.g. ` -F @myrules.txt `.
+
+Comments start with `#` and continue to the end of the line.
+
+# Output format
+
+If a filename ends with `.geojson`, a GeoJSON file
+([RFC 7946](https://datatracker.ietf.org/doc/html/rfc7946) will be created. For
+`.geojsons`, a GeoJSON Text Sequences
+([RFC 8142](https://datatracker.ietf.org/doc/html/rfc8142)), aka GeoJSONSeq, file.
+
+
+# `osm-lump-ways`
+
+# Usage
+
+Generate river drainage basins
+
+	osm-lump-ways -i path/to/region-latest.osm.pbf -o region-rivers.geojson -f waterway=river
+
+To group based on the river's name:
+
+	osm-lump-ways -i path/to/region-latest.osm.pbf -o region-rivers.geojson -f waterway=river -g name
+
+To find long streets and assemble them into connected (Multi)LineStrings:
+
+	osm-lump-ways -i path/to/region-latest.osm.pbf -o long-streets.geojson -f highway -g name
+
+# Installation
+
+	cargo install osm-lump-ways
+
+# Full Options
+
+Run with `--help` to see all options.
+
 # Frames
 
 Here, a “frame” of a grouping is a shortest path through 2 points in the
@@ -103,14 +122,46 @@ GeoJSONSeq output format only.
 * [Die Bahnhofstrassen in jeder Schweizer Sprachregion (german language only)](https://habi.gna.ch/2023/11/14/die-bahnhofstrassen-in-jeder-schweizer-sprachregion/)
 * Your project here!
 
-# Todos
+## `osm-lump-ways-down`
+
+It reads & groups an OSM PBF file, like `osm-lump-ways`, but it uses the
+direction of the OSM way, to produce 
+
+The output filename *must* contain `%s`, which will be replaced 
+
+## Output files
+
+### `loops`
+
+Cycles in the network. Each is a [strongly connected
+component](https://en.wikipedia.org/wiki/Strongly_connected_component).
+
+### `upstreams`
+
+Each way segment (a 2 point LineString) with the upstream
+
+### `upstreams-points`
+
+Above, but just the first point. Each feature a Point.
+
+### `ends`
+
+Points where waterways end.
+
+## Loop removal
+
+After the loops are detected, all the edges (way segments) in the loops are
+contracted together, producing a new graph which is loop-free.
+
+
+# TODOs
 
 This software isn't finished, here's what I'd like to add. Feel free to send a patch.
 
 * All tags need to be specified in advance to join on. Perhaps add something to
-  match all possible tags? (inspired by [this
-  q](https://en.osm.town/@grischard/110763741292331075)). (“Group by all tags
-  the same” might do it)
+  match all possible tags? (inspired by
+  [this q](https://en.osm.town/@grischard/110763741292331075)). (“Group by all
+  tags the same” might do it)
 
 # External Mentions
 
@@ -118,8 +169,8 @@ This software isn't finished, here's what I'd like to add. Feel free to send a p
 
 # Copyright & Licence
 
-Copyright 2023, MIT/Apache2.0. Source code is on [Github
-(`osm-lump-ways`)](https://github.com/amandasaurus/osm-lump-ways).
+Copyright 2023, MIT/Apache2.0. Source code is on
+[Github (`osm-lump-ways`)](https://github.com/amandasaurus/osm-lump-ways).
 
 The output data file(s) are a Derived Database of the OpenStreetMap database,
 and hence under the [ODbL 1.0](https://opendatacommons.org/licenses/odbl/)
