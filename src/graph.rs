@@ -332,7 +332,7 @@ where
         assert!(a != b);
         if let Some(weight_a_b) = self.get(&a, &b) {
             // there already is an edge from a↔b
-            if *weight_a_b <= *self.get(&a, &v).unwrap() + *self.get(&v, &b).unwrap() {
+            if *weight_a_b <= *self.get(&a, v).unwrap() + *self.get(v, &b).unwrap() {
                 // this route via v is longer, so delete v & don't create any new edges
                 self.remove_vertex(v);
                 return true;
