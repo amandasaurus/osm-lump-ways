@@ -169,7 +169,7 @@ This software isn't finished, here's what I'd like to add. Feel free to send a p
 
 # Copyright & Licence
 
-Copyright 2023, MIT/Apache2.0. Source code is on
+Copyright 2023, 2024, MIT/Apache2.0. Source code is on
 [Github (`osm-lump-ways`)](https://github.com/amandasaurus/osm-lump-ways).
 
 The output data file(s) are a Derived Database of the OpenStreetMap database,
