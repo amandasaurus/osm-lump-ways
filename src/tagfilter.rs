@@ -210,6 +210,7 @@ impl std::str::FromStr for TagFilterFunc {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = s.trim();
+        let s = Regex::new("#[^\n]*\n").unwrap().replace_all(s, "");
         let tffs = s
             .split(';')
             .map(|src| src.trim())
