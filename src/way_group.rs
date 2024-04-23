@@ -312,7 +312,7 @@ impl WayGroup {
         }
 
         // Contract edges, but never remove the vertexes that we later want to route on
-        
+
         //let old_num_edges = edges.num_edges();
         edges.contract_edges_some(|v| !convex_hull_nodes.iter().any(|(n, _)| v == n));
         edges.remove_spikes(|v| !convex_hull_nodes.iter().any(|(n, _)| v == n));

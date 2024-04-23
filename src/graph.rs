@@ -192,21 +192,35 @@ pub(crate) struct UndirectedAdjGraph<V, E> {
 impl<V, E> UndirectedAdjGraph<V, E>
 where
     V: std::hash::Hash + Eq + Copy + Ord + Send + std::fmt::Debug + Default,
-    E: Copy + PartialOrd + Clone + std::fmt::Debug + std::ops::Add<Output = E> + std::cmp::PartialEq + Default,
+    E: Copy
+        + PartialOrd
+        + Clone
+        + std::fmt::Debug
+        + std::ops::Add<Output = E>
+        + std::cmp::PartialEq
+        + Default,
 {
     pub fn new() -> Self {
         Self {
-            edges: Default::default()
+            edges: Default::default(),
         }
     }
 
     pub fn set(&mut self, i: &V, j: &V, val: E) {
-        self.edges.entry(*i).or_default().insert(*j, (val, Default::default()));
-        self.edges.entry(*j).or_default().insert(*i, (val, Default::default()));
+        self.edges
+            .entry(*i)
+            .or_default()
+            .insert(*j, (val, Default::default()));
+        self.edges
+            .entry(*j)
+            .or_default()
+            .insert(*i, (val, Default::default()));
     }
 
     pub fn remove_vertex(&mut self, v: &V) {
-        while let Some((other_v, (_weight, _intermediaters))) = self.edges.get_mut(v).unwrap().pop_last() {
+        while let Some((other_v, (_weight, _intermediaters))) =
+            self.edges.get_mut(v).unwrap().pop_last()
+        {
             self.edges.get_mut(&other_v).unwrap().remove(v);
         }
         assert!(self.edges[v].is_empty());
@@ -444,7 +458,6 @@ where
         debug!("End of contract_edges there are now {} edges and {} vertexes. Removed {} edges and {} vertexes in {} rounds", self.num_edges(), self.num_vertexes(), initial_num_edges-self.num_edges(), initial_num_vertexes-self.num_vertexes(), contraction_round);
         graph_has_been_modified
     }
-
 
     /// Spike = vertex with just one neighbour.
     /// Returns true iff graph has been modifed
