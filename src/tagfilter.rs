@@ -214,7 +214,7 @@ impl std::str::FromStr for TagFilterFunc {
         let tffs = s
             .split(';')
             .map(|src| src.trim())
-            .filter(|s| s.len() > 0)
+            .filter(|s| !s.is_empty())
             .map(|tff| tff.parse::<TagFilterFuncElement>())
             .collect::<Result<Vec<_>, _>>()?;
         Ok(TagFilterFunc(tffs))

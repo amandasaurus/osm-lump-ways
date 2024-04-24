@@ -811,12 +811,7 @@ fn main() -> Result<()> {
     ends_membership.sort_by_key(|tf| tf.to_string());
     let nids_wo_outgoing: BTreeMap<i64, smallvec::SmallVec<[bool; 2]>> = g
         .vertexes_wo_outgoing_jumbled()
-        .map(|nid| {
-            (
-                nid,
-                smallvec::smallvec![false; ends_membership.len()],
-            )
-        })
+        .map(|nid| (nid, smallvec::smallvec![false; ends_membership.len()]))
         .collect();
     let nids_wo_outgoing = Arc::new(std::sync::RwLock::new(nids_wo_outgoing));
 
@@ -845,8 +840,7 @@ fn main() -> Result<()> {
                 let mut nids_wo_outgoing = nids_wo_outgoing.write().unwrap();
                 for nid in w.nodes() {
                     if let Some(memb_vec) = nids_wo_outgoing.get_mut(nid) {
-                        for (func, res) in ends_membership.iter().zip(memb_vec.iter_mut())
-                        {
+                        for (func, res) in ends_membership.iter().zip(memb_vec.iter_mut()) {
                             *res = func.filter(&w);
                         }
                     }
