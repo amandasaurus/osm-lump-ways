@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.25.0 (2024-04-24)
 
 * `--tag-filter-func` now recogises a `@` at the start as the filename to read
   the argument from.
