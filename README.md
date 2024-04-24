@@ -148,6 +148,19 @@ Above, but just the first point. Each feature a Point.
 
 Points where waterways end.
 
+#### Ends membership of tagged ways
+
+With the `--ends-membership TAGFILTER` arg every end will have a boolean
+property called `is_in:TAGFILTER` which is only true if this end node is a
+member of a way with this tag filter. This argument can be applied many times.
+An addditional property `is_in_count` is an integer of how many of these
+properties are true.
+
+
+e.g. `--ends-membership natural=coastline` will cause each end point to have a
+JSON property `is_in:natural=coastline` which is `true` iff this node is also a
+member of a way with the `natural=coastline` tag, false otherwise.
+
 ## Loop removal
 
 After the loops are detected, all the edges (way segments) in the loops are

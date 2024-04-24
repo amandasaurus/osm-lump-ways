@@ -5,6 +5,7 @@
 * `--tag-filter-func` now recogises a `@` at the start as the filename to read
   the argument from.
 * Tag filter func can now be split on multiple lines, and have comments (#)
+* End points can now be annotated if they are a part of a way with defined tags
 
 ## v0.24.0 (2024-04-09)
 

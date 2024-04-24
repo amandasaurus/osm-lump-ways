@@ -807,18 +807,89 @@ fn main() -> Result<()> {
         args.output_filename.replace("%s", "strahler")
     );
 
-    let nids_wo_outgoing: BTreeSet<_> = g.vertexes_wo_outgoing_jumbled().collect();
+    let mut ends_membership = args.ends_membership.clone();
+    ends_membership.sort_by_key(|tf| tf.to_string());
+    let nids_wo_outgoing: BTreeMap<i64, smallvec::SmallVec<[bool; 2]>> = g
+        .vertexes_wo_outgoing_jumbled()
+        .map(|nid| {
+            (
+                nid,
+                smallvec::smallvec![false; ends_membership.len()],
+            )
+        })
+        .collect();
+    let nids_wo_outgoing = Arc::new(std::sync::RwLock::new(nids_wo_outgoing));
+
+    if !ends_membership.is_empty() {
+        info!("Rereading file to add memberships for ends");
+        info!(
+            "Adding the following {} attributes for each end: {}",
+            ends_membership.len(),
+            ends_membership
+                .iter()
+                .map(|f| f.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        let reader = read_progress::BufReaderWithSize::from_path(&args.input_filename)?;
+        let mut reader = osmio::stringpbf::PBFReader::new(reader);
+        reader
+            .ways()
+            .par_bridge()
+            .filter(|w| {
+                w.nodes()
+                    .par_iter()
+                    .any(|n| nids_wo_outgoing.read().unwrap().contains_key(n))
+            })
+            .for_each_with(nids_wo_outgoing.clone(), |nids_wo_outgoing, w| {
+                let mut nids_wo_outgoing = nids_wo_outgoing.write().unwrap();
+                for nid in w.nodes() {
+                    if let Some(memb_vec) = nids_wo_outgoing.get_mut(nid) {
+                        for (func, res) in ends_membership.iter().zip(memb_vec.iter_mut())
+                        {
+                            *res = func.filter(&w);
+                        }
+                    }
+                }
+            });
+        // How many have ≥1 true value (versus all default of false)
+        let num_nodes_attributed = nids_wo_outgoing
+            .read()
+            .unwrap()
+            .par_iter()
+            .filter(|(_nid, membs)| membs.par_iter().any(|m| *m))
+            .count();
+        if num_nodes_attributed == 0 {
+            warn!("No end nodes got an end attribute.")
+        } else {
+            let nids_wo_outgoing = nids_wo_outgoing.read().unwrap();
+            info!(
+                "{} of {} ({:.1}%) end points got an attribute for way membership",
+                num_nodes_attributed.to_formatted_string(&Locale::en),
+                nids_wo_outgoing.len().to_formatted_string(&Locale::en),
+                ((100. * num_nodes_attributed as f64) / nids_wo_outgoing.len() as f64)
+            );
+        }
+    }
+    let nids_wo_outgoing = Arc::try_unwrap(nids_wo_outgoing)
+        .unwrap()
+        .into_inner()
+        .unwrap();
     // look for where it ends
     let end_points = nids_wo_outgoing
         .into_iter()
-        .map(|v| (v, length_upstream.get(&v).unwrap()))
-        .filter(|(_v, len)| args.min_upstream_m.map_or(true, |min| len >= &&min))
-        .map(|(v, len)| {
-            (
-                // Round the upstream to only output 1 decimal place
-                serde_json::json!({"upstream_m": round(len, 1), "nid": v}),
-                vec![vec![nodeid_pos.get(&v).unwrap()]],
-            )
+        .map(|(nid, mbms)| (nid, mbms, length_upstream.get(&nid).unwrap()))
+        .filter(|(_nid, _mbms, len)| args.min_upstream_m.map_or(true, |min| len >= &&min))
+        .map(|(nid, mbms, len)| {
+            // Round the upstream to only output 1 decimal place
+            let mut props = serde_json::json!({"upstream_m": round(len, 1), "nid": nid});
+            if !ends_membership.is_empty() {
+                for (end_attr_filter, res) in ends_membership.iter().zip(mbms.iter()) {
+                    props[format!("is_in:{}", end_attr_filter.to_string())] = (*res).into();
+                }
+                props["is_in_count"] = mbms.iter().filter(|m| **m).count().into();
+            }
+            (props, vec![vec![nodeid_pos.get(&nid).unwrap()]])
         });
 
     let mut f = std::io::BufWriter::new(std::fs::File::create(

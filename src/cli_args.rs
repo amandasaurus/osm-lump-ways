@@ -196,6 +196,11 @@ pub(crate) struct Args {
     /// Path to store OpenMetrics/Prometheus metrics
     #[arg(long, value_name = "FILENAME.prom")]
     pub openmetrics: Option<PathBuf>,
+
+    /// The points in the Ends data will have a boolean if they are a member of a way with this
+    /// tag. Syntax is the tag filter.
+    #[arg(long, value_name = "TAGFILTER")]
+    pub ends_membership: Vec<tagfilter::TagFilter>,
 }
 
 /// CLI arg parser. If the value starts with @, the rest is assumed to be a filename, the contents
