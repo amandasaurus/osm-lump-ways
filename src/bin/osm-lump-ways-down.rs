@@ -295,7 +295,6 @@ fn main() -> Result<()> {
         "All data has been loaded in {}. Started processing...",
         formatting::format_duration(global_start.elapsed())
     );
-    info!("{}", g.detailed_size());
     info_memory_used!();
 
     if g.is_empty() {
@@ -530,8 +529,7 @@ fn main() -> Result<()> {
         &mut g,
     )?;
     info!(
-        "Re-read nodes with replacements. Have size: {}",
-        g.detailed_size()
+        "Re-read nodes with replacements.",
     );
 
     // TODO do we need to sort topologically? Why not just calc lengths from upstreams
@@ -569,8 +567,7 @@ fn main() -> Result<()> {
         &mut g,
     )?;
     info!(
-        "Re-read nodes, but unidirecetd. Have size: {}",
-        g.detailed_size()
+        "Re-read nodes, but unidirecetd.",
     );
 
     let setting_node_pos = progress_bars.add(
@@ -588,7 +585,6 @@ fn main() -> Result<()> {
     setting_node_pos.finish();
     progress_bars.remove(&setting_node_pos);
     info_memory_used!();
-    info!("{}", nodeid_pos.detailed_size());
 
     drop(nids_we_need); // don't need you anymore
 
