@@ -677,7 +677,6 @@ fn main() -> Result<()> {
             frames_writing_bar.wrap_iter(frames.into_iter()),
             &mut f,
             &OutputFormat::GeoJSONSeq,
-            &fileio::OutputGeometryType::MultiLineString,
         )?;
         info!(
             "Calculated & wrote {} frames to {:?} in {}",
@@ -938,11 +937,6 @@ fn main() -> Result<()> {
                         features.into_iter(),
                         &mut f,
                         &output_format,
-                        if args.save_as_linestrings {
-                            &fileio::OutputGeometryType::LineString
-                        } else {
-                            &fileio::OutputGeometryType::MultiLineString
-                        },
                     )
                     .with_context(|| {
                         format!(

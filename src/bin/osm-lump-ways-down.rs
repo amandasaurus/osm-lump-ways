@@ -55,7 +55,7 @@ mod way_group;
 
 #[path = "../fileio.rs"]
 mod fileio;
-use fileio::{write_geojson_features_directly, OutputFormat, OutputGeometryType};
+use fileio::{write_geojson_features_directly, OutputFormat};
 
 #[path = "../formatting.rs"]
 mod formatting;
@@ -484,12 +484,8 @@ fn main() -> Result<()> {
         let mut f = std::io::BufWriter::new(std::fs::File::create(
             args.output_filename.replace("%s", "loops"),
         )?);
-        let num_written = write_geojson_features_directly(
-            cycles_output.into_iter(),
-            &mut f,
-            &output_format,
-            &OutputGeometryType::MultiLineString,
-        )?;
+        let num_written =
+            write_geojson_features_directly(cycles_output.into_iter(), &mut f, &output_format)?;
 
         info!(
             "Wrote {num_written} features to output file {}",
@@ -528,9 +524,7 @@ fn main() -> Result<()> {
         &progress_bars,
         &mut g,
     )?;
-    info!(
-        "Re-read nodes with replacements.",
-    );
+    info!("Re-read nodes with replacements.",);
 
     // TODO do we need to sort topologically? Why not just calc lengths from upstreams
     let sorting_nodes_bar = progress_bars.add(
@@ -566,9 +560,7 @@ fn main() -> Result<()> {
         &progress_bars,
         &mut g,
     )?;
-    info!(
-        "Re-read nodes, but unidirecetd.",
-    );
+    info!("Re-read nodes, but unidirecetd.",);
 
     let setting_node_pos = progress_bars.add(
         ProgressBar::new(g.num_vertexes() as u64)
@@ -691,10 +683,10 @@ fn main() -> Result<()> {
                     "from_upstream_m": round(length_upstream.get(&from_nid).unwrap(), 1),
                     //"to_upstream_m": round(length_upstream[&to_nid], 1),
                 }),
-                vec![vec![
+                (
                     nodeid_pos.get(&from_nid).unwrap(),
                     nodeid_pos.get(&to_nid).unwrap(),
-                ]],
+                ),
             )
         });
     info_memory_used!();
@@ -710,12 +702,7 @@ fn main() -> Result<()> {
     let mut f = std::io::BufWriter::new(std::fs::File::create(
         args.output_filename.replace("%s", "upstreams"),
     )?);
-    let num_written = write_geojson_features_directly(
-        lines,
-        &mut f,
-        &output_format,
-        &OutputGeometryType::LineString,
-    )?;
+    let num_written = write_geojson_features_directly(lines, &mut f, &output_format)?;
 
     info!(
         "Wrote {} features to output file {}",
@@ -736,7 +723,7 @@ fn main() -> Result<()> {
                 serde_json::json!({
                     "from_upstream_m": round(length_upstream.get(&from_nid).unwrap(), 1),
                 }),
-                vec![vec![nodeid_pos.get(&from_nid).unwrap()]],
+                nodeid_pos.get(&from_nid).unwrap(),
             )
         });
     info_memory_used!();
@@ -752,12 +739,7 @@ fn main() -> Result<()> {
     let mut f = std::io::BufWriter::new(std::fs::File::create(
         args.output_filename.replace("%s", "upstream-points"),
     )?);
-    let num_written = write_geojson_features_directly(
-        upstream_points,
-        &mut f,
-        &output_format,
-        &OutputGeometryType::Point,
-    )?;
+    let num_written = write_geojson_features_directly(upstream_points, &mut f, &output_format)?;
 
     info!(
         "Wrote {} features to output file {}",
@@ -772,10 +754,10 @@ fn main() -> Result<()> {
             serde_json::json!({
                 "strahler": strahler.get(&from_nid)
             }),
-            vec![vec![
+            (
                 nodeid_pos.get(&from_nid).unwrap(),
                 nodeid_pos.get(&to_nid).unwrap(),
-            ]],
+            ),
         )
     });
     info_memory_used!();
@@ -791,12 +773,8 @@ fn main() -> Result<()> {
     let mut f = std::io::BufWriter::new(std::fs::File::create(
         args.output_filename.replace("%s", "strahler"),
     )?);
-    let num_strahler_written = write_geojson_features_directly(
-        strahler_lines,
-        &mut f,
-        &output_format,
-        &OutputGeometryType::LineString,
-    )?;
+    let num_strahler_written =
+        write_geojson_features_directly(strahler_lines, &mut f, &output_format)?;
     info!(
         "Wrote {} features to output file {}",
         num_strahler_written.to_formatted_string(&Locale::en),
@@ -879,18 +857,13 @@ fn main() -> Result<()> {
                 }
                 props["is_in_count"] = mbms.iter().filter(|m| **m).count().into();
             }
-            (props, vec![vec![nodeid_pos.get(&nid).unwrap()]])
+            (props, nodeid_pos.get(&nid).unwrap())
         });
 
     let mut f = std::io::BufWriter::new(std::fs::File::create(
         args.output_filename.replace("%s", "ends"),
     )?);
-    let num_written = write_geojson_features_directly(
-        end_points,
-        &mut f,
-        &output_format,
-        &OutputGeometryType::Point,
-    )?;
+    let num_written = write_geojson_features_directly(end_points, &mut f, &output_format)?;
     info!(
         "Wrote {} features to output file {}",
         num_written.to_formatted_string(&Locale::en),
