@@ -611,6 +611,13 @@ impl DirectedGraph2 {
         self.edges.get(vid).map(|(ins, _outs)| ins.len())
     }
 
+    /// True iff this vertex exists has has exactly 0 incoming edges
+    pub fn num_ins_zero(&self, vid: &i64) -> bool {
+        self.edges
+            .get(vid)
+            .map_or(false, |(ins, _outs)| ins.is_empty())
+    }
+
     pub fn is_empty(&self) -> bool {
         self.edges.is_empty()
     }
@@ -933,7 +940,7 @@ impl DirectedGraph2 {
                 others.extend(g.vertexes_reachable_from(v));
                 for other in others.drain(..) {
                     g.remove_edge(&v, &other);
-                    if g.num_ins(&other).map_or(false, |n| n == 0) {
+                    if g.num_ins_zero(&other) {
                         no_incoming.insert(other);
                     }
                 }
