@@ -3,6 +3,7 @@
 //! Goal: Reduce memory usage of struct, by storing less of the key.
 //! End result: ~5% memory reduction of total programme. Not very impressive.
 use get_size::GetSize;
+use rayon::prelude::*;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Default, GetSize)]
@@ -24,7 +25,10 @@ fn join_key(ks: &[i32; 2]) -> i64 {
 }
 
 #[allow(dead_code)]
-impl<V> BTreeMapSplitKey<V> {
+impl<V> BTreeMapSplitKey<V>
+where
+    V: Sync,
+{
     pub fn new() -> Self {
         BTreeMapSplitKey {
             inner: BTreeMap::new(),
@@ -34,6 +38,11 @@ impl<V> BTreeMapSplitKey<V> {
         self.inner
             .iter()
             .flat_map(|(k0, i2)| i2.iter().map(|(k1, v)| (join_key(&[*k0, *k1]), v)))
+    }
+    pub fn par_iter(&self) -> impl ParallelIterator<Item = (i64, &V)> {
+        self.inner
+            .par_iter()
+            .flat_map(|(k0, i2)| i2.par_iter().map(|(k1, v)| (join_key(&[*k0, *k1]), v)))
     }
     pub fn get(&self, key: &i64) -> Option<&V> {
         let k = split_key(key);

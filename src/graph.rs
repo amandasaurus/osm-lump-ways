@@ -530,6 +530,7 @@ pub trait DirectedGraphTrait: Send {
 
     /// Iterator over all edges
     fn edges_iter(&self) -> impl Iterator<Item = (i64, i64)>;
+    fn edges_par_iter(&self) -> impl ParallelIterator<Item = (i64, i64)>;
 
     /// returns each vertex and the number of out edges
     fn vertexes_and_num_outs(&self) -> impl Iterator<Item = (i64, usize)>;
@@ -539,8 +540,8 @@ pub trait DirectedGraphTrait: Send {
     }
 
     /// Iterator (in any order) of vertexes which are the destination of an edge
-    fn dest_vertexes_jumbled(&self) -> impl Iterator<Item = i64> {
-        self.edges_iter().map(|(_src, dest)| dest)
+    fn dest_vertexes_jumbled(&self) -> impl ParallelIterator<Item = i64> {
+        self.edges_par_iter().map(|(_src, dest)| dest)
     }
     /// Iterator (in any order) of vertexes which are the src of an edge
     fn src_vertexes_jumbled(&self) -> impl Iterator<Item = i64> {
@@ -553,7 +554,10 @@ pub trait DirectedGraphTrait: Send {
     fn detailed_size(&self) -> String;
 
     /// Iterator (in any order, possibly with dupes) of vertexes which do not have outgoing edges
-    fn vertexes_wo_outgoing_jumbled(&self) -> impl Iterator<Item = i64> {
+    fn vertexes_wo_outgoing_jumbled(&self) -> impl ParallelIterator<Item = i64>
+    where
+        Self: Sync,
+    {
         self.dest_vertexes_jumbled()
             .filter(|v| !self.vertex_has_outgoing(v))
     }
@@ -994,6 +998,11 @@ impl DirectedGraphTrait for DirectedGraph2 {
             .iter()
             .flat_map(move |(v, (_ins, outs))| outs.iter().map(move |o| (v, *o)))
     }
+    fn edges_par_iter(&self) -> impl ParallelIterator<Item = (i64, i64)> {
+        self.edges
+            .par_iter()
+            .flat_map(move |(v, (_ins, outs))| outs.par_iter().map(move |o| (v, *o)))
+    }
 
     /// returns each vertex and the number of out edges
     fn vertexes_and_num_outs(&self) -> impl Iterator<Item = (i64, usize)> {
@@ -1081,6 +1090,11 @@ impl DirectedGraphTrait for UniDirectedGraph {
         self.edges
             .iter()
             .flat_map(|(v, outs)| outs.iter().map(move |o| (v, *o)))
+    }
+    fn edges_par_iter(&self) -> impl ParallelIterator<Item = (i64, i64)> {
+        self.edges
+            .par_iter()
+            .flat_map(|(v, outs)| outs.par_iter().map(move |o| (v, *o)))
     }
 
     /// returns each vertex and the number of out edges
