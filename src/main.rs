@@ -13,7 +13,6 @@ use rayon::prelude::*;
 
 use kdtree::KdTree;
 
-use serde_json::json;
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap};
 use std::time::Instant;
@@ -562,6 +561,11 @@ fn main() -> Result<()> {
     )
     .update(|way_group| {
         trace!("Preparing extra json properties");
+        way_group.extra_json_props["root_wayid"] = way_group.root_wayid.into();
+        way_group.extra_json_props["root_wayid_120"] = (way_group.root_wayid % 120).into();
+        if let Some(_l) = way_group.length_m {
+            way_group.extra_json_props["length_m"] = way_group.length_m.into();
+        }
         for (i, group) in way_group.group.iter().enumerate() {
             way_group.extra_json_props[format!("tag_group_{}", i)] = group.as_ref().cloned().into();
         }
@@ -885,14 +889,8 @@ fn main() -> Result<()> {
             debug!("Convert to GeoJSON (ish)");
             let features = way_groups
                 .into_par_iter()
-                .map(|mut w| {
-                    let mut properties = json!({
-                        "root_wayid": w.root_wayid,
-                        "root_wayid_120": w.root_wayid  % 120,
-                    });
-                    if let Some(_l) = w.length_m {
-                        properties["length_m"] = w.length_m.into();
-                    }
+                .map(|w| {
+                    let mut properties = w.extra_json_props;
                     if args.incl_wayids {
                         properties["all_wayids"] = w
                             .way_ids
@@ -901,11 +899,6 @@ fn main() -> Result<()> {
                             .collect::<Vec<String>>()
                             .into();
                     }
-
-                    properties
-                        .as_object_mut()
-                        .unwrap()
-                        .append(w.extra_json_props.as_object_mut().unwrap());
 
                     (properties, w.coords.unwrap())
                 })
