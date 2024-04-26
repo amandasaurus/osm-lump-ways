@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Internal refactoring to attempt to reduce memory usage & time needed
+
 ## v0.25.0 (2024-04-24)
 
 * `--tag-filter-func` now recogises a `@` at the start as the filename to read
