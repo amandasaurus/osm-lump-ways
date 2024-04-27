@@ -201,6 +201,10 @@ pub(crate) struct Args {
     /// tag. Syntax is the tag filter.
     #[arg(long, value_name = "TAGFILTER")]
     pub ends_membership: Vec<tagfilter::TagFilter>,
+
+    /// Calculate & write a file with the strahler value for lines
+    #[arg(long, default_value = "false")]
+    pub strahler: bool,
 }
 
 /// CLI arg parser. If the value starts with @, the rest is assumed to be a filename, the contents

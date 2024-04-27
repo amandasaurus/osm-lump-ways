@@ -3,6 +3,8 @@
 ## Unreleased
 
 * Internal refactoring to attempt to reduce memory usage & time needed
+* `osm-lump-ways-down`: Strahler output only produced if `--strahler` argument
+  given
 
 ## v0.25.0 (2024-04-24)
 
