@@ -718,42 +718,44 @@ fn main() -> Result<()> {
         args.output_filename.replace("%s", "upstreams")
     );
 
-    debug!("Writing upstream geojson points");
-    let upstream_points = g
-        .edges_iter()
-        .filter(|(from_nid, _to_nid)| {
-            args.min_upstream_m
-                .map_or(true, |min| length_upstream.get(from_nid).unwrap() >= &min)
-        })
-        .map(|(from_nid, _to_nid)| {
-            (
-                // Round the upstream to only output 1 decimal place
-                serde_json::json!({
-                    "from_upstream_m": round(length_upstream.get(&from_nid).unwrap(), 1),
-                }),
-                nodeid_pos.get(&from_nid).unwrap(),
-            )
-        });
-    info_memory_used!();
+    if args.upstream_points {
+        debug!("Writing upstream geojson points");
+        let upstream_points = g
+            .edges_iter()
+            .filter(|(from_nid, _to_nid)| {
+                args.min_upstream_m
+                    .map_or(true, |min| length_upstream.get(from_nid).unwrap() >= &min)
+            })
+            .map(|(from_nid, _to_nid)| {
+                (
+                    // Round the upstream to only output 1 decimal place
+                    serde_json::json!({
+                        "from_upstream_m": round(length_upstream.get(&from_nid).unwrap(), 1),
+                    }),
+                    nodeid_pos.get(&from_nid).unwrap(),
+                )
+            });
+        info_memory_used!();
 
-    let writing_upstreams_bar = progress_bars.add(
-        ProgressBar::new(g.num_edges() as u64)
-            .with_message("Writing upstream points geojson(s) file")
-            .with_style(style.clone()),
-    );
+        let writing_upstreams_bar = progress_bars.add(
+            ProgressBar::new(g.num_edges() as u64)
+                .with_message("Writing upstream points geojson(s) file")
+                .with_style(style.clone()),
+        );
 
-    let upstream_points = upstream_points.progress_with(writing_upstreams_bar);
+        let upstream_points = upstream_points.progress_with(writing_upstreams_bar);
 
-    let mut f = std::io::BufWriter::new(std::fs::File::create(
-        args.output_filename.replace("%s", "upstream-points"),
-    )?);
-    let num_written = write_geojson_features_directly(upstream_points, &mut f, &output_format)?;
+        let mut f = std::io::BufWriter::new(std::fs::File::create(
+            args.output_filename.replace("%s", "upstream-points"),
+        )?);
+        let num_written = write_geojson_features_directly(upstream_points, &mut f, &output_format)?;
 
-    info!(
-        "Wrote {} features to output file {}",
-        num_written.to_formatted_string(&Locale::en),
-        args.output_filename.replace("%s", "upstream-points")
-    );
+        info!(
+            "Wrote {} features to output file {}",
+            num_written.to_formatted_string(&Locale::en),
+            args.output_filename.replace("%s", "upstream-points")
+        );
+    }
 
     if args.strahler {
         debug!("Writing strahler number geojson object(s)");

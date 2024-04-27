@@ -205,6 +205,10 @@ pub(crate) struct Args {
     /// Calculate & write a file with the strahler value for lines
     #[arg(long, default_value = "false")]
     pub strahler: bool,
+
+    /// Calculate & write a file with each upstream line, but the geometry is a point
+    #[arg(long, default_value = "false")]
+    pub upstream_points: bool,
 }
 
 /// CLI arg parser. If the value starts with @, the rest is assumed to be a filename, the contents

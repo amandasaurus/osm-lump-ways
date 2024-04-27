@@ -3,8 +3,8 @@
 ## Unreleased
 
 * Internal refactoring to attempt to reduce memory usage & time needed
-* `osm-lump-ways-down`: Strahler output only produced if `--strahler` argument
-  given
+* `osm-lump-ways-down`: Strahler & Upstream Points output only produced if
+  `--strahler`/`--upstream-points` argument(s) given
 
 ## v0.25.0 (2024-04-24)
 
