@@ -855,12 +855,18 @@ fn main() -> Result<()> {
         .unwrap()
         .into_inner()
         .unwrap();
+
     // look for where it ends
-    let end_points_output = end_points
-        .into_iter()
+    let end_points: Vec<_> = end_points
+        .into_par_iter()
         .map(|(nid, mbms)| (nid, mbms, length_upstream.get(&nid).unwrap()))
         .filter(|(_nid, _mbms, len)| args.min_upstream_m.map_or(true, |min| len >= &&min))
-        .map(|(nid, mbms, len)| {
+        .map(|(nid, mbms, len)| (nid, mbms, len, nodeid_pos.get(&nid).unwrap()))
+        .collect();
+
+    let end_points_output = end_points
+        .iter()
+        .map(|(nid, mbms, len, pos)| {
             // Round the upstream to only output 1 decimal place
             let mut props = serde_json::json!({"upstream_m": round(len, 1), "nid": nid});
             if !ends_membership.is_empty() {
@@ -869,7 +875,7 @@ fn main() -> Result<()> {
                 }
                 props["is_in_count"] = mbms.iter().filter(|m| **m).count().into();
             }
-            (props, nodeid_pos.get(&nid).unwrap())
+            (props, pos)
         });
 
     let mut f = std::io::BufWriter::new(std::fs::File::create(
