@@ -209,6 +209,18 @@ pub(crate) struct Args {
     /// Calculate & write a file with each upstream line, but the geometry is a point
     #[arg(long, default_value = "false")]
     pub upstream_points: bool,
+
+    /// For all ends, calc the complete upstreams
+    #[arg(long, default_value = "false")]
+    pub ends_upstreams: bool,
+
+    /// Only calc upstream len if this upstream is greater than this
+    #[arg(long)]
+    pub ends_upstreams_min_upstream_m: Option<f64>,
+
+    /// Upstream from each end goes only up this many nodes.
+    #[arg(long)]
+    pub ends_upstreams_max_nodes: Option<i64>,
 }
 
 /// CLI arg parser. If the value starts with @, the rest is assumed to be a filename, the contents

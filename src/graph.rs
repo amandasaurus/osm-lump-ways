@@ -3,7 +3,7 @@ use super::*;
 use anyhow::{Context, Result};
 use rayon::prelude::ParallelIterator;
 use smallvec::SmallVec;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet, VecDeque};
 use std::iter::once;
 
 use crate::btreemapsplitkey::BTreeMapSplitKey;
@@ -560,6 +560,56 @@ pub trait DirectedGraphTrait: Send {
     {
         self.dest_vertexes_jumbled()
             .filter(|v| !self.vertex_has_outgoing(v))
+    }
+
+    /// starting at point `nid`, follow all upstreams, in a DFS manner
+    fn all_out_edges_recursive(
+        &self,
+        nid: i64,
+        max_nodes_upstream: impl Into<Option<i64>>,
+    ) -> impl Iterator<Item = Vec<i64>> {
+        let max_nodes_upstream: Option<i64> = max_nodes_upstream.into();
+        let mut frontier = VecDeque::new();
+        let mut seen_vertexes = HashSet::new();
+        frontier.push_back((nid, None, max_nodes_upstream));
+
+        std::iter::from_fn(move || {
+            if frontier.is_empty() {
+                return None;
+            }
+            let (mut curr_point, opt_prev_point, mut max_nodes_upstream) =
+                frontier.pop_front().unwrap();
+            let mut curr_path = Vec::new();
+
+            if let Some(prev_point) = opt_prev_point {
+                curr_path.push(prev_point);
+            }
+            loop {
+                curr_path.push(curr_point);
+                seen_vertexes.insert(curr_point);
+                if let Some(max_nodes_upstream) = max_nodes_upstream.as_mut() {
+                    *max_nodes_upstream -= 1;
+                }
+                if max_nodes_upstream.map_or(false, |m| m == 0) {
+                    return Some(curr_path);
+                } else {
+                    let mut outs = self.out_neighbours(curr_point);
+                    if let Some(nxt) = outs.next() {
+                        // any other out neighbours of this point need to be visited later
+                        frontier.extend(
+                            outs.filter(|n| !seen_vertexes.contains(n))
+                                .map(|out| (out, Some(curr_point), max_nodes_upstream)),
+                        );
+
+                        curr_point = nxt;
+                        continue;
+                    } else {
+                        // no more neighbours here
+                        return Some(curr_path);
+                    }
+                }
+            }
+        })
     }
 }
 

@@ -161,6 +161,14 @@ e.g. `--ends-membership natural=coastline` will cause each end point to have a
 JSON property `is_in:natural=coastline` which is `true` iff this node is also a
 member of a way with the `natural=coastline` tag, false otherwise.
 
+### `ends-full-upstreams`
+
+Only with `--ends-upstreams` argument. File of MultiLineStrings showing, for
+each end, where the upstreams are. Useful to find why there's a big upstream
+end somewhere.
+
+`--ends-upstreams-min-upstream-m 1e6 --ends-upstreams-max-nodes 1000` is a good tradeoff for calculation speed & file size, which still shows the relevant upstreams
+
 ## Loop removal
 
 After the loops are detected, all the edges (way segments) in the loops are

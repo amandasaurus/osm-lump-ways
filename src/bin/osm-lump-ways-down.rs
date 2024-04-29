@@ -908,6 +908,68 @@ fn main() -> Result<()> {
         args.output_filename.replace("%s", "ends")
     );
 
+    if args.ends_upstreams {
+        let started_ends_upstreams = Instant::now();
+        let calc_ends_upstreams = progress_bars.add(
+            ProgressBar::new(
+                end_points
+                    .par_iter()
+                    .map(|(_nid, _mbms, len, _upstream_count, _pos)| len.round() as u64)
+                    .sum(),
+            )
+            .with_message("Calculating complete upstream network per end point")
+            .with_style(style.clone()),
+        );
+        info!(
+            "Calculating the complete upstream network for {} end points (but only 100 points upstream)",
+            end_points.len()
+        );
+        let g = g.into_reversed();
+        let end_point_upstreams = end_points
+            .iter()
+            .filter(|(_nid, _mbms, len, _upstream_count, _pos)| {
+                if args
+                    .ends_upstreams_min_upstream_m
+                    .map_or(false, |m| len < &&m)
+                {
+                    // since we're not doing this end point, update the progress bar
+                    calc_ends_upstreams.inc(len.round() as u64);
+                }
+                args.ends_upstreams_min_upstream_m
+                    .map_or(true, |min_len| len >= &&min_len)
+            })
+            .map(|(nid, _mbms, len, _upstream_count, _pos)| {
+                let all_upstream_paths =
+                    g.all_out_edges_recursive(*nid, args.ends_upstreams_max_nodes);
+                let all_upstream_paths = all_upstream_paths
+                    .map(|path| {
+                        path.par_iter()
+                            .map(|nid| nodeid_pos.get(nid).unwrap())
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>();
+
+                let props = serde_json::json!({"upstream_m": round(len, 1), "nid": nid});
+
+                calc_ends_upstreams.inc(len.round() as u64);
+                (props, all_upstream_paths)
+            });
+
+        let mut f = std::io::BufWriter::new(std::fs::File::create(
+            args.output_filename.replace("%s", "ends-full-upstreams"),
+        )?);
+        let num_written =
+            write_geojson_features_directly(end_point_upstreams, &mut f, &output_format)?;
+        info!(
+            "Calculated & wrote {} features to output file {} in {}",
+            num_written.to_formatted_string(&Locale::en),
+            args.output_filename.replace("%s", "ends-full-upstreams"),
+            formatting::format_duration(started_ends_upstreams.elapsed()),
+        );
+        calc_ends_upstreams.finish();
+        progress_bars.remove(&calc_ends_upstreams);
+    }
+
     info!(
         "Finished all in {}",
         formatting::format_duration(global_start.elapsed())

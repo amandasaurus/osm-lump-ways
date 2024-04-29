@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* New: `ends-full-upstreams` with `osm-lump-ways-down` for showing the upstream
+  of end points.
 * Internal refactoring to attempt to reduce memory usage & time needed
 * `osm-lump-ways-down`: Strahler & Upstream Points output only produced if
   `--strahler`/`--upstream-points` argument(s) given
