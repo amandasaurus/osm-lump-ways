@@ -697,7 +697,7 @@ fn main() -> Result<()> {
             (
                 // Round the upstream to only output 1 decimal place
                 serde_json::json!({
-                    "from_upstream_m": round(&upstream_len, 1),
+                    "from_upstream_m": round(upstream_len, 1),
                     "upstream_node_count": upstream_node_count,
                     //"to_upstream_m": round(length_upstream[&to_nid], 1),
                 }),
@@ -741,7 +741,7 @@ fn main() -> Result<()> {
                 (
                     // Round the upstream to only output 1 decimal place
                     serde_json::json!({
-                        "from_upstream_m": round(&upstream_len, 1),
+                        "from_upstream_m": round(upstream_len, 1),
                         "upstream_node_count": upstream_node_count,
                     }),
                     nodeid_pos.get(&from_nid).unwrap(),
