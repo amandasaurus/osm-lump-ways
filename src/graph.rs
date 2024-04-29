@@ -1068,7 +1068,6 @@ impl UniDirectedGraph {
 
         new
     }
-
 }
 
 impl DirectedGraphTrait for UniDirectedGraph {

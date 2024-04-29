@@ -587,9 +587,15 @@ fn main() -> Result<()> {
             .with_style(style.clone()),
     );
 
-    let mut length_upstream: BTreeMapSplitKey<f64> = BTreeMapSplitKey::new();
+    let mut length_upstream: BTreeMapSplitKey<(f64, i64)> = BTreeMapSplitKey::new();
     info_memory_used!();
-    let (mut curr_upstream, mut num_outs, mut per_downstream, mut curr_pos);
+    let (
+        mut curr_upstream,
+        mut curr_upstream_node_count,
+        mut num_outs,
+        mut per_downstream,
+        mut curr_pos,
+    );
     let (mut other_pos, mut this_edge_len);
 
     // Vec<u32> → All upstream strahler numbers.
@@ -650,15 +656,17 @@ fn main() -> Result<()> {
             parent_strahlers.remove(&v);
         }
 
-        curr_upstream = length_upstream.entry(v).or_insert(0.);
+        (curr_upstream, curr_upstream_node_count) = *length_upstream.entry(v).or_insert((0., 0));
         num_outs = g.out_neighbours(v).count() as f64;
-        per_downstream = *curr_upstream / num_outs;
+        per_downstream = curr_upstream / num_outs;
         curr_pos = nodeid_pos.get(&v).unwrap();
         for other in g.out_neighbours(v) {
             other_pos = nodeid_pos.get(&other)?;
             this_edge_len =
                 haversine::haversine_m(curr_pos.0, curr_pos.1, other_pos.0, other_pos.1);
-            *length_upstream.entry(other).or_insert(0.) += per_downstream + this_edge_len;
+            let new = length_upstream.entry(other).or_default();
+            new.0 += per_downstream + this_edge_len;
+            new.1 += 1 + curr_upstream_node_count;
             if args.strahler {
                 parent_strahlers
                     .entry(other)
@@ -682,13 +690,15 @@ fn main() -> Result<()> {
         .edges_iter()
         .filter(|(from_nid, _to_nid)| {
             args.min_upstream_m
-                .map_or(true, |min| length_upstream.get(from_nid).unwrap() >= &min)
+                .map_or(true, |min| length_upstream.get(from_nid).unwrap().0 >= min)
         })
         .map(|(from_nid, to_nid)| {
+            let (upstream_len, upstream_node_count) = length_upstream.get(&from_nid).unwrap();
             (
                 // Round the upstream to only output 1 decimal place
                 serde_json::json!({
-                    "from_upstream_m": round(length_upstream.get(&from_nid).unwrap(), 1),
+                    "from_upstream_m": round(&upstream_len, 1),
+                    "upstream_node_count": upstream_node_count,
                     //"to_upstream_m": round(length_upstream[&to_nid], 1),
                 }),
                 (
@@ -724,13 +734,15 @@ fn main() -> Result<()> {
             .edges_iter()
             .filter(|(from_nid, _to_nid)| {
                 args.min_upstream_m
-                    .map_or(true, |min| length_upstream.get(from_nid).unwrap() >= &min)
+                    .map_or(true, |min| length_upstream.get(from_nid).unwrap().0 >= min)
             })
             .map(|(from_nid, _to_nid)| {
+                let (upstream_len, upstream_node_count) = length_upstream.get(&from_nid).unwrap();
                 (
                     // Round the upstream to only output 1 decimal place
                     serde_json::json!({
-                        "from_upstream_m": round(length_upstream.get(&from_nid).unwrap(), 1),
+                        "from_upstream_m": round(&upstream_len, 1),
+                        "upstream_node_count": upstream_node_count,
                     }),
                     nodeid_pos.get(&from_nid).unwrap(),
                 )
@@ -851,24 +863,32 @@ fn main() -> Result<()> {
             );
         }
     }
-    let end_points = Arc::try_unwrap(end_points)
-        .unwrap()
-        .into_inner()
-        .unwrap();
+    let end_points = Arc::try_unwrap(end_points).unwrap().into_inner().unwrap();
 
     // look for where it ends
     let end_points: Vec<_> = end_points
         .into_par_iter()
         .map(|(nid, mbms)| (nid, mbms, length_upstream.get(&nid).unwrap()))
-        .filter(|(_nid, _mbms, len)| args.min_upstream_m.map_or(true, |min| len >= &&min))
-        .map(|(nid, mbms, len)| (nid, mbms, len, nodeid_pos.get(&nid).unwrap()))
+        .map(|(nid, mbms, lens)| (nid, mbms, lens.0, lens.1))
+        .filter(|(_nid, _mbms, len, _upstream_count)| {
+            args.min_upstream_m.map_or(true, |min| len >= &min)
+        })
+        .map(|(nid, mbms, len, upstream_count)| {
+            (
+                nid,
+                mbms,
+                len,
+                upstream_count,
+                nodeid_pos.get(&nid).unwrap(),
+            )
+        })
         .collect();
 
     let end_points_output = end_points
         .iter()
-        .map(|(nid, mbms, len, pos)| {
+        .map(|(nid, mbms, len, upstream_count, pos)| {
             // Round the upstream to only output 1 decimal place
-            let mut props = serde_json::json!({"upstream_m": round(len, 1), "nid": nid});
+            let mut props = serde_json::json!({"upstream_m": round(len, 1), "upstream_node_count": *upstream_count, "nid": nid});
             if !ends_membership.is_empty() {
                 for (end_attr_filter, res) in ends_membership.iter().zip(mbms.iter()) {
                     props[format!("is_in:{}", end_attr_filter.to_string())] = (*res).into();

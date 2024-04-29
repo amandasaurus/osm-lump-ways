@@ -5,6 +5,8 @@
 * Internal refactoring to attempt to reduce memory usage & time needed
 * `osm-lump-ways-down`: Strahler & Upstream Points output only produced if
   `--strahler`/`--upstream-points` argument(s) given
+* `osm-lump-ways-down`: end & upstream files include the total number of
+  upstream OSM nodes at each point.
 
 ## v0.25.0 (2024-04-24)
 

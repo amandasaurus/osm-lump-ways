@@ -35,7 +35,6 @@ impl Geometry for &(f64, f64) {
     }
 }
 
-
 impl Geometry for ((f64, f64), (f64, f64)) {
     fn type_name(&self) -> &[u8] {
         b"LineString"
