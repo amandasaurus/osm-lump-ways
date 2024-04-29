@@ -795,11 +795,11 @@ fn main() -> Result<()> {
 
     let mut ends_membership = args.ends_membership.clone();
     ends_membership.sort_by_key(|tf| tf.to_string());
-    let nids_wo_outgoing: BTreeMap<i64, smallvec::SmallVec<[bool; 2]>> = g
+    let end_points: BTreeMap<i64, smallvec::SmallVec<[bool; 2]>> = g
         .vertexes_wo_outgoing_jumbled()
         .map(|nid| (nid, smallvec::smallvec![false; ends_membership.len()]))
         .collect();
-    let nids_wo_outgoing = Arc::new(std::sync::RwLock::new(nids_wo_outgoing));
+    let end_points = Arc::new(std::sync::RwLock::new(end_points));
 
     if !ends_membership.is_empty() {
         info!("Rereading file to add memberships for ends");
@@ -820,12 +820,12 @@ fn main() -> Result<()> {
             .filter(|w| {
                 w.nodes()
                     .par_iter()
-                    .any(|n| nids_wo_outgoing.read().unwrap().contains_key(n))
+                    .any(|n| end_points.read().unwrap().contains_key(n))
             })
-            .for_each_with(nids_wo_outgoing.clone(), |nids_wo_outgoing, w| {
-                let mut nids_wo_outgoing = nids_wo_outgoing.write().unwrap();
+            .for_each_with(end_points.clone(), |end_points, w| {
+                let mut end_points = end_points.write().unwrap();
                 for nid in w.nodes() {
-                    if let Some(memb_vec) = nids_wo_outgoing.get_mut(nid) {
+                    if let Some(memb_vec) = end_points.get_mut(nid) {
                         for (func, res) in ends_membership.iter().zip(memb_vec.iter_mut()) {
                             *res = func.filter(&w);
                         }
@@ -833,7 +833,7 @@ fn main() -> Result<()> {
                 }
             });
         // How many have ≥1 true value (versus all default of false)
-        let num_nodes_attributed = nids_wo_outgoing
+        let num_nodes_attributed = end_points
             .read()
             .unwrap()
             .par_iter()
@@ -842,21 +842,21 @@ fn main() -> Result<()> {
         if num_nodes_attributed == 0 {
             warn!("No end nodes got an end attribute.")
         } else {
-            let nids_wo_outgoing = nids_wo_outgoing.read().unwrap();
+            let ends_points = end_points.read().unwrap();
             info!(
                 "{} of {} ({:.1}%) end points got an attribute for way membership",
                 num_nodes_attributed.to_formatted_string(&Locale::en),
-                nids_wo_outgoing.len().to_formatted_string(&Locale::en),
-                ((100. * num_nodes_attributed as f64) / nids_wo_outgoing.len() as f64)
+                ends_points.len().to_formatted_string(&Locale::en),
+                ((100. * num_nodes_attributed as f64) / ends_points.len() as f64)
             );
         }
     }
-    let nids_wo_outgoing = Arc::try_unwrap(nids_wo_outgoing)
+    let end_points = Arc::try_unwrap(end_points)
         .unwrap()
         .into_inner()
         .unwrap();
     // look for where it ends
-    let end_points = nids_wo_outgoing
+    let end_points_output = end_points
         .into_iter()
         .map(|(nid, mbms)| (nid, mbms, length_upstream.get(&nid).unwrap()))
         .filter(|(_nid, _mbms, len)| args.min_upstream_m.map_or(true, |min| len >= &&min))
@@ -875,7 +875,7 @@ fn main() -> Result<()> {
     let mut f = std::io::BufWriter::new(std::fs::File::create(
         args.output_filename.replace("%s", "ends"),
     )?);
-    let num_written = write_geojson_features_directly(end_points, &mut f, &output_format)?;
+    let num_written = write_geojson_features_directly(end_points_output, &mut f, &output_format)?;
     info!(
         "Wrote {} features to output file {}",
         num_written.to_formatted_string(&Locale::en),
