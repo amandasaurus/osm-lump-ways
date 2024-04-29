@@ -1056,6 +1056,19 @@ impl UniDirectedGraph {
             edges: BTreeMapSplitKey::new(),
         }
     }
+
+    pub fn into_reversed(self) -> Self {
+        let mut new = Self::new();
+
+        for (k, vs) in self.edges.into_iter() {
+            for v in vs.into_iter() {
+                new.add_edge(v, k);
+            }
+        }
+
+        new
+    }
+
 }
 
 impl DirectedGraphTrait for UniDirectedGraph {
