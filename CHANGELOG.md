@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.26.0 (2024-05-02)
 
 * New: `ends-full-upstreams` with `osm-lump-ways-down` for showing the upstream
   of end points.
