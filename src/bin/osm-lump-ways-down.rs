@@ -930,13 +930,13 @@ fn main() -> Result<()> {
             .filter(|(_nid, _mbms, len, _upstream_count, _pos)| {
                 if args
                     .ends_upstreams_min_upstream_m
-                    .map_or(false, |m| len < &&m)
+                    .map_or(false, |m| len < &m)
                 {
                     // since we're not doing this end point, update the progress bar
                     calc_ends_upstreams.inc(len.round() as u64);
                 }
                 args.ends_upstreams_min_upstream_m
-                    .map_or(true, |min_len| len >= &&min_len)
+                    .map_or(true, |min_len| len >= &min_len)
             })
             .map(|(nid, _mbms, len, _upstream_count, _pos)| {
                 let all_upstream_paths =
