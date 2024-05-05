@@ -1,8 +1,11 @@
 /*.geojson
 /*.geojsons
 /*.geojsons.zst
+/*.geojsons.gz
 /*.gpkg
+/*.gpkg*
 /*.mbtiles
+/*.mbtiles-journal
 /*.osm.pbf
 /*.pmtiles
 /*.pmtiles-journal
