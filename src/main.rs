@@ -563,9 +563,7 @@ fn main() -> Result<()> {
         trace!("Preparing extra json properties");
         way_group.extra_json_props["root_wayid"] = way_group.root_wayid.into();
         way_group.extra_json_props["root_wayid_120"] = (way_group.root_wayid % 120).into();
-        if let Some(_l) = way_group.length_m {
-            way_group.extra_json_props["length_m"] = way_group.length_m.into();
-        }
+        way_group.extra_json_props["length_m"] = way_group.length_m.into();
         for (i, group) in way_group.group.iter().enumerate() {
             way_group.extra_json_props[format!("tag_group_{}", i)] = group.as_ref().cloned().into();
         }
