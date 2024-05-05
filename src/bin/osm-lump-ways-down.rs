@@ -97,8 +97,19 @@ fn main() -> Result<()> {
         std::env!("CARGO_PKG_VERSION")
     );
 
-    let reader = read_progress::BufReaderWithSize::from_path(&args.input_filename)?;
-    let mut reader = osmio::stringpbf::PBFReader::new(reader);
+    let file_reading_style =
+                ProgressStyle::with_template(
+        "[{elapsed_precise}] {percent:>3}% done. eta {eta:>4} {bar:10.cyan/blue} {bytes:>7}/{total_bytes:7} {per_sec:>12} {msg}",
+            ).unwrap();
+    let input_fp = std::fs::File::open(&args.input_filename)?;
+    let input_bar = progress_bars.add(
+        ProgressBar::new(input_fp.metadata()?.len())
+            .with_message("Reading input file")
+            .with_style(file_reading_style.clone()),
+    );
+    let rdr = input_bar.wrap_read(input_fp);
+
+    let mut reader = osmio::stringpbf::PBFReader::new(rdr);
 
     if !args.output_filename.contains("%s") {
         error!("No %s found in output filename ({})", args.output_filename);
@@ -289,6 +300,8 @@ fn main() -> Result<()> {
     progress_bars.remove(&obj_reader);
     ways_added.finish();
     progress_bars.remove(&ways_added);
+    input_bar.finish();
+    progress_bars.remove(&input_bar);
     let g: graph::DirectedGraph2 = Arc::try_unwrap(g).unwrap().into_inner().unwrap();
 
     info!(
