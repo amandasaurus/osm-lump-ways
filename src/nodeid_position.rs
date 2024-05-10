@@ -3,6 +3,7 @@ use super::*;
 use osmio::{Lat, Lon};
 use std::collections::BTreeMap;
 
+#[allow(dead_code)]
 /// Store the position of a node based on it's id
 pub trait NodeIdPosition: std::fmt::Debug + std::marker::Send + std::marker::Sync {
     fn new() -> Self
