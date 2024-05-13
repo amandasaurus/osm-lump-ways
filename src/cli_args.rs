@@ -206,6 +206,10 @@ pub(crate) struct Args {
     #[arg(long, default_value = "false")]
     pub strahler: bool,
 
+    /// Calculate & write a file with each upstream line
+    #[arg(long, default_value="false")]
+    pub upstreams: bool,
+    
     /// Calculate & write a file with each upstream line, but the geometry is a point
     #[arg(long, default_value = "false")]
     pub upstream_points: bool,

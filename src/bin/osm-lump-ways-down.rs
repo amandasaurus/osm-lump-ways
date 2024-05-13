@@ -698,48 +698,50 @@ fn main() -> Result<()> {
     );
     info_memory_used!();
 
-    debug!("Writing upstream geojson object(s)");
-    let lines = g
-        .edges_iter()
-        .filter(|(from_nid, _to_nid)| {
-            args.min_upstream_m
-                .map_or(true, |min| length_upstream.get(from_nid).unwrap().0 >= min)
-        })
-        .map(|(from_nid, to_nid)| {
-            let (upstream_len, upstream_node_count) = length_upstream.get(&from_nid).unwrap();
-            (
-                // Round the upstream to only output 1 decimal place
-                serde_json::json!({
-                    "from_upstream_m": round(upstream_len, 1),
-                    "upstream_node_count": upstream_node_count,
-                    //"to_upstream_m": round(length_upstream[&to_nid], 1),
-                }),
+    if args.upstreams {
+        debug!("Writing upstream geojson object(s)");
+        let lines = g
+            .edges_iter()
+            .filter(|(from_nid, _to_nid)| {
+                args.min_upstream_m
+                    .map_or(true, |min| length_upstream.get(from_nid).unwrap().0 >= min)
+            })
+            .map(|(from_nid, to_nid)| {
+                let (upstream_len, upstream_node_count) = length_upstream.get(&from_nid).unwrap();
                 (
-                    nodeid_pos.get(&from_nid).unwrap(),
-                    nodeid_pos.get(&to_nid).unwrap(),
-                ),
-            )
-        });
-    info_memory_used!();
+                    // Round the upstream to only output 1 decimal place
+                    serde_json::json!({
+                        "from_upstream_m": round(upstream_len, 1),
+                        "upstream_node_count": upstream_node_count,
+                        //"to_upstream_m": round(length_upstream[&to_nid], 1),
+                    }),
+                    (
+                        nodeid_pos.get(&from_nid).unwrap(),
+                        nodeid_pos.get(&to_nid).unwrap(),
+                    ),
+                )
+            });
+        info_memory_used!();
 
-    let writing_upstreams_bar = progress_bars.add(
-        ProgressBar::new(g.num_edges() as u64)
-            .with_message("Writing upstreams geojson(s) file")
-            .with_style(style.clone()),
-    );
+        let writing_upstreams_bar = progress_bars.add(
+            ProgressBar::new(g.num_edges() as u64)
+                .with_message("Writing upstreams geojson(s) file")
+                .with_style(style.clone()),
+        );
 
-    let lines = lines.progress_with(writing_upstreams_bar);
+        let lines = lines.progress_with(writing_upstreams_bar);
 
-    let mut f = std::io::BufWriter::new(std::fs::File::create(
-        args.output_filename.replace("%s", "upstreams"),
-    )?);
-    let num_written = write_geojson_features_directly(lines, &mut f, &output_format)?;
+        let mut f = std::io::BufWriter::new(std::fs::File::create(
+            args.output_filename.replace("%s", "upstreams"),
+        )?);
+        let num_written = write_geojson_features_directly(lines, &mut f, &output_format)?;
 
-    info!(
-        "Wrote {} features to output file {}",
-        num_written.to_formatted_string(&Locale::en),
-        args.output_filename.replace("%s", "upstreams")
-    );
+        info!(
+            "Wrote {} features to output file {}",
+            num_written.to_formatted_string(&Locale::en),
+            args.output_filename.replace("%s", "upstreams")
+        );
+    }
 
     if args.upstream_points {
         debug!("Writing upstream geojson points");
