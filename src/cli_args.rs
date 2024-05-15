@@ -207,7 +207,7 @@ pub(crate) struct Args {
     pub strahler: bool,
 
     /// Calculate & write a file with each upstream line
-    #[arg(long, default_value="false")]
+    #[arg(long, default_value = "false")]
     pub upstreams: bool,
 
     /// For every upstream, include details on which end point(s) this eventually flows to.
@@ -218,7 +218,7 @@ pub(crate) struct Args {
     /// from_upstream_m value rounded to the nearest multiple of N.
     #[arg(long)]
     pub upstream_from_upstream_multiple: Vec<i64>,
-    
+
     /// Calculate & write a file with each upstream line, but the geometry is a point
     #[arg(long, default_value = "false")]
     pub upstream_points: bool,
@@ -234,7 +234,6 @@ pub(crate) struct Args {
     /// Upstream from each end goes only up this many nodes.
     #[arg(long)]
     pub ends_upstreams_max_nodes: Option<i64>,
-
 }
 
 /// CLI arg parser. If the value starts with @, the rest is assumed to be a filename, the contents

@@ -851,7 +851,8 @@ fn main() -> Result<()> {
                     .map_or(true, |min| length_upstream.get(from_nid).unwrap().0 >= min)
             })
             .map(|(from_nid, to_nid)| {
-                let (upstream_len, upstream_node_count, ends) = length_upstream.get(&from_nid).unwrap();
+                let (upstream_len, upstream_node_count, ends) =
+                    length_upstream.get(&from_nid).unwrap();
                 // Round the upstream to only output 1 decimal place
                 let mut props = serde_json::json!({
                     "from_upstream_m": round(upstream_len, 1),
@@ -860,7 +861,8 @@ fn main() -> Result<()> {
                 });
 
                 for mult in args.upstream_from_upstream_multiple.iter() {
-                    props[format!("from_upstream_m_{}", mult)] = round_mult(&upstream_len, *mult).into();
+                    props[format!("from_upstream_m_{}", mult)] =
+                        round_mult(&upstream_len, *mult).into();
                 }
 
                 if args.upstream_tag_ends {
