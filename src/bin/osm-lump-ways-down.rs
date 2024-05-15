@@ -25,6 +25,7 @@ use std::sync::{Arc, Mutex};
 use num_format::{Locale, ToFormattedString};
 
 use country_boundaries::{CountryBoundaries, LatLon, BOUNDARIES_ODBL_360X180};
+use ordered_float::OrderedFloat;
 
 use smallvec::SmallVec;
 
@@ -600,7 +601,8 @@ fn main() -> Result<()> {
             .with_style(style.clone()),
     );
 
-    let mut length_upstream: BTreeMapSplitKey<(f64, i64)> = BTreeMapSplitKey::new();
+    let mut length_upstream: BTreeMapSplitKey<(f64, i64, SmallVec<[i64; 1]>)> =
+        BTreeMapSplitKey::new();
     info_memory_used!();
     let (
         mut curr_upstream,
@@ -669,7 +671,7 @@ fn main() -> Result<()> {
             parent_strahlers.remove(&v);
         }
 
-        (curr_upstream, curr_upstream_node_count) = *length_upstream.entry(v).or_default();
+        (curr_upstream, curr_upstream_node_count, _) = *length_upstream.entry(v).or_default();
         num_outs = g.out_neighbours(v).count() as f64;
         per_downstream = curr_upstream / num_outs;
         curr_pos = nodeid_pos.get(&v).unwrap();
@@ -697,128 +699,6 @@ fn main() -> Result<()> {
         length_upstream.len().to_formatted_string(&Locale::en)
     );
     info_memory_used!();
-
-    if args.upstreams {
-        debug!("Writing upstream geojson object(s)");
-        let lines = g
-            .edges_iter()
-            .filter(|(from_nid, _to_nid)| {
-                args.min_upstream_m
-                    .map_or(true, |min| length_upstream.get(from_nid).unwrap().0 >= min)
-            })
-            .map(|(from_nid, to_nid)| {
-                let (upstream_len, upstream_node_count) = length_upstream.get(&from_nid).unwrap();
-                (
-                    // Round the upstream to only output 1 decimal place
-                    serde_json::json!({
-                        "from_upstream_m": round(upstream_len, 1),
-                        "upstream_node_count": upstream_node_count,
-                        //"to_upstream_m": round(length_upstream[&to_nid], 1),
-                    }),
-                    (
-                        nodeid_pos.get(&from_nid).unwrap(),
-                        nodeid_pos.get(&to_nid).unwrap(),
-                    ),
-                )
-            });
-        info_memory_used!();
-
-        let writing_upstreams_bar = progress_bars.add(
-            ProgressBar::new(g.num_edges() as u64)
-                .with_message("Writing upstreams geojson(s) file")
-                .with_style(style.clone()),
-        );
-
-        let lines = lines.progress_with(writing_upstreams_bar);
-
-        let mut f = std::io::BufWriter::new(std::fs::File::create(
-            args.output_filename.replace("%s", "upstreams"),
-        )?);
-        let num_written = write_geojson_features_directly(lines, &mut f, &output_format)?;
-
-        info!(
-            "Wrote {} features to output file {}",
-            num_written.to_formatted_string(&Locale::en),
-            args.output_filename.replace("%s", "upstreams")
-        );
-    }
-
-    if args.upstream_points {
-        debug!("Writing upstream geojson points");
-        let upstream_points = g
-            .edges_iter()
-            .filter(|(from_nid, _to_nid)| {
-                args.min_upstream_m
-                    .map_or(true, |min| length_upstream.get(from_nid).unwrap().0 >= min)
-            })
-            .map(|(from_nid, _to_nid)| {
-                let (upstream_len, upstream_node_count) = length_upstream.get(&from_nid).unwrap();
-                (
-                    // Round the upstream to only output 1 decimal place
-                    serde_json::json!({
-                        "from_upstream_m": round(upstream_len, 1),
-                        "upstream_node_count": upstream_node_count,
-                    }),
-                    nodeid_pos.get(&from_nid).unwrap(),
-                )
-            });
-        info_memory_used!();
-
-        let writing_upstreams_bar = progress_bars.add(
-            ProgressBar::new(g.num_edges() as u64)
-                .with_message("Writing upstream points geojson(s) file")
-                .with_style(style.clone()),
-        );
-
-        let upstream_points = upstream_points.progress_with(writing_upstreams_bar);
-
-        let mut f = std::io::BufWriter::new(std::fs::File::create(
-            args.output_filename.replace("%s", "upstream-points"),
-        )?);
-        let num_written = write_geojson_features_directly(upstream_points, &mut f, &output_format)?;
-
-        info!(
-            "Wrote {} features to output file {}",
-            num_written.to_formatted_string(&Locale::en),
-            args.output_filename.replace("%s", "upstream-points")
-        );
-    }
-
-    if args.strahler {
-        debug!("Writing strahler number geojson object(s)");
-        let strahler_lines = g.edges_iter().map(|(from_nid, to_nid)| {
-            (
-                // Round the upstream to only output 1 decimal place
-                serde_json::json!({
-                    "strahler": strahler.get(&from_nid)
-                }),
-                (
-                    nodeid_pos.get(&from_nid).unwrap(),
-                    nodeid_pos.get(&to_nid).unwrap(),
-                ),
-            )
-        });
-        info_memory_used!();
-
-        let writing_upstreams_bar = progress_bars.add(
-            ProgressBar::new(g.num_edges() as u64)
-                .with_message("Writing strahler geojson(s) file")
-                .with_style(style.clone()),
-        );
-
-        let strahler_lines = strahler_lines.progress_with(writing_upstreams_bar);
-
-        let mut f = std::io::BufWriter::new(std::fs::File::create(
-            args.output_filename.replace("%s", "strahler"),
-        )?);
-        let num_strahler_written =
-            write_geojson_features_directly(strahler_lines, &mut f, &output_format)?;
-        info!(
-            "Wrote {} features to output file {}",
-            num_strahler_written.to_formatted_string(&Locale::en),
-            args.output_filename.replace("%s", "strahler")
-        );
-    }
 
     let mut ends_membership = args.ends_membership.clone();
     ends_membership.sort_by_key(|tf| tf.to_string());
@@ -881,7 +761,7 @@ fn main() -> Result<()> {
     let end_points = Arc::try_unwrap(end_points).unwrap().into_inner().unwrap();
 
     // look for where it ends
-    let end_points: Vec<_> = end_points
+    let end_points: BTreeMap<_, _> = end_points
         .into_par_iter()
         .map(|(nid, mbms)| (nid, mbms, length_upstream.get(&nid).unwrap()))
         .map(|(nid, mbms, lens)| (nid, mbms, lens.0, lens.1))
@@ -891,17 +771,14 @@ fn main() -> Result<()> {
         .map(|(nid, mbms, len, upstream_count)| {
             (
                 nid,
-                mbms,
-                len,
-                upstream_count,
-                nodeid_pos.get(&nid).unwrap(),
+                (mbms, len, upstream_count, nodeid_pos.get(&nid).unwrap()),
             )
         })
         .collect();
 
     let end_points_output = end_points
         .iter()
-        .map(|(nid, mbms, len, upstream_count, pos)| {
+        .map(|(nid, (mbms, len, upstream_count, pos))| {
             // Round the upstream to only output 1 decimal place
             let mut props = serde_json::json!({"upstream_m": round(len, 1), "upstream_node_count": *upstream_count, "nid": nid});
             if !ends_membership.is_empty() {
@@ -923,13 +800,206 @@ fn main() -> Result<()> {
         args.output_filename.replace("%s", "ends")
     );
 
+    let reversed_g = g.into_reversed();
+    if args.upstream_tag_ends {
+        // TODO use topologically_sorted_nodes instead of looping over all the ends
+        info!("For all points, recording which end it flows into");
+        let started_upstream_tag_ends = Instant::now();
+        let calc_ends_points = progress_bars.add(
+            ProgressBar::new(end_points.len() as u64)
+                .with_message("Calculating the end point(s) for all points (ends processed)")
+                .with_style(style.clone()),
+        );
+
+        let mut seen_vertexes = HashSet::new();
+        let mut frontier = Vec::new();
+        let mut new;
+        for end_nid in end_points
+            .iter()
+            .map(|(nid, (_mbms, _len, _upstream_count, _pos))| nid)
+        {
+            seen_vertexes.clear();
+            frontier.push(*end_nid);
+            while let Some(nid) = frontier.pop() {
+                //dbg!(frontier.len()+1)
+                new = length_upstream.entry(nid).or_default();
+                new.2.push(*end_nid);
+                new.2.sort();
+                seen_vertexes.insert(nid);
+                frontier.extend(
+                    reversed_g
+                        .out_neighbours(nid)
+                        .filter(|n2| !seen_vertexes.contains(n2)),
+                );
+            }
+            calc_ends_points.inc(1);
+        }
+        info!(
+            "Calculated, for {} end points, all the upstreams in {} ",
+            end_points.len().to_formatted_string(&Locale::en),
+            formatting::format_duration(started_upstream_tag_ends.elapsed()),
+        );
+    }
+
+    if args.upstreams {
+        debug!("Writing upstream geojson object(s)");
+        let lines = reversed_g
+            .edges_iter()
+            .map(|(a, b)| (b, a)) // undo the graph reversal here
+            .filter(|(from_nid, _to_nid)| {
+                args.min_upstream_m
+                    .map_or(true, |min| length_upstream.get(from_nid).unwrap().0 >= min)
+            })
+            .map(|(from_nid, to_nid)| {
+                let (upstream_len, upstream_node_count, ends) = length_upstream.get(&from_nid).unwrap();
+                // Round the upstream to only output 1 decimal place
+                let mut props = serde_json::json!({
+                    "from_upstream_m": round(upstream_len, 1),
+                    "upstream_node_count": upstream_node_count,
+                    //"to_upstream_m": round(length_upstream[&to_nid], 1),
+                });
+
+                props["from_upstream_m_10"] = round_mult(&upstream_len, 10).into();
+                props["from_upstream_m_100"] = round_mult(&upstream_len, 100).into();
+                props["from_upstream_m_1000"] = round_mult(&upstream_len, 1000).into();
+
+                if args.upstream_tag_ends {
+                    props["num_ends"] = ends.len().into();
+                    props["ends"] = ends.iter().copied().collect::<Vec<i64>>().into();
+                    let mut ends_strs = vec![",".to_string()];
+                    let mut this_len;
+                    let mut biggest_end = (length_upstream.get(&ends[0]).unwrap().0, ends[0]);
+                    for end in ends {
+                        ends_strs.push(end.to_string());
+                        ends_strs.push(",".to_string());
+                        this_len = length_upstream.get(&ends[0]).unwrap().0;
+                        if this_len > biggest_end.0 {
+                            biggest_end = (this_len, *end);
+                        }
+                    }
+                    props["ends_s"] = ends_strs.join("").into();
+                    props["biggest_end_upstream_m"] = round(&biggest_end.0, 1).into();
+                    props["biggest_end_nid"] = biggest_end.1.into();
+                }
+
+                (
+                    props,
+                    (
+                        nodeid_pos.get(&from_nid).unwrap(),
+                        nodeid_pos.get(&to_nid).unwrap(),
+                    ),
+                )
+            });
+        info_memory_used!();
+
+        let writing_upstreams_bar = progress_bars.add(
+            ProgressBar::new(reversed_g.num_edges() as u64)
+                .with_message("Writing upstreams geojson(s) file")
+                .with_style(style.clone()),
+        );
+
+        let lines = lines.progress_with(writing_upstreams_bar);
+
+        let mut f = std::io::BufWriter::new(std::fs::File::create(
+            args.output_filename.replace("%s", "upstreams"),
+        )?);
+        let num_written = write_geojson_features_directly(lines, &mut f, &output_format)?;
+
+        info!(
+            "Wrote {} features to output file {}",
+            num_written.to_formatted_string(&Locale::en),
+            args.output_filename.replace("%s", "upstreams")
+        );
+    }
+
+    if args.upstream_points {
+        debug!("Writing upstream geojson points");
+        let upstream_points = reversed_g
+            .edges_iter()
+            .map(|(a, b)| (b, a)) // undo the graph reversal here
+            .filter(|(from_nid, _to_nid)| {
+                args.min_upstream_m
+                    .map_or(true, |min| length_upstream.get(from_nid).unwrap().0 >= min)
+            })
+            .map(|(from_nid, _to_nid)| {
+                let (upstream_len, upstream_node_count, _ends) =
+                    length_upstream.get(&from_nid).unwrap();
+                (
+                    // Round the upstream to only output 1 decimal place
+                    serde_json::json!({
+                        "from_upstream_m": round(upstream_len, 1),
+                        "upstream_node_count": upstream_node_count,
+                    }),
+                    nodeid_pos.get(&from_nid).unwrap(),
+                )
+            });
+        info_memory_used!();
+
+        let writing_upstreams_bar = progress_bars.add(
+            ProgressBar::new(reversed_g.num_edges() as u64)
+                .with_message("Writing upstream points geojson(s) file")
+                .with_style(style.clone()),
+        );
+
+        let upstream_points = upstream_points.progress_with(writing_upstreams_bar);
+
+        let mut f = std::io::BufWriter::new(std::fs::File::create(
+            args.output_filename.replace("%s", "upstream-points"),
+        )?);
+        let num_written = write_geojson_features_directly(upstream_points, &mut f, &output_format)?;
+
+        info!(
+            "Wrote {} features to output file {}",
+            num_written.to_formatted_string(&Locale::en),
+            args.output_filename.replace("%s", "upstream-points")
+        );
+    }
+
+    if args.strahler {
+        debug!("Writing strahler number geojson object(s)");
+        let strahler_lines = reversed_g
+            .edges_iter()
+            .map(|(a, b)| (b, a)) // undo graph reversal
+            .map(|(from_nid, to_nid)| {
+                (
+                    // Round the upstream to only output 1 decimal place
+                    serde_json::json!({
+                        "strahler": strahler.get(&from_nid)
+                    }),
+                    (
+                        nodeid_pos.get(&from_nid).unwrap(),
+                        nodeid_pos.get(&to_nid).unwrap(),
+                    ),
+                )
+            });
+        info_memory_used!();
+
+        let writing_upstreams_bar = progress_bars.add(
+            ProgressBar::new(reversed_g.num_edges() as u64)
+                .with_message("Writing strahler geojson(s) file")
+                .with_style(style.clone()),
+        );
+
+        let strahler_lines = strahler_lines.progress_with(writing_upstreams_bar);
+
+        let mut f = std::io::BufWriter::new(std::fs::File::create(
+            args.output_filename.replace("%s", "strahler"),
+        )?);
+        let num_strahler_written =
+            write_geojson_features_directly(strahler_lines, &mut f, &output_format)?;
+        info!(
+            "Wrote {} features to output file {}",
+            num_strahler_written.to_formatted_string(&Locale::en),
+            args.output_filename.replace("%s", "strahler")
+        );
+    }
     if args.ends_upstreams {
         let started_ends_upstreams = Instant::now();
         let calc_ends_upstreams = progress_bars.add(
             ProgressBar::new(
                 end_points
                     .par_iter()
-                    .map(|(_nid, _mbms, len, _upstream_count, _pos)| len.round() as u64)
+                    .map(|(_nid, (_mbms, len, _upstream_count, _pos))| len.round() as u64)
                     .sum(),
             )
             .with_message("Calculating complete upstream network per end point")
@@ -939,10 +1009,10 @@ fn main() -> Result<()> {
             "Calculating the complete upstream network for {} end points (but only 100 points upstream)",
             end_points.len()
         );
-        let g = g.into_reversed();
+        //let g = g.into_reversed();
         let end_point_upstreams = end_points
             .iter()
-            .filter(|(_nid, _mbms, len, _upstream_count, _pos)| {
+            .filter(|(_nid, (_mbms, len, _upstream_count, _pos))| {
                 if args
                     .ends_upstreams_min_upstream_m
                     .map_or(false, |m| len < &m)
@@ -953,9 +1023,9 @@ fn main() -> Result<()> {
                 args.ends_upstreams_min_upstream_m
                     .map_or(true, |min_len| len >= &min_len)
             })
-            .map(|(nid, _mbms, len, _upstream_count, _pos)| {
+            .map(|(nid, (_mbms, len, _upstream_count, _pos))| {
                 let all_upstream_paths =
-                    g.all_out_edges_recursive(*nid, args.ends_upstreams_max_nodes);
+                    reversed_g.all_out_edges_recursive(*nid, args.ends_upstreams_max_nodes);
                 let all_upstream_paths = all_upstream_paths
                     .map(|path| {
                         path.par_iter()
@@ -1125,4 +1195,27 @@ fn multilinestring_length(coords: &Vec<Vec<(f64, f64)>>) -> f64 {
 fn round(f: &f64, places: u8) -> f64 {
     let places: f64 = 10_u64.pow(places as u32) as f64;
     (f * places).round() / places
+}
+
+/// Round this float to be a whole number multiple of base.
+fn round_mult(f: &f64, base: i64) -> i64 {
+    (f / (base as f64)).round() as i64 * base
+}
+
+fn _bbox_area(points: impl Iterator<Item = (f64, f64)>) -> Option<f64> {
+    use std::cmp::{max, min};
+    points
+        .map(|p| (OrderedFloat(p.0), OrderedFloat(p.1)))
+        .map(|p| (p.0, p.0, p.1, p.1))
+        .reduce(|acc, p| {
+            (
+                min(acc.0, p.0),
+                max(acc.1, p.1),
+                min(acc.2, p.2),
+                max(acc.3, p.3),
+            )
+        })
+        .map(|bbox| (bbox.1 - bbox.0, bbox.3 - bbox.2))
+        .map(|delta| (delta.0.into_inner(), delta.1.into_inner()))
+        .map(|delta| delta.0 * delta.1)
 }

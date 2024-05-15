@@ -138,7 +138,10 @@ component](https://en.wikipedia.org/wiki/Strongly_connected_component).
 
 ### `upstreams`
 
-Each way segment (a 2 point LineString) with the upstream
+Each way segment (a 2 point `LineString`) with the upstream data.
+
+with `--upstream-tag-ends`, each segement get information about the end
+point(s) for that segment.
 
 ### `upstreams-points`
 
