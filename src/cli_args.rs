@@ -210,6 +210,7 @@ pub(crate) struct Args {
     #[arg(long, default_value="false")]
     pub upstreams: bool,
 
+    /// For every upstream, include details on which end point(s) this eventually flows to.
     #[arg(long, default_value = "false")]
     pub upstream_tag_ends: bool,
 
