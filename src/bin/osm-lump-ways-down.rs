@@ -669,7 +669,7 @@ fn main() -> Result<()> {
             parent_strahlers.remove(&v);
         }
 
-        (curr_upstream, curr_upstream_node_count) = *length_upstream.entry(v).or_insert((0., 0));
+        (curr_upstream, curr_upstream_node_count) = *length_upstream.entry(v).or_default();
         num_outs = g.out_neighbours(v).count() as f64;
         per_downstream = curr_upstream / num_outs;
         curr_pos = nodeid_pos.get(&v).unwrap();
