@@ -859,9 +859,9 @@ fn main() -> Result<()> {
                     //"to_upstream_m": round(length_upstream[&to_nid], 1),
                 });
 
-                props["from_upstream_m_10"] = round_mult(&upstream_len, 10).into();
-                props["from_upstream_m_100"] = round_mult(&upstream_len, 100).into();
-                props["from_upstream_m_1000"] = round_mult(&upstream_len, 1000).into();
+                for mult in args.upstream_from_upstream_multiple.iter() {
+                    props[format!("from_upstream_m_{}", mult)] = round_mult(&upstream_len, *mult).into();
+                }
 
                 if args.upstream_tag_ends {
                     props["num_ends"] = ends.len().into();

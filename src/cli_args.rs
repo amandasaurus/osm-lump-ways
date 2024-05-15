@@ -212,6 +212,11 @@ pub(crate) struct Args {
 
     #[arg(long, default_value = "false")]
     pub upstream_tag_ends: bool,
+
+    /// Include an extra property from_upstream_m_N for every occurance of this argument, with the
+    /// from_upstream_m value rounded to the nearest multiple of N.
+    #[arg(long)]
+    pub upstream_from_upstream_multiple: Vec<i64>,
     
     /// Calculate & write a file with each upstream line, but the geometry is a point
     #[arg(long, default_value = "false")]

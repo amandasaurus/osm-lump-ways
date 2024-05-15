@@ -4,6 +4,8 @@
 
 * `osm-lump-ways-down`'s `upstreams` now has attributes for the end point this
   node goes to when the `--upstream-tag-ends` arg is given.
+* `osm-lump-ways-down`'s `upstreams` can now have rounded values for
+  `from_upstream_m` with the `--upstream-from-upstream-multiple`
 * `osm-lump-ways-down`: Upstream line segments only produced if
   `--upstreams` argument given
 
