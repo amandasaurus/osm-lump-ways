@@ -47,15 +47,6 @@ pub trait NodeIdPosition: std::fmt::Debug + std::marker::Send + std::marker::Syn
     /// Number of nodes inside
     fn len(&self) -> usize;
 
-    /// Only keep nodeids which pass this function
-    fn retain_by_key(&mut self, f: impl FnMut(&i64) -> bool);
-
-    fn extend<I: IntoIterator<Item = (i64, (f64, f64))>>(&mut self, iter: I) {
-        for el in iter {
-            self.insert(el.0, el.1);
-        }
-    }
-
     fn detailed_size(&self) -> String;
 
     fn shrink_to_fit(&mut self) {}
@@ -115,10 +106,6 @@ impl NodeIdPosition for NodeIdPositionMap {
         self.inner.len()
     }
 
-    fn retain_by_key(&mut self, mut f: impl FnMut(&i64) -> bool) {
-        self.inner.retain(|k, _v| f(k));
-    }
-
     fn detailed_size(&self) -> String {
         let mut output = String::new();
         output.push_str(&format!(
@@ -130,12 +117,6 @@ impl NodeIdPosition for NodeIdPositionMap {
             self.get_size() as f64 / self.len() as f64,
         ));
         output
-    }
-
-    fn extend<I: IntoIterator<Item = (i64, (f64, f64))>>(&mut self, iter: I) {
-        for (nid, pos) in iter {
-            self.insert(nid, pos);
-        }
     }
 }
 
@@ -346,10 +327,6 @@ impl NodeIdPosition for NodeIdPositionBucket {
 
     fn len(&self) -> usize {
         self.num_nodes
-    }
-
-    fn retain_by_key(&mut self, _f: impl FnMut(&i64) -> bool) {
-        todo!()
     }
 
     fn detailed_size(&self) -> String {
