@@ -778,9 +778,9 @@ fn main() -> Result<()> {
 
     let end_points_output = end_points
         .iter()
-        .map(|(nid, (mbms, len, upstream_count, pos))| {
+        .map(|(nid, (mbms, len, _upstream_count, pos))| {
             // Round the upstream to only output 1 decimal place
-            let mut props = serde_json::json!({"upstream_m": round(len, 1), "upstream_node_count": *upstream_count, "nid": nid});
+            let mut props = serde_json::json!({"upstream_m": round(len, 1), "nid": nid});
             if !ends_membership.is_empty() {
                 for (end_attr_filter, res) in ends_membership.iter().zip(mbms.iter()) {
                     props[format!("is_in:{}", end_attr_filter.to_string())] = (*res).into();
@@ -851,12 +851,11 @@ fn main() -> Result<()> {
                     .map_or(true, |min| length_upstream.get(from_nid).unwrap().0 >= min)
             })
             .map(|(from_nid, to_nid)| {
-                let (upstream_len, upstream_node_count, ends) =
+                let (upstream_len, _upstream_node_count, ends) =
                     length_upstream.get(&from_nid).unwrap();
                 // Round the upstream to only output 1 decimal place
                 let mut props = serde_json::json!({
                     "from_upstream_m": round(upstream_len, 1),
-                    "upstream_node_count": upstream_node_count,
                     //"to_upstream_m": round(length_upstream[&to_nid], 1),
                 });
 
@@ -924,13 +923,12 @@ fn main() -> Result<()> {
                     .map_or(true, |min| length_upstream.get(from_nid).unwrap().0 >= min)
             })
             .map(|(from_nid, _to_nid)| {
-                let (upstream_len, upstream_node_count, _ends) =
+                let (upstream_len, _upstream_node_count, _ends) =
                     length_upstream.get(&from_nid).unwrap();
                 (
                     // Round the upstream to only output 1 decimal place
                     serde_json::json!({
                         "from_upstream_m": round(upstream_len, 1),
-                        "upstream_node_count": upstream_node_count,
                     }),
                     nodeid_pos.get(&from_nid).unwrap(),
                 )
