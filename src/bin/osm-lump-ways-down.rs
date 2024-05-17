@@ -673,7 +673,9 @@ fn main() -> Result<()> {
         }
 
         curr_upstream = upstream_length.entry(v).or_default();
-        curr_upstream_nodes = upstream_nodes.entry(v).or_default().0;
+        if args.upstreams {
+            curr_upstream_nodes = upstream_nodes.entry(v).or_default().0;
+        }
         num_outs = g.out_neighbours(v).count() as f64;
         per_downstream = *curr_upstream / num_outs;
         curr_pos = nodeid_pos.get(&v).unwrap();
@@ -682,7 +684,9 @@ fn main() -> Result<()> {
             this_edge_len =
                 haversine::haversine_m(curr_pos.0, curr_pos.1, other_pos.0, other_pos.1);
             *upstream_length.entry(other).or_default() += per_downstream + this_edge_len;
-            upstream_nodes.entry(other).or_default().0 += 1 + curr_upstream_nodes;
+            if args.upstreams {
+                upstream_nodes.entry(other).or_default().0 += 1 + curr_upstream_nodes;
+            }
             if args.strahler {
                 parent_strahlers
                     .entry(other)

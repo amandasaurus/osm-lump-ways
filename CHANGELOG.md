@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+* `osm-lump-ways-down` Internal refactoring to use less memory if upstreams
+  aren't being outputted.
+
 ## v0.27.0 (2024-05-15)
 
 * `osm-lump-ways-down`'s `upstreams` now has attributes for the end point this
