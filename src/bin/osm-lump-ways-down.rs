@@ -601,17 +601,18 @@ fn main() -> Result<()> {
             .with_style(style.clone()),
     );
 
-    let mut length_upstream: BTreeMapSplitKey<(f64, i64, SmallVec<[i64; 1]>)> =
-        BTreeMapSplitKey::new();
+    let mut upstream_length: BTreeMapSplitKey<f64> = BTreeMapSplitKey::new();
+    let mut upstream_nodes: BTreeMapSplitKey<(i64, SmallVec<[i64; 1]>)> = BTreeMapSplitKey::new();
     info_memory_used!();
     let (
         mut curr_upstream,
-        mut curr_upstream_node_count,
+        mut curr_upstream_nodes,
         mut num_outs,
         mut per_downstream,
         mut curr_pos,
     );
     let (mut other_pos, mut this_edge_len);
+    curr_upstream_nodes = Default::default();
 
     // Vec<u32> → All upstream strahler numbers.
     // Strahler https://en.wikipedia.org/wiki/Strahler_number needs to look at the parent, but we
@@ -671,17 +672,17 @@ fn main() -> Result<()> {
             parent_strahlers.remove(&v);
         }
 
-        (curr_upstream, curr_upstream_node_count, _) = *length_upstream.entry(v).or_default();
+        curr_upstream = upstream_length.entry(v).or_default();
+        curr_upstream_nodes = upstream_nodes.entry(v).or_default().0;
         num_outs = g.out_neighbours(v).count() as f64;
-        per_downstream = curr_upstream / num_outs;
+        per_downstream = *curr_upstream / num_outs;
         curr_pos = nodeid_pos.get(&v).unwrap();
         for other in g.out_neighbours(v) {
             other_pos = nodeid_pos.get(&other)?;
             this_edge_len =
                 haversine::haversine_m(curr_pos.0, curr_pos.1, other_pos.0, other_pos.1);
-            let new = length_upstream.entry(other).or_default();
-            new.0 += per_downstream + this_edge_len;
-            new.1 += 1 + curr_upstream_node_count;
+            *upstream_length.entry(other).or_default() += per_downstream + this_edge_len;
+            upstream_nodes.entry(other).or_default().0 += 1 + curr_upstream_nodes;
             if args.strahler {
                 parent_strahlers
                     .entry(other)
@@ -696,7 +697,7 @@ fn main() -> Result<()> {
     progress_bars.remove(&calc_upstream_bar);
     info!(
         "Calculated the upstream value for {} nodes",
-        length_upstream.len().to_formatted_string(&Locale::en)
+        upstream_length.len().to_formatted_string(&Locale::en)
     );
     info_memory_used!();
 
@@ -763,32 +764,22 @@ fn main() -> Result<()> {
     // look for where it ends
     let end_points: BTreeMap<_, _> = end_points
         .into_par_iter()
-        .map(|(nid, mbms)| (nid, mbms, length_upstream.get(&nid).unwrap()))
-        .map(|(nid, mbms, lens)| (nid, mbms, lens.0, lens.1))
-        .filter(|(_nid, _mbms, len, _upstream_count)| {
-            args.min_upstream_m.map_or(true, |min| len >= &min)
-        })
-        .map(|(nid, mbms, len, upstream_count)| {
-            (
-                nid,
-                (mbms, len, upstream_count, nodeid_pos.get(&nid).unwrap()),
-            )
-        })
+        .map(|(nid, mbms)| (nid, mbms, upstream_length.get(&nid).unwrap()))
+        .filter(|(_nid, _mbms, len)| args.min_upstream_m.map_or(true, |min| *len >= &min))
+        .map(|(nid, mbms, len)| (nid, (mbms, len, nodeid_pos.get(&nid).unwrap())))
         .collect();
 
-    let end_points_output = end_points
-        .iter()
-        .map(|(nid, (mbms, len, _upstream_count, pos))| {
-            // Round the upstream to only output 1 decimal place
-            let mut props = serde_json::json!({"upstream_m": round(len, 1), "nid": nid});
-            if !ends_membership.is_empty() {
-                for (end_attr_filter, res) in ends_membership.iter().zip(mbms.iter()) {
-                    props[format!("is_in:{}", end_attr_filter.to_string())] = (*res).into();
-                }
-                props["is_in_count"] = mbms.iter().filter(|m| **m).count().into();
+    let end_points_output = end_points.iter().map(|(nid, (mbms, len, pos))| {
+        // Round the upstream to only output 1 decimal place
+        let mut props = serde_json::json!({"upstream_m": round(len, 1), "nid": nid});
+        if !ends_membership.is_empty() {
+            for (end_attr_filter, res) in ends_membership.iter().zip(mbms.iter()) {
+                props[format!("is_in:{}", end_attr_filter.to_string())] = (*res).into();
             }
-            (props, pos)
-        });
+            props["is_in_count"] = mbms.iter().filter(|m| **m).count().into();
+        }
+        (props, pos)
+    });
 
     let mut f = std::io::BufWriter::new(std::fs::File::create(
         args.output_filename.replace("%s", "ends"),
@@ -814,17 +805,14 @@ fn main() -> Result<()> {
         let mut seen_vertexes = HashSet::new();
         let mut frontier = Vec::new();
         let mut new;
-        for end_nid in end_points
-            .iter()
-            .map(|(nid, (_mbms, _len, _upstream_count, _pos))| nid)
-        {
+        for end_nid in end_points.iter().map(|(nid, (_mbms, _len, _pos))| nid) {
             seen_vertexes.clear();
             frontier.push(*end_nid);
             while let Some(nid) = frontier.pop() {
                 //dbg!(frontier.len()+1)
-                new = length_upstream.entry(nid).or_default();
-                new.2.push(*end_nid);
-                new.2.sort();
+                new = upstream_nodes.entry(nid).or_default();
+                new.1.push(*end_nid);
+                new.1.sort();
                 seen_vertexes.insert(nid);
                 frontier.extend(
                     reversed_g
@@ -848,11 +836,10 @@ fn main() -> Result<()> {
             .map(|(a, b)| (b, a)) // undo the graph reversal here
             .filter(|(from_nid, _to_nid)| {
                 args.min_upstream_m
-                    .map_or(true, |min| length_upstream.get(from_nid).unwrap().0 >= min)
+                    .map_or(true, |min| *upstream_length.get(from_nid).unwrap() >= min)
             })
             .map(|(from_nid, to_nid)| {
-                let (upstream_len, _upstream_node_count, ends) =
-                    length_upstream.get(&from_nid).unwrap();
+                let upstream_len = upstream_length.get(&from_nid).unwrap();
                 // Round the upstream to only output 1 decimal place
                 let mut props = serde_json::json!({
                     "from_upstream_m": round(upstream_len, 1),
@@ -865,15 +852,16 @@ fn main() -> Result<()> {
                 }
 
                 if args.upstream_tag_ends {
+                    let (_upstream_node_count, ends) = upstream_nodes.get(&from_nid).unwrap();
                     props["num_ends"] = ends.len().into();
                     props["ends"] = ends.iter().copied().collect::<Vec<i64>>().into();
                     let mut ends_strs = vec![",".to_string()];
                     let mut this_len;
-                    let mut biggest_end = (length_upstream.get(&ends[0]).unwrap().0, ends[0]);
+                    let mut biggest_end = (upstream_length.get(&ends[0]).unwrap(), ends[0]);
                     for end in ends {
                         ends_strs.push(end.to_string());
                         ends_strs.push(",".to_string());
-                        this_len = length_upstream.get(&ends[0]).unwrap().0;
+                        this_len = upstream_length.get(&ends[0]).unwrap();
                         if this_len > biggest_end.0 {
                             biggest_end = (this_len, *end);
                         }
@@ -920,11 +908,11 @@ fn main() -> Result<()> {
             .map(|(a, b)| (b, a)) // undo the graph reversal here
             .filter(|(from_nid, _to_nid)| {
                 args.min_upstream_m
-                    .map_or(true, |min| length_upstream.get(from_nid).unwrap().0 >= min)
+                    .map_or(true, |min| *upstream_length.get(from_nid).unwrap() >= min)
             })
             .map(|(from_nid, _to_nid)| {
-                let (upstream_len, _upstream_node_count, _ends) =
-                    length_upstream.get(&from_nid).unwrap();
+                let upstream_len = upstream_length.get(&from_nid).unwrap();
+                //let (_upstream_node_count, _ends) = upstream_nodes.get(&from_nid).unwrap();
                 (
                     // Round the upstream to only output 1 decimal place
                     serde_json::json!({
@@ -999,7 +987,7 @@ fn main() -> Result<()> {
             ProgressBar::new(
                 end_points
                     .par_iter()
-                    .map(|(_nid, (_mbms, len, _upstream_count, _pos))| len.round() as u64)
+                    .map(|(_nid, (_mbms, len, _pos))| len.round() as u64)
                     .sum(),
             )
             .with_message("Calculating complete upstream network per end point")
@@ -1012,18 +1000,18 @@ fn main() -> Result<()> {
         //let g = g.into_reversed();
         let end_point_upstreams = end_points
             .iter()
-            .filter(|(_nid, (_mbms, len, _upstream_count, _pos))| {
+            .filter(|(_nid, (_mbms, len, _pos))| {
                 if args
                     .ends_upstreams_min_upstream_m
-                    .map_or(false, |m| len < &m)
+                    .map_or(false, |m| **len < m)
                 {
                     // since we're not doing this end point, update the progress bar
                     calc_ends_upstreams.inc(len.round() as u64);
                 }
                 args.ends_upstreams_min_upstream_m
-                    .map_or(true, |min_len| len >= &min_len)
+                    .map_or(true, |min_len| **len >= min_len)
             })
-            .map(|(nid, (_mbms, len, _upstream_count, _pos))| {
+            .map(|(nid, (_mbms, len, _pos))| {
                 let all_upstream_paths =
                     reversed_g.all_out_edges_recursive(*nid, args.ends_upstreams_max_nodes);
                 let all_upstream_paths = all_upstream_paths
