@@ -17,28 +17,28 @@ pub enum TagFilter {
     Or(Vec<TagFilter>),
 }
 
-impl ToString for TagFilter {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for TagFilter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TagFilter::HasK(k) => format!("∃{}", k),
-            TagFilter::HasReK(k) => format!("∃~{}", k),
-            TagFilter::NotHasK(k) => format!("∄{}", k),
-            TagFilter::NotHasReK(k) => format!("∄~{}", k),
-            TagFilter::KV(k, v) => format!("{}={}", k, v),
-            TagFilter::KneV(k, v) => format!("{}≠{}", k, v),
-            TagFilter::KinV(k, vs) => format!("{}∈{}", k, vs.join(",")),
-            TagFilter::KnotInV(k, vs) => format!("{}∉{}", k, vs.join(",")),
-            TagFilter::KreV(k, r) => format!("{}~{}", k, r),
-            TagFilter::Or(tfs) => tfs
+            TagFilter::HasK(k) => write!(f, "∃{}", k),
+            TagFilter::HasReK(k) => write!(f, "∃~{}", k),
+            TagFilter::NotHasK(k) => write!(f, "∄{}", k),
+            TagFilter::NotHasReK(k) => write!(f, "∄~{}", k),
+            TagFilter::KV(k, v) => write!(f, "{}={}", k, v),
+            TagFilter::KneV(k, v) => write!(f, "{}≠{}", k, v),
+            TagFilter::KinV(k, vs) => write!(f, "{}∈{}", k, vs.join(",")),
+            TagFilter::KnotInV(k, vs) => write!(f, "{}∉{}", k, vs.join(",")),
+            TagFilter::KreV(k, r) => write!(f, "{}~{}", k, r),
+            TagFilter::Or(tfs) => write!(f, "{}", tfs
                 .iter()
                 .map(|tf| tf.to_string())
                 .collect::<Vec<_>>()
-                .join("∨"),
-            TagFilter::And(tfs) => tfs
+                .join("∨")),
+            TagFilter::And(tfs) => write!(f, "{}", tfs
                 .iter()
                 .map(|tf| tf.to_string())
                 .collect::<Vec<_>>()
-                .join("∧"),
+                .join("∧")),
         }
     }
 }
@@ -167,13 +167,13 @@ impl std::str::FromStr for TagFilterFuncElement {
     }
 }
 
-impl ToString for TagFilterFuncElement {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for TagFilterFuncElement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TagFilterFuncElement::AlwaysTrue => "T".to_string(),
-            TagFilterFuncElement::AlwaysFalse => "F".to_string(),
-            TagFilterFuncElement::FilterMatchThenTrue(f) => format!("{}→T", f.to_string()),
-            TagFilterFuncElement::FilterMatchThenFalse(f) => format!("{}→F", f.to_string()),
+            TagFilterFuncElement::AlwaysTrue => write!(f, "T"),
+            TagFilterFuncElement::AlwaysFalse => write!(f, "F"),
+            TagFilterFuncElement::FilterMatchThenTrue(flt) => write!(f, "{}→T", flt),
+            TagFilterFuncElement::FilterMatchThenFalse(flt) => write!(f, "{}→F", flt),
         }
     }
 }
@@ -221,14 +221,14 @@ impl std::str::FromStr for TagFilterFunc {
     }
 }
 
-impl ToString for TagFilterFunc {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for TagFilterFunc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let parts = self
             .0
             .iter()
             .map(|tff| tff.to_string())
             .collect::<Vec<String>>();
-        parts.join(";")
+        write!(f, "{}", parts.join(";"))
     }
 }
 

@@ -778,7 +778,7 @@ fn main() -> Result<()> {
         let mut props = serde_json::json!({"upstream_m": round(len, 1), "nid": nid});
         if !ends_membership.is_empty() {
             for (end_attr_filter, res) in ends_membership.iter().zip(mbms.iter()) {
-                props[format!("is_in:{}", end_attr_filter.to_string())] = (*res).into();
+                props[format!("is_in:{}", end_attr_filter)] = (*res).into();
             }
             props["is_in_count"] = mbms.iter().filter(|m| **m).count().into();
         }
@@ -852,7 +852,7 @@ fn main() -> Result<()> {
 
                 for mult in args.upstream_from_upstream_multiple.iter() {
                     props[format!("from_upstream_m_{}", mult)] =
-                        round_mult(&upstream_len, *mult).into();
+                        round_mult(upstream_len, *mult).into();
                 }
 
                 if args.upstream_tag_ends {
@@ -871,7 +871,7 @@ fn main() -> Result<()> {
                         }
                     }
                     props["ends_s"] = ends_strs.join("").into();
-                    props["biggest_end_upstream_m"] = round(&biggest_end.0, 1).into();
+                    props["biggest_end_upstream_m"] = round(biggest_end.0, 1).into();
                     props["biggest_end_nid"] = biggest_end.1.into();
                 }
 

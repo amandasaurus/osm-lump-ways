@@ -9,9 +9,9 @@ impl std::str::FromStr for TagGrouper {
         Ok(TagGrouper(s.split(',').map(|s| s.to_string()).collect()))
     }
 }
-impl std::string::ToString for TagGrouper {
-    fn to_string(&self) -> String {
-        self.0.join(",")
+impl std::fmt::Display for TagGrouper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.join(","))
     }
 }
 

@@ -24,7 +24,7 @@ fn min_max<T: PartialOrd>(a: T, b: T) -> (T, T) {
 
 pub(crate) fn into_segments(
     wg: &WayGroup,
-    nodeid_pos: &(impl NodeIdPosition + std::marker::Send),
+    nodeid_pos: &impl NodeIdPosition,
     min_length_m: Option<f64>,
     only_longest_n_splitted_paths: Option<usize>,
     max_sinuosity: Option<f64>,

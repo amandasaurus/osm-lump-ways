@@ -360,7 +360,7 @@ where
         assert!(self.edges[&a].contains_key(v));
         assert!(self.edges[&b].contains_key(v));
         assert!(
-            self.edges[&a][v].0 + self.edges[v][&b].0 == self.edges[&b][v].0 + self.edges[&v][&a].0
+            self.edges[&a][v].0 + self.edges[v][&b].0 == self.edges[&b][v].0 + self.edges[v][&a].0
         );
         let edge_a_v = self.edges.get_mut(&a).unwrap().remove(v).unwrap();
         let _edge_b_v = self.edges.get_mut(&b).unwrap().remove(v).unwrap();

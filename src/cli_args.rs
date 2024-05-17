@@ -70,7 +70,7 @@ pub(crate) struct Args {
     )]
     pub tag_filter: Vec<tagfilter::TagFilter>,
 
-    ///
+    /// Tag filter function code to use. (see README)
     #[arg(
         short = 'F',
         long = "tag-filter-func",
