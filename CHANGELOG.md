@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.28.0 (2024-05-23)
 
 * `osm-lump-ways-down` Internal refactoring to use less memory if upstreams
   aren't being outputted.
