@@ -252,11 +252,7 @@ fn main() -> Result<()> {
         ))
     });
 
-    let boundaries = if metrics.is_some() || csv_stats.is_some() {
-        Some(CountryBoundaries::from_reader(BOUNDARIES_ODBL_360X180).unwrap())
-    } else {
-        None
-    };
+    let boundaries = CountryBoundaries::from_reader(BOUNDARIES_ODBL_360X180)?;
 
     let g = graph::DirectedGraph2::new();
     let g = Arc::new(Mutex::new(g));
@@ -419,38 +415,45 @@ fn main() -> Result<()> {
         let cycles_output: Vec<(serde_json::Value, Vec<Vec<(f64, f64)>>)> = cycles
             .par_iter()
             .map(|cycle| {
-                (
-                    serde_json::json!({
-                        "root_nid": cycle.iter().flat_map(|seg| seg.iter()).min().unwrap(),
-                        "num_nodes": cycle.len(),
-                        "length_m": round(&node_group_to_length_m(cycle.as_slice(), &nodeid_pos), 1),
-                        "nodes": cycle
-                                    .iter()
-                                    .flat_map(|seg| seg.iter())
-                                    .map(|nid| format!("n{}", nid))
-                                    .collect::<Vec<_>>()
-                                    .join(","),
-                    }),
-                    node_group_to_lines(cycle.as_slice(), &nodeid_pos),
-                )
+                let coords = node_group_to_lines(cycle.as_slice(), &nodeid_pos);
+                // WTF do I have lat & lng mixed up??
+                let mut these_boundaries =
+                    boundaries.ids(LatLon::new(coords[0][0].1, coords[0][0].0)?);
+                these_boundaries.sort_unstable_by_key(|s| -(s.len() as isize));
+                if these_boundaries.is_empty() {
+                    these_boundaries.push("terranullis");
+                }
+                let mut props = serde_json::json!({
+                    "root_nid": cycle.iter().flat_map(|seg| seg.iter()).min().unwrap(),
+                    "num_nodes": cycle.len(),
+                    "length_m": round(&node_group_to_length_m(cycle.as_slice(), &nodeid_pos), 1),
+                    "nodes": cycle
+                                .iter()
+                                .flat_map(|seg| seg.iter())
+                                .map(|nid| format!("n{}", nid))
+                                .collect::<Vec<_>>()
+                                .join(","),
+                });
+
+                for (i, boundary) in these_boundaries.iter().enumerate() {
+                    props[format!("area_{}", i)] = boundary.to_string().into();
+                }
+                props["areas_s"] = format!(",{},", these_boundaries.join(",")).into();
+                props["areas"] = these_boundaries.into();
+
+                Ok((props, coords))
             })
-            .collect();
+            .collect::<Result<_>>()?;
         info_memory_used!();
 
         if csv_stats.is_some() || metrics.is_some() {
             let mut per_boundary: BTreeMap<&str, (u64, f64)> = BTreeMap::new();
-            let boundaries = boundaries.as_ref().unwrap();
             for cycle in cycles_output.iter() {
-                let these_boundaries =
-                    boundaries.ids(LatLon::new(cycle.1[0][0].1, cycle.1[0][0].0)?);
+                let boundaries = cycle.0["areas"].as_array().unwrap();
                 let this_len = multilinestring_length(&cycle.1);
                 per_boundary.entry("planet").or_default().0 += 1;
                 per_boundary.entry("planet").or_default().1 += this_len;
-                if these_boundaries.is_empty() {
-                    per_boundary.entry("terranullis").or_default().0 += 1;
-                    per_boundary.entry("terranullis").or_default().1 += this_len;
-                }
-                for boundary in these_boundaries {
+                for boundary in boundaries.iter().filter_map(|s| s.as_str()) {
                     per_boundary.entry(boundary).or_default().0 += 1;
                     per_boundary.entry(boundary).or_default().1 += this_len;
                 }

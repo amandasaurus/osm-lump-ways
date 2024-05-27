@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Loops dataset now includes the “geocoded” area value.
+
 ## v0.28.0 (2024-05-23)
 
 * `osm-lump-ways-down` Internal refactoring to use less memory if upstreams
