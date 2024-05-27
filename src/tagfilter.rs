@@ -29,16 +29,22 @@ impl std::fmt::Display for TagFilter {
             TagFilter::KinV(k, vs) => write!(f, "{}∈{}", k, vs.join(",")),
             TagFilter::KnotInV(k, vs) => write!(f, "{}∉{}", k, vs.join(",")),
             TagFilter::KreV(k, r) => write!(f, "{}~{}", k, r),
-            TagFilter::Or(tfs) => write!(f, "{}", tfs
-                .iter()
-                .map(|tf| tf.to_string())
-                .collect::<Vec<_>>()
-                .join("∨")),
-            TagFilter::And(tfs) => write!(f, "{}", tfs
-                .iter()
-                .map(|tf| tf.to_string())
-                .collect::<Vec<_>>()
-                .join("∧")),
+            TagFilter::Or(tfs) => write!(
+                f,
+                "{}",
+                tfs.iter()
+                    .map(|tf| tf.to_string())
+                    .collect::<Vec<_>>()
+                    .join("∨")
+            ),
+            TagFilter::And(tfs) => write!(
+                f,
+                "{}",
+                tfs.iter()
+                    .map(|tf| tf.to_string())
+                    .collect::<Vec<_>>()
+                    .join("∧")
+            ),
         }
     }
 }
