@@ -840,7 +840,7 @@ dependencies = [
 
 [[package]]
 name = "osm-lump-ways"
-version = "0.29.0-dev"
+version = "0.29.0"
 dependencies = [
  "anyhow",
  "clap",
