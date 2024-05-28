@@ -1057,7 +1057,8 @@ impl DirectedGraphTrait for DirectedGraph2 {
     }
     fn edges_par_iter(&self) -> impl ParallelIterator<Item = (i64, i64)> {
         self.edges
-            .par_iter()
+            .iter()
+            .par_bridge()
             .flat_map(move |(v, (_ins, outs))| outs.par_iter().map(move |o| (v, *o)))
     }
 
