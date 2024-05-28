@@ -627,7 +627,7 @@ pub struct DirectedGraph2 {
 impl DirectedGraph2 {
     pub fn new() -> Self {
         Self {
-            edges: BTreeMapSplitKey::new(),
+            edges: Default::default()
         }
     }
 
