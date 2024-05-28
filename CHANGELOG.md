@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## v0.29.0 (2024-05-27)
 
 * Loops dataset now includes the “geocoded” area value.
