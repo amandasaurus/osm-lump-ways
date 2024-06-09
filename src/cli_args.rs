@@ -66,7 +66,8 @@ pub(crate) struct Args {
         short = 'f',
         long = "tag-filter",
         value_name = "FILTER",
-        conflicts_with = "tag_filter_func"
+        conflicts_with = "tag_filter_func",
+        verbatim_doc_comment,
     )]
     pub tag_filter: Vec<tagfilter::TagFilter>,
 
@@ -129,12 +130,12 @@ pub(crate) struct Args {
     pub split_into_single_paths: bool,
 
     /// When splitting into single paths, how are the “largest” decided
-    /// `longest-path`: Longest path along the graph
-    /// `as-crow-flies`: Path between the 2 points that are furthest apart.
+    /// • `longest-path`: Longest path along the graph
+    /// • `as-crow-flies`: Path between the 2 points that are furthest apart.
     /// The `longest-path` for motorways can produce technically correct, but unwanted, results by
     /// going up one lane of the motorway, and then down the other side. Here, `as-crow-flies` is
     /// often what people expect.
-    #[arg(long, requires = "split_into_single_paths")]
+    #[arg(long, requires = "split_into_single_paths", verbatim_doc_comment)]
     pub split_into_single_paths_by: Option<SplitPathsMethod>,
 
     /// Only procoess way groups which include these way ids
@@ -190,7 +191,7 @@ pub(crate) struct Args {
     ///     • `loops_count`: Number of loops in this region (integer)
     ///     • `loops_length_m`: Total length, in metres, of all loops in this region (float)
     /// • `value` The value of the metric.
-    #[arg(long, value_name = "FILENAME.csv")]
+    #[arg(long, value_name = "FILENAME.csv", verbatim_doc_comment)]
     pub csv_stats_file: Option<PathBuf>,
 
     /// Path to store OpenMetrics/Prometheus metrics
