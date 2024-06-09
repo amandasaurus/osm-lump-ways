@@ -537,7 +537,7 @@ fn main() -> Result<()> {
         &args.input_filename,
         &args.tag_filter,
         &args.tag_filter_func,
-        &node_id_replaces,
+        &|nid| *node_id_replaces.get(&nid).unwrap_or(&nid),
         &progress_bars,
         &mut g,
     )?;
@@ -573,7 +573,7 @@ fn main() -> Result<()> {
         &args.input_filename,
         &args.tag_filter,
         &args.tag_filter_func,
-        &node_id_replaces,
+        &|nid| *node_id_replaces.get(&nid).unwrap_or(&nid),
         &progress_bars,
         &mut g,
     )?;
@@ -1062,7 +1062,7 @@ fn read_with_node_replacements(
     input_filename: &Path,
     tag_filter: &[tagfilter::TagFilter],
     tag_filter_func: &Option<tagfilter::TagFilterFunc>,
-    node_id_replaces: &HashMap<i64, i64>,
+    node_id_replaces: &(impl Fn(i64) -> i64 + Sync),
     progress_bars: &MultiProgress,
     graph: &mut impl graph::DirectedGraphTrait,
 ) -> Result<()> {
@@ -1099,12 +1099,11 @@ fn read_with_node_replacements(
             let nodes = w.nodes();
             if nodes
                 .par_iter()
-                .any(|nid| node_id_replaces.contains_key(nid))
+                .any(|nid| node_id_replaces(*nid) != *nid)
             {
                 let mut new_nodes = nodes
                     .iter()
-                    .map(|nid| node_id_replaces.get(nid).unwrap_or(nid))
-                    .copied()
+                    .map(|nid| node_id_replaces(*nid))
                     .collect::<Vec<i64>>();
                 new_nodes.dedup();
                 let mut graph = graph.lock().unwrap();
