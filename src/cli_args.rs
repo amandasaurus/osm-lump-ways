@@ -185,7 +185,7 @@ pub(crate) struct Args {
     /// • `area` Name of the area (string). Many rows per loop. Possible values:
     ///    • `planet` for everything in the file
     ///    • A region code from the country-boundaries crate
-    ///    • `terranullis` if it doesn't match any area in country-boundaries
+    ///    • `unknown_area` if it doesn't match any area in country-boundaries
     /// • `metric` String name of the metric. Current values:
     ///     • `loops_count`: Number of loops in this region (integer)
     ///     • `loops_length_m`: Total length, in metres, of all loops in this region (float)

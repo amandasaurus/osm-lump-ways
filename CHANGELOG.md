@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+* In the loops stats file, loops not in any area are now called `unknown_area`,
+  instead of `terranullis` (a term too associated with colonization)
+
 ## v0.29.0 (2024-05-27)
 
 * Loops dataset now includes the “geocoded” area value.

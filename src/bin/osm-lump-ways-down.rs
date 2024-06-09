@@ -421,7 +421,7 @@ fn main() -> Result<()> {
                     boundaries.ids(LatLon::new(coords[0][0].1, coords[0][0].0)?);
                 these_boundaries.sort_unstable_by_key(|s| -(s.len() as isize));
                 if these_boundaries.is_empty() {
-                    these_boundaries.push("terranullis");
+                    these_boundaries.push("unknown_area");
                 }
                 let mut props = serde_json::json!({
                     "root_nid": cycle.iter().flat_map(|seg| seg.iter()).min().unwrap(),
