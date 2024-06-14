@@ -67,7 +67,7 @@ pub(crate) struct Args {
         long = "tag-filter",
         value_name = "FILTER",
         conflicts_with = "tag_filter_func",
-        verbatim_doc_comment,
+        verbatim_doc_comment
     )]
     pub tag_filter: Vec<tagfilter::TagFilter>,
 

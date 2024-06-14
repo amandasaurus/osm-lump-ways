@@ -1097,10 +1097,7 @@ fn read_with_node_replacements(
         // TODO support grouping by tag value
         .for_each_with(graph.clone(), |graph, w| {
             let nodes = w.nodes();
-            if nodes
-                .par_iter()
-                .any(|nid| node_id_replaces(*nid) != *nid)
-            {
+            if nodes.par_iter().any(|nid| node_id_replaces(*nid) != *nid) {
                 let mut new_nodes = nodes
                     .iter()
                     .map(|nid| node_id_replaces(*nid))

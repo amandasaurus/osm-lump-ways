@@ -627,7 +627,7 @@ pub struct DirectedGraph2 {
 impl DirectedGraph2 {
     pub fn new() -> Self {
         Self {
-            edges: Default::default()
+            edges: Default::default(),
         }
     }
 
@@ -1022,8 +1022,16 @@ impl DirectedGraphTrait for DirectedGraph2 {
         }
 
         // assume we never get inconsistant
-        self.edges.entry(vertex2).or_insert_with(Default::default).0.push(vertex1);
-        self.edges.entry(vertex2).or_insert_with(Default::default).0.sort();
+        self.edges
+            .entry(vertex2)
+            .or_insert_with(Default::default)
+            .0
+            .push(vertex1);
+        self.edges
+            .entry(vertex2)
+            .or_insert_with(Default::default)
+            .0
+            .sort();
         false
     }
 
