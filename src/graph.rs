@@ -1013,7 +1013,7 @@ impl DirectedGraphTrait for DirectedGraph2 {
         if vertex1 == vertex2 {
             return false;
         }
-        let from_v1 = &mut self.edges.entry(vertex1).or_insert_with(Default::default).1;
+        let from_v1 = &mut self.edges.entry(vertex1).or_default().1;
         if from_v1.contains(&vertex2) {
             return true;
         } else {
@@ -1024,12 +1024,12 @@ impl DirectedGraphTrait for DirectedGraph2 {
         // assume we never get inconsistant
         self.edges
             .entry(vertex2)
-            .or_insert_with(Default::default)
+            .or_default()
             .0
             .push(vertex1);
         self.edges
             .entry(vertex2)
-            .or_insert_with(Default::default)
+            .or_default()
             .0
             .sort();
         false
