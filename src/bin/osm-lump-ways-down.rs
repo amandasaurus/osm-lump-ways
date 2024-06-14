@@ -605,17 +605,11 @@ fn main() -> Result<()> {
     );
 
     let mut upstream_length: BTreeMapSplitKey<f64> = BTreeMapSplitKey::new();
-    let mut upstream_nodes: BTreeMapSplitKey<(i64, SmallVec<[i64; 1]>)> = BTreeMapSplitKey::new();
+    let mut upstream_ends_full: BTreeMap<i64, SmallVec<[i64; 1]>> = Default::default();
+    let mut upstream_biggest_end: BTreeMap<i64, i64> = Default::default();
     info_memory_used!();
-    let (
-        mut curr_upstream,
-        mut curr_upstream_nodes,
-        mut num_outs,
-        mut per_downstream,
-        mut curr_pos,
-    );
+    let (mut curr_upstream, mut num_outs, mut per_downstream, mut curr_pos);
     let (mut other_pos, mut this_edge_len);
-    curr_upstream_nodes = Default::default();
 
     // Vec<u32> → All upstream strahler numbers.
     // Strahler https://en.wikipedia.org/wiki/Strahler_number needs to look at the parent, but we
@@ -676,9 +670,6 @@ fn main() -> Result<()> {
         }
 
         curr_upstream = upstream_length.entry(v).or_default();
-        if args.upstreams {
-            curr_upstream_nodes = upstream_nodes.entry(v).or_default().0;
-        }
         num_outs = g.out_neighbours(v).count() as f64;
         per_downstream = *curr_upstream / num_outs;
         curr_pos = nodeid_pos.get(&v).unwrap();
@@ -687,9 +678,6 @@ fn main() -> Result<()> {
             this_edge_len =
                 haversine::haversine_m(curr_pos.0, curr_pos.1, other_pos.0, other_pos.1);
             *upstream_length.entry(other).or_default() += per_downstream + this_edge_len;
-            if args.upstreams {
-                upstream_nodes.entry(other).or_default().0 += 1 + curr_upstream_nodes;
-            }
             if args.strahler {
                 parent_strahlers
                     .entry(other)
@@ -799,7 +787,7 @@ fn main() -> Result<()> {
     );
 
     let reversed_g = g.into_reversed();
-    if args.upstream_tag_ends {
+    if args.upstream_tag_ends_full || args.upstream_tag_biggest_end {
         // TODO use topologically_sorted_nodes instead of looping over all the ends
         info!("For all points, recording which end it flows into");
         let started_upstream_tag_ends = Instant::now();
@@ -811,15 +799,29 @@ fn main() -> Result<()> {
 
         let mut seen_vertexes = HashSet::new();
         let mut frontier = Vec::new();
-        let mut new;
         for end_nid in end_points.iter().map(|(nid, (_mbms, _len, _pos))| nid) {
             seen_vertexes.clear();
             frontier.push(*end_nid);
             while let Some(nid) = frontier.pop() {
-                //dbg!(frontier.len()+1)
-                new = upstream_nodes.entry(nid).or_default();
-                new.1.push(*end_nid);
-                new.1.sort();
+                if args.upstream_tag_biggest_end {
+                    // Store the end point with the longest upstream for this point
+                    if let Some(curr_end_nid) = upstream_biggest_end.get(&nid) {
+                        if upstream_length.get(curr_end_nid).unwrap()
+                            < upstream_length.get(end_nid).unwrap()
+                        {
+                            upstream_biggest_end.insert(nid, *end_nid);
+                        }
+                    } else {
+                        upstream_biggest_end.insert(nid, *end_nid);
+                    }
+                } else if args.upstream_tag_ends_full {
+                    let curr = upstream_ends_full.entry(nid).or_default();
+                    curr.push(*end_nid);
+                    curr.sort();
+                    curr.dedup();
+                    //upstream_ends_full.insert(nid, curr);
+                }
+
                 seen_vertexes.insert(nid);
                 frontier.extend(
                     reversed_g
@@ -858,8 +860,13 @@ fn main() -> Result<()> {
                         round_mult(upstream_len, *mult).into();
                 }
 
-                if args.upstream_tag_ends {
-                    let (_upstream_node_count, ends) = upstream_nodes.get(&from_nid).unwrap();
+                if args.upstream_tag_biggest_end {
+                    let biggest_end = upstream_biggest_end.get(&from_nid).unwrap();
+                    props["biggest_end_upstream_m"] =
+                        round(upstream_length.get(biggest_end).unwrap(), 1).into();
+                    props["biggest_end_nid"] = (*biggest_end).into();
+                } else if args.upstream_tag_ends_full {
+                    let ends = upstream_ends_full.get(&from_nid).unwrap();
                     props["num_ends"] = ends.len().into();
                     props["ends"] = ends.iter().copied().collect::<Vec<i64>>().into();
                     let mut ends_strs = vec![",".to_string()];

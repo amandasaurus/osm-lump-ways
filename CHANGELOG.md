@@ -4,6 +4,9 @@
 
 * In the loops stats file, loops not in any area are now called `unknown_area`,
   instead of `terranullis` (a term too associated with colonization)
+* `--upstream-tag-ends` split into `--upstream-tag-biggest-end` &
+  `--upstream-tag-ends-full`. `biggest` will only include data for the end with
+  the largest upstream value. This uses a little less memory.
 
 ## v0.29.0 (2024-05-27)
 

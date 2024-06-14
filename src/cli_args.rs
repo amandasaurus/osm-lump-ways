@@ -212,8 +212,19 @@ pub(crate) struct Args {
     pub upstreams: bool,
 
     /// For every upstream, include details on which end point(s) this eventually flows to.
-    #[arg(long, default_value = "false")]
-    pub upstream_tag_ends: bool,
+    #[arg(long, default_value = "false", requires = "upstreams")]
+    pub upstream_tag_ends_full: bool,
+
+    /// For every upstream, include details on the largest end that this point flows to.
+    /// Less details on other ends than upstream_tag_ends_full, but requires less memory to
+    /// process.
+    #[arg(
+        long,
+        default_value = "false",
+        conflicts_with = "upstream_tag_ends_full",
+        requires = "upstreams"
+    )]
+    pub upstream_tag_biggest_end: bool,
 
     /// Include an extra property from_upstream_m_N for every occurance of this argument, with the
     /// from_upstream_m value rounded to the nearest multiple of N.
