@@ -611,63 +611,8 @@ fn main() -> Result<()> {
     let (mut curr_upstream, mut num_outs, mut per_downstream, mut curr_pos);
     let (mut other_pos, mut this_edge_len);
 
-    // Vec<u32> → All upstream strahler numbers.
-    // Strahler https://en.wikipedia.org/wiki/Strahler_number needs to look at the parent, but we
-    // only have a single directed graph. So push the current strahler numbers down to the child
-    // nodes and then calculate the number when we get to that node.
-    // NB we use parent/child different order from Wikipedia
-    let mut parent_strahlers: BTreeMapSplitKey<SmallVec<[u32; 1]>> = BTreeMapSplitKey::new();
-
-    // final strahler numbers go here.
-    let mut strahler: BTreeMapSplitKey<u32> = BTreeMapSplitKey::new();
-
-    // Want to only include strahler numbers if the user has the --strahler option
-    // This is a bit hacky, and should be refactored
-
     for v in topologically_sorted_nodes.drain(..) {
         calc_upstream_bar.inc(1);
-
-        let mut this_strahler_value = 0;
-        if args.strahler {
-            assert!(!strahler.contains_key(&v));
-            if !parent_strahlers.contains_key(&v) {
-                this_strahler_value = 1;
-            } else {
-                let this_parent_strahlers = parent_strahlers.get(&v).unwrap();
-                let max_parent_strahler = this_parent_strahlers.iter().max().unwrap();
-                if this_parent_strahlers
-                    .iter()
-                    .filter(|x| *x == max_parent_strahler)
-                    .count()
-                    == 1
-                    && this_parent_strahlers
-                        .iter()
-                        .filter(|x| *x < max_parent_strahler)
-                        .count()
-                        == this_parent_strahlers.len() - 1
-                {
-                    this_strahler_value = *max_parent_strahler;
-                } else if this_parent_strahlers
-                    .iter()
-                    .filter(|x| *x == max_parent_strahler)
-                    .count()
-                    >= 2
-                {
-                    this_strahler_value = *max_parent_strahler + 1;
-                } else {
-                    dbg!(
-                        this_strahler_value,
-                        max_parent_strahler,
-                        v,
-                        this_parent_strahlers
-                    );
-                    panic!();
-                }
-            }
-            *strahler.entry(v).or_default() = this_strahler_value;
-            // try to recoop some memory
-            parent_strahlers.remove(&v);
-        }
 
         curr_upstream = upstream_length.entry(v).or_default();
         num_outs = g.out_neighbours(v).count() as f64;
@@ -678,15 +623,8 @@ fn main() -> Result<()> {
             this_edge_len =
                 haversine::haversine_m(curr_pos.0, curr_pos.1, other_pos.0, other_pos.1);
             *upstream_length.entry(other).or_default() += per_downstream + this_edge_len;
-            if args.strahler {
-                parent_strahlers
-                    .entry(other)
-                    .or_default()
-                    .push(this_strahler_value);
-            }
         }
     }
-    drop(parent_strahlers);
 
     calc_upstream_bar.finish();
     progress_bars.remove(&calc_upstream_bar);
@@ -957,44 +895,6 @@ fn main() -> Result<()> {
         );
     }
 
-    if args.strahler {
-        debug!("Writing strahler number geojson object(s)");
-        let strahler_lines = reversed_g
-            .edges_iter()
-            .map(|(a, b)| (b, a)) // undo graph reversal
-            .map(|(from_nid, to_nid)| {
-                (
-                    // Round the upstream to only output 1 decimal place
-                    serde_json::json!({
-                        "strahler": strahler.get(&from_nid)
-                    }),
-                    (
-                        nodeid_pos.get(&from_nid).unwrap(),
-                        nodeid_pos.get(&to_nid).unwrap(),
-                    ),
-                )
-            });
-        info_memory_used!();
-
-        let writing_upstreams_bar = progress_bars.add(
-            ProgressBar::new(reversed_g.num_edges() as u64)
-                .with_message("Writing strahler geojson(s) file")
-                .with_style(style.clone()),
-        );
-
-        let strahler_lines = strahler_lines.progress_with(writing_upstreams_bar);
-
-        let mut f = std::io::BufWriter::new(std::fs::File::create(
-            args.output_filename.replace("%s", "strahler"),
-        )?);
-        let num_strahler_written =
-            write_geojson_features_directly(strahler_lines, &mut f, &output_format)?;
-        info!(
-            "Wrote {} features to output file {}",
-            num_strahler_written.to_formatted_string(&Locale::en),
-            args.output_filename.replace("%s", "strahler")
-        );
-    }
     if args.ends_upstreams {
         let started_ends_upstreams = Instant::now();
         let calc_ends_upstreams = progress_bars.add(

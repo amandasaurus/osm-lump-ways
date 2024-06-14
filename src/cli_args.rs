@@ -203,10 +203,6 @@ pub(crate) struct Args {
     #[arg(long, value_name = "TAGFILTER")]
     pub ends_membership: Vec<tagfilter::TagFilter>,
 
-    /// Calculate & write a file with the strahler value for lines
-    #[arg(long, default_value = "false")]
-    pub strahler: bool,
-
     /// Calculate & write a file with each upstream line
     #[arg(long, default_value = "false")]
     pub upstreams: bool,
