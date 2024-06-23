@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Massive refactor to allow `--upstream-tag-biggest-end` to work with much less
+  memory.
 * In the loops stats file, loops not in any area are now called `unknown_area`,
   instead of `terranullis` (a term too associated with colonization)
 * `--upstream-tag-ends` split into `--upstream-tag-biggest-end` &

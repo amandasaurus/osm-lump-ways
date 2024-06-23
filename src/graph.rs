@@ -25,7 +25,6 @@ where
 {
     pub fn new(size: usize, initial: T) -> Result<Self> {
         // FIXME this needs too much memory if size is large
-        //dbg!("Before graph alloc size", size);
         let mut data = Vec::new();
         data.try_reserve(size * size).with_context(|| {
             format!(
@@ -37,7 +36,6 @@ where
         for _ in 0..(size * size) {
             data.push(initial.clone());
         }
-        //dbg!("after graph alloc size", size);
         Ok(UndirectedGraph { data, size })
     }
 
@@ -484,7 +482,6 @@ where
                 trace!("No more candidate vertexes");
                 break;
             }
-            //dbg!(candidate_vertexes.len());
             trace!("There are {} candidate vertexes", candidate_vertexes.len());
             graph_has_been_modified_this_iteration = false;
             for v in candidate_vertexes.drain(..) {
@@ -661,11 +658,14 @@ impl DirectedGraph2 {
         self.edges.get(vid).map(|(ins, _outs)| ins.len())
     }
 
-    /// True iff this vertex exists has has exactly 0 incoming edges
+    /// True iff this vertex does not have ≥1 edges. this happens with zero in edges, or if the
+    /// edge doesn't exist
+    /// when doing topological sorting, we remove edges, which can remove the vertex when there are
+    /// no more incoming
     pub fn num_ins_zero(&self, vid: &i64) -> bool {
         self.edges
             .get(vid)
-            .map_or(false, |(ins, _outs)| ins.is_empty())
+            .map_or(true, |(ins, _outs)| ins.is_empty())
     }
 
     pub fn is_empty(&self) -> bool {
@@ -966,7 +966,7 @@ impl DirectedGraph2 {
     //}
 
     pub fn into_vertexes_topologically_sorted(self, sorting_nodes_bar: &ProgressBar) -> Vec<i64> {
-        let mut g = self; //.clone();
+        let mut g = self;
         let mut result = Vec::with_capacity(g.num_vertexes());
         let mut no_incoming: BTreeSet<i64> = BTreeSet::new();
 
@@ -996,7 +996,6 @@ impl DirectedGraph2 {
                 }
             }
         }
-        //dbg!(g.len());
 
         result
     }

@@ -23,11 +23,10 @@ use std::sync::{Arc, Mutex};
 //use get_size_derive::*;
 
 use num_format::{Locale, ToFormattedString};
+use smallvec::SmallVec;
 
 use country_boundaries::{CountryBoundaries, LatLon, BOUNDARIES_ODBL_360X180};
 use ordered_float::OrderedFloat;
-
-use smallvec::SmallVec;
 
 #[path = "../cli_args.rs"]
 mod cli_args;
@@ -46,7 +45,6 @@ mod nodeid_position;
 use nodeid_position::NodeIdPosition;
 #[path = "../btreemapsplitkey.rs"]
 mod btreemapsplitkey;
-use btreemapsplitkey::BTreeMapSplitKey;
 #[path = "../kosaraju.rs"]
 mod kosaraju;
 #[path = "../taggrouper.rs"]
@@ -532,7 +530,6 @@ fn main() -> Result<()> {
     info_memory_used!();
     info!("Re-reading file to generate upstreams etc");
     let mut g = graph::DirectedGraph2::new();
-    //let mut g = graph::UniDirectedGraph::new();
     read_with_node_replacements(
         &args.input_filename,
         &args.tag_filter,
@@ -551,7 +548,8 @@ fn main() -> Result<()> {
     );
     info!("Sorting all vertexes topologically...");
     //// TODO this graph (g) can be split into disconnected components
-    let mut topologically_sorted_nodes = g.into_vertexes_topologically_sorted(&sorting_nodes_bar);
+    let orig_num_vertexes = g.num_vertexes();
+    let topologically_sorted_nodes = g.into_vertexes_topologically_sorted(&sorting_nodes_bar);
     sorting_nodes_bar.finish();
     progress_bars.remove(&sorting_nodes_bar);
     info!(
@@ -565,10 +563,9 @@ fn main() -> Result<()> {
             .to_formatted_string(&Locale::en),
     );
 
-    // eh, this assert fails?! TODO fix
-    //assert_eq!(g.num_vertexes(), topologically_sorted_nodes.len());
+    assert_eq!(orig_num_vertexes, topologically_sorted_nodes.len());
     info!("Re-reading the file again to build the graph");
-    let mut g = graph::UniDirectedGraph::new();
+    let mut g = graph::DirectedGraph2::new();
     read_with_node_replacements(
         &args.input_filename,
         &args.tag_filter,
@@ -577,7 +574,7 @@ fn main() -> Result<()> {
         &progress_bars,
         &mut g,
     )?;
-    info!("Re-read nodes, but unidirecetd.",);
+    info!("Re-read nodes",);
 
     let setting_node_pos = progress_bars.add(
         ProgressBar::new(g.num_vertexes() as u64)
@@ -598,56 +595,101 @@ fn main() -> Result<()> {
     drop(nids_we_need); // don't need you anymore
 
     info_memory_used!();
-    let calc_upstream_bar = progress_bars.add(
-        ProgressBar::new(g.num_vertexes() as u64)
-            .with_message("Calculating upstream lengths...")
-            .with_style(style.clone()),
+
+    // Sorted list of all nids which are an end point
+    let end_points: Vec<i64> = collect_into_vec_set(g.vertexes_wo_outgoing_jumbled());
+
+    info!(
+        "Calculated the {} end points",
+        end_points.len().to_formatted_string(&Locale::en)
     );
 
-    let mut upstream_length: BTreeMapSplitKey<f64> = BTreeMapSplitKey::new();
-    let mut upstream_ends_full: BTreeMap<i64, SmallVec<[i64; 1]>> = Default::default();
-    let mut upstream_biggest_end: BTreeMap<i64, i64> = Default::default();
-    info_memory_used!();
-    let (mut curr_upstream, mut num_outs, mut per_downstream, mut curr_pos);
-    let (mut other_pos, mut this_edge_len);
+    // Using index in `end_points` to get whether this end is in this filter
+    let mut end_point_memberships: Vec<smallvec::SmallVec<[bool; 2]>> = Vec::new();
 
-    for v in topologically_sorted_nodes.drain(..) {
-        calc_upstream_bar.inc(1);
+    // Upstream value for every end point
+    let mut end_point_upstreams: Vec<f64> = vec![0.; end_points.len()];
 
-        curr_upstream = upstream_length.entry(v).or_default();
-        num_outs = g.out_neighbours(v).count() as f64;
-        per_downstream = *curr_upstream / num_outs;
-        curr_pos = nodeid_pos.get(&v).unwrap();
-        for other in g.out_neighbours(v) {
-            other_pos = nodeid_pos.get(&other)?;
-            this_edge_len =
-                haversine::haversine_m(curr_pos.0, curr_pos.1, other_pos.0, other_pos.1);
-            *upstream_length.entry(other).or_default() += per_downstream + this_edge_len;
-        }
+    let mut ends_membership_filters = args.ends_membership.clone();
+    ends_membership_filters.sort_by_key(|tf| tf.to_string());
+    if !ends_membership_filters.is_empty() {
+        end_point_memberships.resize(
+            end_points.len(),
+            smallvec::smallvec![false; ends_membership_filters.len()],
+        );
     }
 
-    calc_upstream_bar.finish();
-    progress_bars.remove(&calc_upstream_bar);
+    // This is an iterator that returns the total upstream length for all nodes.
+    // it keeps track of an intermediate value which is the length of items “further downstream”.
+    // It's a function because we want to create it many times.
+    // return value: (
+    //  nid_idx: usize. Index in topologically_sorted_nodes for this node
+    //  nid: i64, OSM Node id
+    //  upstream_length_m: f64, upstream value at this node
+    let upstream_length_iter = || {
+        topologically_sorted_nodes.iter().copied().enumerate().scan(
+            // a cache of node id and the currently best known upstream value
+            // we “push” values onto this from upstream
+            HashMap::new() as HashMap<i64, f64>,
+            |tmp_upstream_length, (nid_idx, nid)| {
+                let curr_upstream = tmp_upstream_length.remove(&nid).unwrap_or(0.);
+
+                let num_outs = g.out_neighbours(nid).count() as f64;
+                let per_downstream = curr_upstream / num_outs;
+                let curr_pos = nodeid_pos.get(&nid).unwrap();
+                for other in g.out_neighbours(nid) {
+                    let other_pos = nodeid_pos.get(&other).unwrap();
+                    let this_edge_len =
+                        haversine::haversine_m(curr_pos.0, curr_pos.1, other_pos.0, other_pos.1);
+                    *tmp_upstream_length.entry(other).or_default() +=
+                        per_downstream + this_edge_len;
+                }
+
+                Some((nid_idx, nid, curr_upstream))
+            },
+        )
+    };
+
+    let calc_upstream_ends_bar = progress_bars.add(
+        ProgressBar::new(end_points.len() as u64)
+            .with_message("End points with calculated upstreams")
+            .with_style(style.clone()),
+    );
+    let calc_all_upstream_bar = progress_bars.add(
+        ProgressBar::new(end_points.len() as u64)
+            .with_message("End points with calculated upstreams")
+            .with_style(style.clone()),
+    );
+    calc_all_upstream_bar.set_length(topologically_sorted_nodes.len() as u64);
+
+    // Calculate all the upstream value for all the end points.
+    for (_nid_idx, nid, upstream_length) in calc_all_upstream_bar.wrap_iter(upstream_length_iter())
+    {
+        if let Ok(idx) = end_points.binary_search(&nid) {
+            end_point_upstreams[idx] = upstream_length;
+            calc_all_upstream_bar.inc(1);
+        }
+    }
+    calc_all_upstream_bar.finish();
+    calc_upstream_ends_bar.finish();
+    progress_bars.remove(&calc_all_upstream_bar);
+    progress_bars.remove(&calc_upstream_ends_bar);
     info!(
         "Calculated the upstream value for {} nodes",
-        upstream_length.len().to_formatted_string(&Locale::en)
+        topologically_sorted_nodes
+            .len()
+            .to_formatted_string(&Locale::en)
     );
     info_memory_used!();
 
-    let mut ends_membership = args.ends_membership.clone();
-    ends_membership.sort_by_key(|tf| tf.to_string());
-    let end_points: BTreeMap<i64, smallvec::SmallVec<[bool; 2]>> = g
-        .vertexes_wo_outgoing_jumbled()
-        .map(|nid| (nid, smallvec::smallvec![false; ends_membership.len()]))
-        .collect();
-    let end_points = Arc::new(std::sync::RwLock::new(end_points));
+    let end_point_memberships = Arc::new(std::sync::RwLock::new(end_point_memberships));
 
-    if !ends_membership.is_empty() {
+    if !ends_membership_filters.is_empty() {
         info!("Rereading file to add memberships for ends");
         info!(
             "Adding the following {} attributes for each end: {}",
-            ends_membership.len(),
-            ends_membership
+            ends_membership_filters.len(),
+            ends_membership_filters
                 .iter()
                 .map(|f| f.to_string())
                 .collect::<Vec<_>>()
@@ -657,62 +699,81 @@ fn main() -> Result<()> {
         let mut reader = osmio::stringpbf::PBFReader::new(reader);
         reader
             .ways()
+            // ↑ all the ways
             .par_bridge()
+            .filter(|w| tagfilter::obj_pass_filters(w, &ends_membership_filters, &None))
+            // ↑ .. which match at least one end-membership filter
             .filter(|w| {
                 w.nodes()
-                    .par_iter()
-                    .any(|n| end_points.read().unwrap().contains_key(n))
+                    .iter()
+                    .any(|nid| end_points.binary_search(nid).is_ok())
             })
-            .for_each_with(end_points.clone(), |end_points, w| {
-                let mut end_points = end_points.write().unwrap();
-                for nid in w.nodes() {
-                    if let Some(memb_vec) = end_points.get_mut(nid) {
-                        for (func, res) in ends_membership.iter().zip(memb_vec.iter_mut()) {
-                            *res = func.filter(&w);
-                        }
+            // ↑ .. which have at least one node in the end points
+            .for_each_with(end_point_memberships.clone(), |end_point_memberships, w| {
+                let filter_results = ends_membership_filters
+                    .iter()
+                    .map(|f| f.filter(&w))
+                    .collect::<SmallVec<[bool; 2]>>();
+                for end_point_idx in w
+                    .nodes()
+                    .iter()
+                    .filter_map(|nid| end_points.binary_search(nid).ok())
+                {
+                    let mut curr_mbmrs_all = end_point_memberships.write().unwrap();
+                    let curr_mbmrs = curr_mbmrs_all.get_mut(end_point_idx).unwrap();
+                    for (new, old) in filter_results.iter().zip(curr_mbmrs.iter_mut()) {
+                        *old |= new;
                     }
                 }
             });
         // How many have ≥1 true value (versus all default of false)
-        let num_nodes_attributed = end_points
+        let num_nodes_attributed = end_point_memberships
             .read()
             .unwrap()
             .par_iter()
-            .filter(|(_nid, membs)| membs.par_iter().any(|m| *m))
+            .filter(|membs| membs.par_iter().any(|m| *m))
             .count();
         if num_nodes_attributed == 0 {
             warn!("No end nodes got an end attribute.")
         } else {
-            let ends_points = end_points.read().unwrap();
             info!(
                 "{} of {} ({:.1}%) end points got an attribute for way membership",
                 num_nodes_attributed.to_formatted_string(&Locale::en),
-                ends_points.len().to_formatted_string(&Locale::en),
-                ((100. * num_nodes_attributed as f64) / ends_points.len() as f64)
+                end_points.len().to_formatted_string(&Locale::en),
+                ((100. * num_nodes_attributed as f64) / end_points.len() as f64)
             );
         }
     }
-    let end_points = Arc::try_unwrap(end_points).unwrap().into_inner().unwrap();
+    let end_point_memberships = Arc::try_unwrap(end_point_memberships)
+        .unwrap()
+        .into_inner()
+        .unwrap();
 
-    // look for where it ends
-    let end_points: BTreeMap<_, _> = end_points
-        .into_par_iter()
-        .map(|(nid, mbms)| (nid, mbms, upstream_length.get(&nid).unwrap()))
-        .filter(|(_nid, _mbms, len)| args.min_upstream_m.map_or(true, |min| *len >= &min))
-        .map(|(nid, mbms, len)| (nid, (mbms, len, nodeid_pos.get(&nid).unwrap())))
-        .collect();
+    let empty_smallvec = smallvec::smallvec![];
 
-    let end_points_output = end_points.iter().map(|(nid, (mbms, len, pos))| {
-        // Round the upstream to only output 1 decimal place
-        let mut props = serde_json::json!({"upstream_m": round(len, 1), "nid": nid});
-        if !ends_membership.is_empty() {
-            for (end_attr_filter, res) in ends_membership.iter().zip(mbms.iter()) {
-                props[format!("is_in:{}", end_attr_filter)] = (*res).into();
+    let end_points_output = end_points
+        .iter()
+        .zip(
+            // If no end_point_memberships's then that vec is empty, so the zip doesn't return
+            // anything. using chain(repeat(…)) to always give something
+            end_point_memberships
+                .iter()
+                .chain(std::iter::repeat(&empty_smallvec)),
+        )
+        .zip(end_point_upstreams.iter())
+        .filter(|((_nid, _mbms), len)| args.min_upstream_m.map_or(true, |min| *len >= &min))
+        .map(|((nid, mbms), len)| (nid, mbms, len, nodeid_pos.get(nid).unwrap()))
+        .map(|(nid, mbms, len, pos)| {
+            // Round the upstream to only output 1 decimal place
+            let mut props = serde_json::json!({"upstream_m": round(len, 1), "nid": nid});
+            if !ends_membership_filters.is_empty() {
+                for (end_attr_filter, res) in ends_membership_filters.iter().zip(mbms.iter()) {
+                    props[format!("is_in:{}", end_attr_filter)] = (*res).into();
+                }
+                props["is_in_count"] = mbms.iter().filter(|m| **m).count().into();
             }
-            props["is_in_count"] = mbms.iter().filter(|m| **m).count().into();
-        }
-        (props, pos)
-    });
+            (props, pos)
+        });
 
     let mut f = std::io::BufWriter::new(std::fs::File::create(
         args.output_filename.replace("%s", "ends"),
@@ -724,103 +785,101 @@ fn main() -> Result<()> {
         args.output_filename.replace("%s", "ends")
     );
 
-    let reversed_g = g.into_reversed();
-    if args.upstream_tag_ends_full || args.upstream_tag_biggest_end {
-        // TODO use topologically_sorted_nodes instead of looping over all the ends
-        info!("For all points, recording which end it flows into");
-        let started_upstream_tag_ends = Instant::now();
-        let calc_ends_points = progress_bars.add(
-            ProgressBar::new(end_points.len() as u64)
-                .with_message("Calculating the end point(s) for all points (ends processed)")
-                .with_style(style.clone()),
-        );
+    assert!(
+        end_points.len() < i32::MAX as usize,
+        "Too many end nodes (>2³²). We optimize by addressing nodes with a i32"
+    );
 
-        let mut seen_vertexes = HashSet::new();
-        let mut frontier = Vec::new();
-        for end_nid in end_points.iter().map(|(nid, (_mbms, _len, _pos))| nid) {
-            seen_vertexes.clear();
-            frontier.push(*end_nid);
-            while let Some(nid) = frontier.pop() {
-                if args.upstream_tag_biggest_end {
-                    // Store the end point with the longest upstream for this point
-                    if let Some(curr_end_nid) = upstream_biggest_end.get(&nid) {
-                        if upstream_length.get(curr_end_nid).unwrap()
-                            < upstream_length.get(end_nid).unwrap()
+    // For every node in topologically_sorted_nodes, store the index (in end_points) of the biggest
+    // end point that this node flows into.
+    // We store the index as a i32 to save space. We assume we will have <2³² end points
+    // -1 = no known end point (yet).
+    // (biggest end point = end point with the largest upstream value)
+    // TODO replace this with nonzerou32
+    let mut upstream_biggest_end: Vec<i32> = Vec::new();
+
+    if args.upstream_tag_biggest_end {
+        upstream_biggest_end.resize(topologically_sorted_nodes.len(), -1);
+
+        // this is a cache of values as we walk upstream
+        let mut tmp_biggest_end: HashMap<i64, i32> = HashMap::new();
+
+        // Doing topologically_sorted_nodes in reverse, means we are “walking upstream”. We will
+        for (nid_idx, &nid) in topologically_sorted_nodes.iter().enumerate().rev() {
+            // if this node is an end point then save that
+            // otherwise, use the value from the cache
+            let this_end_idx = end_points.binary_search(&nid).ok().map(|i| i as i32);
+            let curr_biggest = tmp_biggest_end.remove(&nid).or(this_end_idx).unwrap();
+            upstream_biggest_end[nid_idx] = curr_biggest;
+
+            for upper in g.in_neighbours(nid) {
+                tmp_biggest_end
+                    .entry(upper)
+                    .and_modify(|prev_biggest_end_idx| {
+                        // for all nodes which are one step upstream of this node, check the
+                        // previously calcualted best and update if needed.
+                        if end_point_upstreams[*prev_biggest_end_idx as usize]
+                            < end_point_upstreams[curr_biggest as usize]
                         {
-                            upstream_biggest_end.insert(nid, *end_nid);
+                            *prev_biggest_end_idx = curr_biggest;
                         }
-                    } else {
-                        upstream_biggest_end.insert(nid, *end_nid);
-                    }
-                } else if args.upstream_tag_ends_full {
-                    let curr = upstream_ends_full.entry(nid).or_default();
-                    curr.push(*end_nid);
-                    curr.sort();
-                    curr.dedup();
-                    //upstream_ends_full.insert(nid, curr);
-                }
-
-                seen_vertexes.insert(nid);
-                frontier.extend(
-                    reversed_g
-                        .out_neighbours(nid)
-                        .filter(|n2| !seen_vertexes.contains(n2)),
-                );
+                    })
+                    // or just store this end point.
+                    .or_insert(curr_biggest);
             }
-            calc_ends_points.inc(1);
         }
-        info!(
-            "Calculated, for {} end points, all the upstreams in {} ",
-            end_points.len().to_formatted_string(&Locale::en),
-            formatting::format_duration(started_upstream_tag_ends.elapsed()),
-        );
     }
+    assert!(upstream_biggest_end.par_iter().all(|end| *end >= 0));
 
     if args.upstreams {
         debug!("Writing upstream geojson object(s)");
-        let lines = reversed_g
-            .edges_iter()
-            .map(|(a, b)| (b, a)) // undo the graph reversal here
-            .filter(|(from_nid, _to_nid)| {
-                args.min_upstream_m
-                    .map_or(true, |min| *upstream_length.get(from_nid).unwrap() >= min)
+
+        // we loop over all nodes in topologically_sorted_nodes (which is annotated in
+        // upstream_length_iter with the upstream value) and flat_map that into each line segment
+        // that goes out of that.
+        let lines = upstream_length_iter()
+            .filter(|(_from_nid_idx, _from_nid, upstream_m)| {
+                args.min_upstream_m.map_or(true, |min| *upstream_m >= min)
             })
-            .map(|(from_nid, to_nid)| {
-                let upstream_len = upstream_length.get(&from_nid).unwrap();
+            .flat_map(|(from_nid_idx, from_nid, upstream_len)| {
+                g.out_neighbours(from_nid)
+                    .map(move |to_nid| (from_nid_idx, from_nid, to_nid, upstream_len))
+            })
+            .map(|(from_nid_idx, from_nid, to_nid, upstream_len)| {
                 // Round the upstream to only output 1 decimal place
                 let mut props = serde_json::json!({
-                    "from_upstream_m": round(upstream_len, 1),
-                    //"to_upstream_m": round(length_upstream[&to_nid], 1),
+                    "from_upstream_m": round(&upstream_len, 1),
                 });
 
                 for mult in args.upstream_from_upstream_multiple.iter() {
                     props[format!("from_upstream_m_{}", mult)] =
-                        round_mult(upstream_len, *mult).into();
+                        round_mult(&upstream_len, *mult).into();
                 }
 
                 if args.upstream_tag_biggest_end {
-                    let biggest_end = upstream_biggest_end.get(&from_nid).unwrap();
+                    let biggest_end_idx: usize = upstream_biggest_end[from_nid_idx] as usize;
                     props["biggest_end_upstream_m"] =
-                        round(upstream_length.get(biggest_end).unwrap(), 1).into();
-                    props["biggest_end_nid"] = (*biggest_end).into();
+                        round(&end_point_upstreams[biggest_end_idx], 1).into();
+                    props["biggest_end_nid"] = end_points[biggest_end_idx].into();
                 } else if args.upstream_tag_ends_full {
-                    let ends = upstream_ends_full.get(&from_nid).unwrap();
-                    props["num_ends"] = ends.len().into();
-                    props["ends"] = ends.iter().copied().collect::<Vec<i64>>().into();
-                    let mut ends_strs = vec![",".to_string()];
-                    let mut this_len;
-                    let mut biggest_end = (upstream_length.get(&ends[0]).unwrap(), ends[0]);
-                    for end in ends {
-                        ends_strs.push(end.to_string());
-                        ends_strs.push(",".to_string());
-                        this_len = upstream_length.get(&ends[0]).unwrap();
-                        if this_len > biggest_end.0 {
-                            biggest_end = (this_len, *end);
-                        }
-                    }
-                    props["ends_s"] = ends_strs.join("").into();
-                    props["biggest_end_upstream_m"] = round(biggest_end.0, 1).into();
-                    props["biggest_end_nid"] = biggest_end.1.into();
+                    todo!();
+                    //let ends = upstream_ends_full.get(&from_nid).unwrap();
+                    //props["num_ends"] = ends.len().into();
+                    //props["ends"] = ends.iter().copied().collect::<Vec<i64>>().into();
+                    //let mut ends_strs = vec![",".to_string()];
+                    //let mut this_len;
+                    //let mut biggest_end = (upstream_length.get(&ends[0]).unwrap(), ends[0]);
+                    //for end in ends {
+                    //    ends_strs.push(end.to_string());
+                    //    ends_strs.push(",".to_string());
+                    //    this_len = upstream_length.get(&ends[0]).unwrap();
+                    //    if this_len > biggest_end.0 {
+                    //        biggest_end = (this_len, *end);
+                    //    }
+                    //}
+                    //props["ends_s"] = ends_strs.join("").into();
+                    //props["biggest_end_upstream_m"] = round(biggest_end.0, 1).into();
+                    //props["biggest_end_nid"] = biggest_end.1.into();
                 }
 
                 (
@@ -834,7 +893,7 @@ fn main() -> Result<()> {
         info_memory_used!();
 
         let writing_upstreams_bar = progress_bars.add(
-            ProgressBar::new(reversed_g.num_edges() as u64)
+            ProgressBar::new(g.num_edges() as u64)
                 .with_message("Writing upstreams geojson(s) file")
                 .with_style(style.clone()),
         );
@@ -851,68 +910,6 @@ fn main() -> Result<()> {
             num_written.to_formatted_string(&Locale::en),
             args.output_filename.replace("%s", "upstreams")
         );
-    }
-
-    if args.ends_upstreams {
-        let started_ends_upstreams = Instant::now();
-        let calc_ends_upstreams = progress_bars.add(
-            ProgressBar::new(
-                end_points
-                    .par_iter()
-                    .map(|(_nid, (_mbms, len, _pos))| len.round() as u64)
-                    .sum(),
-            )
-            .with_message("Calculating complete upstream network per end point")
-            .with_style(style.clone()),
-        );
-        info!(
-            "Calculating the complete upstream network for {} end points (but only 100 points upstream)",
-            end_points.len()
-        );
-        //let g = g.into_reversed();
-        let end_point_upstreams = end_points
-            .iter()
-            .filter(|(_nid, (_mbms, len, _pos))| {
-                if args
-                    .ends_upstreams_min_upstream_m
-                    .map_or(false, |m| **len < m)
-                {
-                    // since we're not doing this end point, update the progress bar
-                    calc_ends_upstreams.inc(len.round() as u64);
-                }
-                args.ends_upstreams_min_upstream_m
-                    .map_or(true, |min_len| **len >= min_len)
-            })
-            .map(|(nid, (_mbms, len, _pos))| {
-                let all_upstream_paths =
-                    reversed_g.all_out_edges_recursive(*nid, args.ends_upstreams_max_nodes);
-                let all_upstream_paths = all_upstream_paths
-                    .map(|path| {
-                        path.par_iter()
-                            .map(|nid| nodeid_pos.get(nid).unwrap())
-                            .collect::<Vec<_>>()
-                    })
-                    .collect::<Vec<_>>();
-
-                let props = serde_json::json!({"upstream_m": round(len, 1), "nid": nid});
-
-                calc_ends_upstreams.inc(len.round() as u64);
-                (props, all_upstream_paths)
-            });
-
-        let mut f = std::io::BufWriter::new(std::fs::File::create(
-            args.output_filename.replace("%s", "ends-full-upstreams"),
-        )?);
-        let num_written =
-            write_geojson_features_directly(end_point_upstreams, &mut f, &output_format)?;
-        info!(
-            "Calculated & wrote {} features to output file {} in {}",
-            num_written.to_formatted_string(&Locale::en),
-            args.output_filename.replace("%s", "ends-full-upstreams"),
-            formatting::format_duration(started_ends_upstreams.elapsed()),
-        );
-        calc_ends_upstreams.finish();
-        progress_bars.remove(&calc_ends_upstreams);
     }
 
     info!(
@@ -1074,4 +1071,15 @@ fn _bbox_area(points: impl Iterator<Item = (f64, f64)>) -> Option<f64> {
         .map(|bbox| (bbox.1 - bbox.0, bbox.3 - bbox.2))
         .map(|delta| (delta.0.into_inner(), delta.1.into_inner()))
         .map(|delta| delta.0 * delta.1)
+}
+
+fn collect_into_vec_set<T>(it: impl ParallelIterator<Item = T>) -> Vec<T>
+where
+    T: Ord + Send,
+{
+    let mut result: Vec<T> = it.collect();
+    result.sort_unstable();
+    result.dedup();
+    result.shrink_to_fit();
+    result
 }
