@@ -227,10 +227,6 @@ pub(crate) struct Args {
     #[arg(long)]
     pub upstream_from_upstream_multiple: Vec<i64>,
 
-    /// Calculate & write a file with each upstream line, but the geometry is a point
-    #[arg(long, default_value = "false")]
-    pub upstream_points: bool,
-
     /// For all ends, calc the complete upstreams
     #[arg(long, default_value = "false")]
     pub ends_upstreams: bool,

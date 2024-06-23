@@ -853,48 +853,6 @@ fn main() -> Result<()> {
         );
     }
 
-    if args.upstream_points {
-        debug!("Writing upstream geojson points");
-        let upstream_points = reversed_g
-            .edges_iter()
-            .map(|(a, b)| (b, a)) // undo the graph reversal here
-            .filter(|(from_nid, _to_nid)| {
-                args.min_upstream_m
-                    .map_or(true, |min| *upstream_length.get(from_nid).unwrap() >= min)
-            })
-            .map(|(from_nid, _to_nid)| {
-                let upstream_len = upstream_length.get(&from_nid).unwrap();
-                //let (_upstream_node_count, _ends) = upstream_nodes.get(&from_nid).unwrap();
-                (
-                    // Round the upstream to only output 1 decimal place
-                    serde_json::json!({
-                        "from_upstream_m": round(upstream_len, 1),
-                    }),
-                    nodeid_pos.get(&from_nid).unwrap(),
-                )
-            });
-        info_memory_used!();
-
-        let writing_upstreams_bar = progress_bars.add(
-            ProgressBar::new(reversed_g.num_edges() as u64)
-                .with_message("Writing upstream points geojson(s) file")
-                .with_style(style.clone()),
-        );
-
-        let upstream_points = upstream_points.progress_with(writing_upstreams_bar);
-
-        let mut f = std::io::BufWriter::new(std::fs::File::create(
-            args.output_filename.replace("%s", "upstream-points"),
-        )?);
-        let num_written = write_geojson_features_directly(upstream_points, &mut f, &output_format)?;
-
-        info!(
-            "Wrote {} features to output file {}",
-            num_written.to_formatted_string(&Locale::en),
-            args.output_filename.replace("%s", "upstream-points")
-        );
-    }
-
     if args.ends_upstreams {
         let started_ends_upstreams = Instant::now();
         let calc_ends_upstreams = progress_bars.add(
