@@ -180,7 +180,7 @@ fn main() -> Result<()> {
     anyhow::ensure!(
         args.ends
             || args.loops
-            || args.upstreams
+            || args.upstreams.is_some()
             || args.csv_stats_file.is_some()
             || args.openmetrics.is_some(),
         "Nothing to do. You need to specifiy one of --ends/loops/upstreams/etc."
@@ -790,7 +790,8 @@ fn main() -> Result<()> {
         let mut f = std::io::BufWriter::new(std::fs::File::create(
             args.output_filename.replace("%s", "ends"),
         )?);
-        let num_written = write_geojson_features_directly(end_points_output, &mut f, &output_format)?;
+        let num_written =
+            write_geojson_features_directly(end_points_output, &mut f, &output_format)?;
         info!(
             "Wrote {} features to output file {}",
             num_written.to_formatted_string(&Locale::en),
@@ -844,7 +845,7 @@ fn main() -> Result<()> {
     }
     assert!(upstream_biggest_end.par_iter().all(|end| *end >= 0));
 
-    if args.upstreams {
+    if let Some(upstream_filename) = args.upstreams {
         debug!("Writing upstream geojson object(s)");
 
         // we loop over all nodes in topologically_sorted_nodes (which is annotated in
@@ -913,15 +914,13 @@ fn main() -> Result<()> {
 
         let lines = lines.progress_with(writing_upstreams_bar);
 
-        let mut f = std::io::BufWriter::new(std::fs::File::create(
-            args.output_filename.replace("%s", "upstreams"),
-        )?);
+        let mut f = std::io::BufWriter::new(std::fs::File::create(&upstream_filename)?);
         let num_written = write_geojson_features_directly(lines, &mut f, &output_format)?;
 
         info!(
             "Wrote {} features to output file {}",
             num_written.to_formatted_string(&Locale::en),
-            args.output_filename.replace("%s", "upstreams")
+            upstream_filename.display(),
         );
     }
 
