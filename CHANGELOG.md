@@ -13,6 +13,8 @@
 * Remove `--upstream-points`.
 * Ends & Loops file are now only created if the `--ends`/`--loops` argument is
   given
+* `--upstreams` now takes a filename argument, rather that taking the filename
+  from `-o`.
 
 ## v0.29.0 (2024-05-27)
 
