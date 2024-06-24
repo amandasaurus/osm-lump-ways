@@ -6,6 +6,7 @@ use std::iter::once;
 pub trait Geometry {
     fn type_name(&self) -> &[u8];
     fn write_coords(&self, f: &mut impl Write) -> Result<()>;
+    fn write_wkt(&self, buf: &mut Vec<u8>);
 }
 
 impl Geometry for Vec<Vec<(f64, f64)>> {
@@ -14,6 +15,10 @@ impl Geometry for Vec<Vec<(f64, f64)>> {
     }
     fn write_coords(&self, f: &mut impl Write) -> Result<()> {
         write_multilinestring_coords(f, self)
+    }
+
+    fn write_wkt(&self, _buf: &mut Vec<u8>) {
+        unimplemented!("WKT not implemented for this yet");
     }
 }
 
@@ -24,6 +29,9 @@ impl Geometry for (f64, f64) {
     fn write_coords(&self, f: &mut impl Write) -> Result<()> {
         write_point_coords(f, self)
     }
+    fn write_wkt(&self, buf: &mut Vec<u8>) {
+        buf.extend(format!("POINT({:.8} {:.8})", self.0, self.1).bytes());
+    }
 }
 
 impl Geometry for &(f64, f64) {
@@ -33,6 +41,10 @@ impl Geometry for &(f64, f64) {
     fn write_coords(&self, f: &mut impl Write) -> Result<()> {
         write_point_coords(f, self)
     }
+
+    fn write_wkt(&self, buf: &mut Vec<u8>) {
+        buf.extend(format!("POINT({:.8} {:.8})", self.0, self.1).bytes());
+    }
 }
 
 impl Geometry for ((f64, f64), (f64, f64)) {
@@ -41,6 +53,15 @@ impl Geometry for ((f64, f64), (f64, f64)) {
     }
     fn write_coords(&self, f: &mut impl Write) -> Result<()> {
         write_linestring_coords(f, once(self.0).chain(once(self.1)))
+    }
+    fn write_wkt(&self, buf: &mut Vec<u8>) {
+        buf.extend(
+            format!(
+                "LINESTRING({:.8} {:.8},{:.8} {:.8})",
+                self.0 .0, self.0 .1, self.1 .0, self.1 .1
+            )
+            .bytes(),
+        );
     }
 }
 
@@ -150,4 +171,39 @@ fn write_linestring_coords(
     }
     f.write_all(b"]")?;
     Ok(())
+}
+
+#[allow(dead_code)]
+pub(crate) fn write_csv_features_directly<G>(
+    features: impl Iterator<Item = (serde_json::Value, G)>,
+    f: &mut impl Write,
+    columns: &[&str],
+) -> Result<usize>
+where
+    G: Geometry,
+{
+    let mut num_written = 0;
+
+    let mut wtr = csv::Writer::from_writer(f);
+
+    for col in columns {
+        wtr.write_field(&col)?;
+    }
+    wtr.write_field("geom")?;
+    wtr.write_record(None::<&[u8]>)?;
+
+    let mut buf = Vec::new();
+    for (props, geom) in features {
+        for col in columns {
+            wtr.write_field(&props[&col].to_string())?;
+        }
+        buf.clear();
+        geom.write_wkt(&mut buf);
+        wtr.write_field(&buf)?;
+
+        wtr.write_record(None::<&[u8]>)?;
+        num_written += 1;
+    }
+
+    Ok(num_written)
 }
