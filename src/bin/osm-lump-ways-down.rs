@@ -177,6 +177,15 @@ fn main() -> Result<()> {
         anyhow::ensure!(a > b);
     }
 
+    anyhow::ensure!(
+        args.ends
+            || args.loops
+            || args.upstreams
+            || args.csv_stats_file.is_some()
+            || args.openmetrics.is_some(),
+        "Nothing to do. You need to specifiy one of --ends/loops/upstreams/etc."
+    );
+
     info!("Starting to read {:?}", &args.input_filename);
     if args.tag_filter.is_empty() {
         if let Some(ref tff) = args.tag_filter_func {
@@ -496,16 +505,18 @@ fn main() -> Result<()> {
             }
         }
 
-        let mut f = std::io::BufWriter::new(std::fs::File::create(
-            args.output_filename.replace("%s", "loops"),
-        )?);
-        let num_written =
-            write_geojson_features_directly(cycles_output.into_iter(), &mut f, &output_format)?;
+        if args.loops {
+            let mut f = std::io::BufWriter::new(std::fs::File::create(
+                args.output_filename.replace("%s", "loops"),
+            )?);
+            let num_written =
+                write_geojson_features_directly(cycles_output.into_iter(), &mut f, &output_format)?;
 
-        info!(
-            "Wrote {num_written} features to output file {}",
-            args.output_filename.replace("%s", "loops")
-        );
+            info!(
+                "Wrote {num_written} features to output file {}",
+                args.output_filename.replace("%s", "loops")
+            );
+        }
     }
 
     info_memory_used!();
@@ -751,39 +762,41 @@ fn main() -> Result<()> {
 
     let empty_smallvec = smallvec::smallvec![];
 
-    let end_points_output = end_points
-        .iter()
-        .zip(
-            // If no end_point_memberships's then that vec is empty, so the zip doesn't return
-            // anything. using chain(repeat(…)) to always give something
-            end_point_memberships
-                .iter()
-                .chain(std::iter::repeat(&empty_smallvec)),
-        )
-        .zip(end_point_upstreams.iter())
-        .filter(|((_nid, _mbms), len)| args.min_upstream_m.map_or(true, |min| *len >= &min))
-        .map(|((nid, mbms), len)| (nid, mbms, len, nodeid_pos.get(nid).unwrap()))
-        .map(|(nid, mbms, len, pos)| {
-            // Round the upstream to only output 1 decimal place
-            let mut props = serde_json::json!({"upstream_m": round(len, 1), "nid": nid});
-            if !ends_membership_filters.is_empty() {
-                for (end_attr_filter, res) in ends_membership_filters.iter().zip(mbms.iter()) {
-                    props[format!("is_in:{}", end_attr_filter)] = (*res).into();
+    if args.ends {
+        let end_points_output = end_points
+            .iter()
+            .zip(
+                // If no end_point_memberships's then that vec is empty, so the zip doesn't return
+                // anything. using chain(repeat(…)) to always give something
+                end_point_memberships
+                    .iter()
+                    .chain(std::iter::repeat(&empty_smallvec)),
+            )
+            .zip(end_point_upstreams.iter())
+            .filter(|((_nid, _mbms), len)| args.min_upstream_m.map_or(true, |min| *len >= &min))
+            .map(|((nid, mbms), len)| (nid, mbms, len, nodeid_pos.get(nid).unwrap()))
+            .map(|(nid, mbms, len, pos)| {
+                // Round the upstream to only output 1 decimal place
+                let mut props = serde_json::json!({"upstream_m": round(len, 1), "nid": nid});
+                if !ends_membership_filters.is_empty() {
+                    for (end_attr_filter, res) in ends_membership_filters.iter().zip(mbms.iter()) {
+                        props[format!("is_in:{}", end_attr_filter)] = (*res).into();
+                    }
+                    props["is_in_count"] = mbms.iter().filter(|m| **m).count().into();
                 }
-                props["is_in_count"] = mbms.iter().filter(|m| **m).count().into();
-            }
-            (props, pos)
-        });
+                (props, pos)
+            });
 
-    let mut f = std::io::BufWriter::new(std::fs::File::create(
-        args.output_filename.replace("%s", "ends"),
-    )?);
-    let num_written = write_geojson_features_directly(end_points_output, &mut f, &output_format)?;
-    info!(
-        "Wrote {} features to output file {}",
-        num_written.to_formatted_string(&Locale::en),
-        args.output_filename.replace("%s", "ends")
-    );
+        let mut f = std::io::BufWriter::new(std::fs::File::create(
+            args.output_filename.replace("%s", "ends"),
+        )?);
+        let num_written = write_geojson_features_directly(end_points_output, &mut f, &output_format)?;
+        info!(
+            "Wrote {} features to output file {}",
+            num_written.to_formatted_string(&Locale::en),
+            args.output_filename.replace("%s", "ends")
+        );
+    }
 
     assert!(
         end_points.len() < i32::MAX as usize,

@@ -198,9 +198,17 @@ pub(crate) struct Args {
     #[arg(long, value_name = "FILENAME.prom")]
     pub openmetrics: Option<PathBuf>,
 
+    /// Write the ends file
+    #[arg(long, default_value = "false")]
+    pub ends: bool,
+
+    /// Write the loops file
+    #[arg(long, default_value = "false")]
+    pub loops: bool,
+
     /// The points in the Ends data will have a boolean if they are a member of a way with this
     /// tag. Syntax is the tag filter.
-    #[arg(long, value_name = "TAGFILTER")]
+    #[arg(long, value_name = "TAGFILTER", requires = "ends")]
     pub ends_membership: Vec<tagfilter::TagFilter>,
 
     /// Calculate & write a file with each upstream line
@@ -224,7 +232,7 @@ pub(crate) struct Args {
 
     /// Include an extra property from_upstream_m_N for every occurance of this argument, with the
     /// from_upstream_m value rounded to the nearest multiple of N.
-    #[arg(long)]
+    #[arg(long, requires = "upstreams")]
     pub upstream_from_upstream_multiple: Vec<i64>,
 
     /// For all ends, calc the complete upstreams

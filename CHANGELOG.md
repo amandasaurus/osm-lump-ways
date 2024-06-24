@@ -11,6 +11,8 @@
   the largest upstream value. This uses a little less memory.
 * Remove Strahler number calculation. It doesn't work well for OSM data
 * Remove `--upstream-points`.
+* Ends & Loops file are now only created if the `--ends`/`--loops` argument is
+  given
 
 ## v0.29.0 (2024-05-27)
 
