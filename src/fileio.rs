@@ -177,7 +177,7 @@ fn write_linestring_coords(
 pub(crate) fn write_csv_features_directly<G>(
     features: impl Iterator<Item = (serde_json::Value, G)>,
     f: &mut impl Write,
-    columns: &[&str],
+    columns: &[String],
 ) -> Result<usize>
 where
     G: Geometry,

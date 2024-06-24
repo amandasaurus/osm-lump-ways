@@ -212,7 +212,7 @@ pub(crate) struct Args {
     pub ends_membership: Vec<tagfilter::TagFilter>,
 
     /// Calculate & write a file with each upstream line to this file
-    #[arg(long, value_name="UPSTREAMS_FILENAME.geojson[s]")]
+    #[arg(long, value_name = "UPSTREAMS_FILENAME")]
     pub upstreams: Option<PathBuf>,
 
     /// For every upstream, include details on which end point(s) this eventually flows to.

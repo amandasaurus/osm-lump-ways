@@ -15,6 +15,7 @@
   given
 * `--upstreams` now takes a filename argument, rather that taking the filename
   from `-o`.
+* Upstream data can be written in CSV format now.
 
 ## v0.29.0 (2024-05-27)
 

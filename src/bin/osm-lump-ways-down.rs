@@ -54,7 +54,7 @@ mod way_group;
 
 #[path = "../fileio.rs"]
 mod fileio;
-use fileio::{write_geojson_features_directly, OutputFormat};
+use fileio::{write_csv_features_directly, write_geojson_features_directly, OutputFormat};
 
 #[path = "../formatting.rs"]
 mod formatting;
@@ -846,7 +846,7 @@ fn main() -> Result<()> {
     assert!(upstream_biggest_end.par_iter().all(|end| *end >= 0));
 
     if let Some(upstream_filename) = args.upstreams {
-        debug!("Writing upstream geojson object(s)");
+        debug!("Writing upstreams");
 
         // we loop over all nodes in topologically_sorted_nodes (which is annotated in
         // upstream_length_iter with the upstream value) and flat_map that into each line segment
@@ -915,7 +915,28 @@ fn main() -> Result<()> {
         let lines = lines.progress_with(writing_upstreams_bar);
 
         let mut f = std::io::BufWriter::new(std::fs::File::create(&upstream_filename)?);
-        let num_written = write_geojson_features_directly(lines, &mut f, &output_format)?;
+
+        let num_written;
+        if upstream_filename.extension().unwrap() == "geojsons"
+            || upstream_filename.extension().unwrap() == "geojson"
+        {
+            num_written = write_geojson_features_directly(lines, &mut f, &output_format)?;
+        } else if upstream_filename.extension().unwrap() == "csv" {
+            let mut csv_columns = vec!["from_upstream_m".to_string()];
+            if args.upstream_tag_biggest_end {
+                csv_columns.push("biggest_end_nid".to_string());
+            }
+            for mult in args.upstream_from_upstream_multiple.iter() {
+                csv_columns.push(format!("from_upstream_m_{}", mult));
+            }
+            num_written = write_csv_features_directly(
+                lines,
+                &mut f,
+                &csv_columns,
+            )?;
+        } else {
+            anyhow::bail!("Unsupported output format");
+        }
 
         info!(
             "Wrote {} features to output file {}",
