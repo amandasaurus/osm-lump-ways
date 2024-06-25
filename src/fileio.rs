@@ -187,7 +187,7 @@ where
     let mut wtr = csv::Writer::from_writer(f);
 
     for col in columns {
-        wtr.write_field(&col)?;
+        wtr.write_field(col)?;
     }
     wtr.write_field("geom")?;
     wtr.write_record(None::<&[u8]>)?;
