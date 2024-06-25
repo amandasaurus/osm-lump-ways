@@ -668,7 +668,7 @@ fn main() -> Result<()> {
     );
     let calc_all_upstream_bar = progress_bars.add(
         ProgressBar::new(end_points.len() as u64)
-            .with_message("End points with calculated upstreams")
+            .with_message("Calculating upstream value for all End points")
             .with_style(style.clone()),
     );
     calc_all_upstream_bar.set_length(topologically_sorted_nodes.len() as u64);
