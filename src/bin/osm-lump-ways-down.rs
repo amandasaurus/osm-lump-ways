@@ -929,11 +929,7 @@ fn main() -> Result<()> {
             for mult in args.upstream_from_upstream_multiple.iter() {
                 csv_columns.push(format!("from_upstream_m_{}", mult));
             }
-            num_written = write_csv_features_directly(
-                lines,
-                &mut f,
-                &csv_columns,
-            )?;
+            num_written = write_csv_features_directly(lines, &mut f, &csv_columns)?;
         } else {
             anyhow::bail!("Unsupported output format");
         }
