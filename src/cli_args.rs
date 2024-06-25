@@ -230,6 +230,10 @@ pub(crate) struct Args {
     )]
     pub upstream_tag_biggest_end: bool,
 
+    /// Write the group
+    #[arg(long, default_value = "false", requires = "upstream_tag_biggest_end")]
+    pub group_by_ends: bool,
+
     /// Include an extra property from_upstream_m_N for every occurance of this argument, with the
     /// from_upstream_m value rounded to the nearest multiple of N.
     #[arg(long, requires = "upstreams")]

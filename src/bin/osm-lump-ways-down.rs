@@ -663,7 +663,7 @@ fn main() -> Result<()> {
 
     let calc_upstream_ends_bar = progress_bars.add(
         ProgressBar::new(end_points.len() as u64)
-            .with_message("End points with calculated upstreams")
+            .with_message("Calculating upstream value for end points")
             .with_style(style.clone()),
     );
     let calc_all_upstream_bar = progress_bars.add(
@@ -845,6 +845,66 @@ fn main() -> Result<()> {
     }
     assert!(upstream_biggest_end.par_iter().all(|end| *end >= 0));
 
+    if args.group_by_ends {
+        let group_ends_bar = progress_bars.add(
+            ProgressBar::new(end_points.len() as u64)
+                .with_message("Grouping all waterways by end point")
+                .with_style(style.clone()),
+        );
+
+        let upstreams_grouped_by_end = group_ends_bar
+            .wrap_iter(end_points.iter())
+            .copied()
+            .zip(end_point_upstreams.iter().copied())
+            .enumerate()
+            .filter(|(_end_idx, (_end_nid, end_upstream))| {
+                args.min_upstream_m.map_or(true, |min| *end_upstream >= min)
+            })
+            .flat_map(|(end_idx, (end_nid, end_upstream))| {
+                let end_idx_i32: i32 = end_idx.try_into().unwrap();
+                let nids_that_go_here: HashSet<i64> = topologically_sorted_nodes
+                    .iter()
+                    .zip(upstream_biggest_end.iter())
+                    .filter_map(|(nid, biggest_end_i32)| {
+                        if *biggest_end_i32 == end_idx_i32 {
+                            Some(nid)
+                        } else {
+                            None
+                        }
+                    })
+                    .copied()
+                    .collect();
+
+                g.all_in_edges_recursive(end_nid, None, move |nid| {
+                    nids_that_go_here.contains(nid)
+                })
+                .map(|segment| {
+                    segment
+                        .into_par_iter()
+                        .map(|nid| nodeid_pos.get(&nid).unwrap())
+                        .collect::<Vec<_>>()
+                })
+                .map(move |points| {
+                    let props = serde_json::json!({
+                        "biggest_end_nid": end_nid,
+                        "biggest_end_upstream_m": end_upstream,
+                    });
+                    (props, points)
+                })
+            });
+
+        let mut f = std::io::BufWriter::new(std::fs::File::create(
+            args.output_filename.replace("%s", "grouped-ends"),
+        )?);
+        let num_written =
+            write_geojson_features_directly(upstreams_grouped_by_end, &mut f, &output_format)?;
+        info!(
+            "Wrote {} features to output file {}",
+            num_written.to_formatted_string(&Locale::en),
+            args.output_filename.replace("%s", "grouped-ends")
+        );
+    }
+
     if let Some(upstream_filename) = args.upstreams {
         debug!("Writing upstreams");
 
@@ -1004,7 +1064,7 @@ fn read_with_node_replacements(
             }
         });
     obj_reader.finish();
-    progress_bars.remove(&obj_reader);
+    //progress_bars.remove(&obj_reader);
     ways_added.finish();
     progress_bars.remove(&ways_added);
 

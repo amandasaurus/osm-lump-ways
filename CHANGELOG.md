@@ -16,6 +16,7 @@
 * `--upstreams` now takes a filename argument, rather that taking the filename
   from `-o`.
 * Upstream data can be written in CSV format now.
+* `--group-by-ends` outputs all the waterways based on the biggest end
 
 ## v0.29.0 (2024-05-27)
 

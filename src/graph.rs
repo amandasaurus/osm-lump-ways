@@ -518,6 +518,7 @@ pub trait DirectedGraphTrait: Send {
     /// Adds an edge between these 2, returning true iff the edge already existed
     fn add_edge(&mut self, vertex1: i64, vertex2: i64) -> bool;
 
+    fn in_neighbours(&self, from_vertex: i64) -> impl Iterator<Item = i64>;
     fn out_neighbours(&self, from_vertex: i64) -> impl Iterator<Item = i64>;
 
     fn num_vertexes(&self) -> usize;
@@ -560,15 +561,18 @@ pub trait DirectedGraphTrait: Send {
     }
 
     /// starting at point `nid`, follow all upstreams, in a DFS manner
-    fn all_out_edges_recursive(
+    fn all_in_edges_recursive(
         &self,
         nid: i64,
         max_nodes_upstream: impl Into<Option<i64>>,
+        incl_nid: impl Fn(&i64) -> bool,
     ) -> impl Iterator<Item = Vec<i64>> {
         let max_nodes_upstream: Option<i64> = max_nodes_upstream.into();
         let mut frontier = VecDeque::new();
         let mut seen_vertexes = HashSet::new();
-        frontier.push_back((nid, None, max_nodes_upstream));
+        if incl_nid(&nid) {
+            frontier.push_back((nid, None, max_nodes_upstream));
+        }
 
         std::iter::from_fn(move || {
             if frontier.is_empty() {
@@ -588,20 +592,23 @@ pub trait DirectedGraphTrait: Send {
                     *max_nodes_upstream -= 1;
                 }
                 if max_nodes_upstream.map_or(false, |m| m == 0) {
+                    curr_path.reverse();
                     return Some(curr_path);
                 } else {
-                    let mut outs = self.out_neighbours(curr_point);
-                    if let Some(nxt) = outs.next() {
+                    let mut ins = self.in_neighbours(curr_point);
+                    if let Some(nxt) = ins.next() {
                         // any other out neighbours of this point need to be visited later
                         frontier.extend(
-                            outs.filter(|n| !seen_vertexes.contains(n))
-                                .map(|out| (out, Some(curr_point), max_nodes_upstream)),
+                            ins.filter(|n| !seen_vertexes.contains(n))
+                                .filter(|n| incl_nid(n))
+                                .map(|in_nid| (in_nid, Some(curr_point), max_nodes_upstream)),
                         );
 
                         curr_point = nxt;
                         continue;
                     } else {
                         // no more neighbours here
+                        curr_path.reverse();
                         return Some(curr_path);
                     }
                 }
@@ -1026,11 +1033,18 @@ impl DirectedGraphTrait for DirectedGraph2 {
         false
     }
 
-    fn out_neighbours(&self, from_vertex: i64) -> impl Iterator<Item = i64> + '_ {
+    fn out_neighbours(&self, from_vertex: i64) -> impl Iterator<Item = i64> {
         self.edges
             .get(&from_vertex)
             .into_iter()
             .flat_map(|(_ins, outs)| outs.iter())
+            .copied()
+    }
+    fn in_neighbours(&self, from_vertex: i64) -> impl Iterator<Item = i64> {
+        self.edges
+            .get(&from_vertex)
+            .into_iter()
+            .flat_map(|(ins, _outs)| ins.iter())
             .copied()
     }
 
@@ -1132,6 +1146,10 @@ impl DirectedGraphTrait for UniDirectedGraph {
         false
     }
 
+    fn in_neighbours(&self, _from_vertex: i64) -> impl Iterator<Item = i64> {
+        unimplemented!();
+        std::iter::empty()
+    }
     fn out_neighbours(&self, from_vertex: i64) -> impl Iterator<Item = i64> {
         self.edges
             .get(&from_vertex)

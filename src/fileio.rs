@@ -22,6 +22,19 @@ impl Geometry for Vec<Vec<(f64, f64)>> {
     }
 }
 
+impl Geometry for Vec<(f64, f64)> {
+    fn type_name(&self) -> &[u8] {
+        b"LineString"
+    }
+    fn write_coords(&self, f: &mut impl Write) -> Result<()> {
+        write_linestring_coords(f, self.iter().copied())
+    }
+
+    fn write_wkt(&self, _buf: &mut Vec<u8>) {
+        unimplemented!("WKT not implemented for this yet");
+    }
+}
+
 impl Geometry for (f64, f64) {
     fn type_name(&self) -> &[u8] {
         b"Point"
