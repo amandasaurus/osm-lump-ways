@@ -564,22 +564,19 @@ pub trait DirectedGraphTrait: Send {
     fn all_in_edges_recursive(
         &self,
         nid: i64,
-        max_nodes_upstream: impl Into<Option<i64>>,
         incl_nid: impl Fn(&i64) -> bool,
     ) -> impl Iterator<Item = Vec<i64>> {
-        let max_nodes_upstream: Option<i64> = max_nodes_upstream.into();
-        let mut frontier = VecDeque::new();
+        let mut frontier = Vec::new();
         let mut seen_vertexes = HashSet::new();
         if incl_nid(&nid) {
-            frontier.push_back((nid, None, max_nodes_upstream));
+            frontier.push((nid, None));
         }
 
         std::iter::from_fn(move || {
             if frontier.is_empty() {
                 return None;
             }
-            let (mut curr_point, opt_prev_point, mut max_nodes_upstream) =
-                frontier.pop_front().unwrap();
+            let (mut curr_point, opt_prev_point) = frontier.pop().unwrap();
             let mut curr_path = Vec::new();
 
             if let Some(prev_point) = opt_prev_point {
@@ -588,29 +585,21 @@ pub trait DirectedGraphTrait: Send {
             loop {
                 curr_path.push(curr_point);
                 seen_vertexes.insert(curr_point);
-                if let Some(max_nodes_upstream) = max_nodes_upstream.as_mut() {
-                    *max_nodes_upstream -= 1;
-                }
-                if max_nodes_upstream.map_or(false, |m| m == 0) {
+                let mut ins = self.in_neighbours(curr_point);
+                if let Some(nxt) = ins.next() {
+                    // any other out neighbours of this point need to be visited later
+                    frontier.extend(
+                        ins.filter(|n| !seen_vertexes.contains(n))
+                            .filter(|n| incl_nid(n))
+                            .map(|in_nid| (in_nid, Some(curr_point))),
+                    );
+
+                    curr_point = nxt;
+                    continue;
+                } else {
+                    // no more neighbours here
                     curr_path.reverse();
                     return Some(curr_path);
-                } else {
-                    let mut ins = self.in_neighbours(curr_point);
-                    if let Some(nxt) = ins.next() {
-                        // any other out neighbours of this point need to be visited later
-                        frontier.extend(
-                            ins.filter(|n| !seen_vertexes.contains(n))
-                                .filter(|n| incl_nid(n))
-                                .map(|in_nid| (in_nid, Some(curr_point), max_nodes_upstream)),
-                        );
-
-                        curr_point = nxt;
-                        continue;
-                    } else {
-                        // no more neighbours here
-                        curr_path.reverse();
-                        return Some(curr_path);
-                    }
                 }
             }
         })

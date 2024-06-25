@@ -851,6 +851,13 @@ fn main() -> Result<()> {
                 .with_message("Grouping all waterways by end point")
                 .with_style(style.clone()),
         );
+        let segments_spinner = progress_bars.add(ProgressBar::new_spinner().with_style(
+            ProgressStyle::with_template("       {human_pos} segments output").unwrap(),
+        ));
+        let nodes_spinner =
+            progress_bars.add(ProgressBar::new_spinner().with_style(
+                ProgressStyle::with_template("       {human_pos} nodes output").unwrap(),
+            ));
 
         let upstreams_grouped_by_end = group_ends_bar
             .wrap_iter(end_points.iter())
@@ -875,22 +882,26 @@ fn main() -> Result<()> {
                     .copied()
                     .collect();
 
-                g.all_in_edges_recursive(end_nid, None, move |nid| {
-                    nids_that_go_here.contains(nid)
-                })
-                .map(|segment| {
-                    segment
-                        .into_par_iter()
-                        .map(|nid| nodeid_pos.get(&nid).unwrap())
-                        .collect::<Vec<_>>()
-                })
-                .map(move |points| {
-                    let props = serde_json::json!({
-                        "biggest_end_nid": end_nid,
-                        "biggest_end_upstream_m": end_upstream,
-                    });
-                    (props, points)
-                })
+                g.all_in_edges_recursive(end_nid, move |nid| nids_that_go_here.contains(nid))
+                    .map(|segment| {
+                        segment
+                            .into_par_iter()
+                            .map(|nid| nodeid_pos.get(&nid).unwrap())
+                            .collect::<Vec<_>>()
+                    })
+                    .map({
+                        let segments_spinner = segments_spinner.clone();
+                        let nodes_spinner = nodes_spinner.clone();
+                        move |points| {
+                            segments_spinner.inc(1);
+                            nodes_spinner.inc(points.len() as u64);
+                            let props = serde_json::json!({
+                                "biggest_end_nid": end_nid,
+                                "biggest_end_upstream_m": end_upstream,
+                            });
+                            (props, points)
+                        }
+                    })
             });
 
         let mut f = std::io::BufWriter::new(std::fs::File::create(
