@@ -1029,6 +1029,20 @@ fn read_with_node_replacements(
     progress_bars: &MultiProgress,
     graph: &mut impl graph::DirectedGraphTrait,
 ) -> Result<()> {
+    let file_reading_style =
+                ProgressStyle::with_template(
+        "[{elapsed_precise}] {percent:>3}% done. eta {eta:>4} {bar:10.cyan/blue} {bytes:>7}/{total_bytes:7} {per_sec:>12} {msg}",
+            ).unwrap();
+    let input_fp = std::fs::File::open(&input_filename)?;
+    let input_bar = progress_bars.add(
+        ProgressBar::new(input_fp.metadata()?.len())
+            .with_message("Reading input file")
+            .with_style(file_reading_style.clone()),
+    );
+    let rdr = input_bar.wrap_read(input_fp);
+
+    let mut reader = osmio::stringpbf::PBFReader::new(rdr);
+
     let obj_reader = progress_bars.add(
         ProgressBar::new_spinner().with_style(
             ProgressStyle::with_template(
@@ -1045,9 +1059,6 @@ fn read_with_node_replacements(
             .unwrap(),
         ),
     );
-
-    let reader = read_progress::BufReaderWithSize::from_path(input_filename)?;
-    let mut reader = osmio::stringpbf::PBFReader::new(reader);
 
     let graph = Arc::new(Mutex::new(graph));
 
