@@ -859,13 +859,14 @@ fn main() -> Result<()> {
                 ProgressStyle::with_template("       {human_pos} nodes output").unwrap(),
             ));
 
-        let upstreams_grouped_by_end = group_ends_bar
-            .wrap_iter(end_points.iter())
-            .copied()
-            .zip(end_point_upstreams.iter().copied())
+        let upstreams_grouped_by_end = end_points
+            .iter()
+            .zip(end_point_upstreams.iter())
             .enumerate()
+            .inspect(|_| group_ends_bar.inc(1))
             .filter(|(_end_idx, (_end_nid, end_upstream))| {
-                args.min_upstream_m.map_or(true, |min| *end_upstream >= min)
+                args.min_upstream_m
+                    .map_or(true, |min| **end_upstream >= min)
             })
             .flat_map(|(end_idx, (end_nid, end_upstream))| {
                 let end_idx_i32: i32 = end_idx.try_into().unwrap();
@@ -882,7 +883,7 @@ fn main() -> Result<()> {
                     .copied()
                     .collect();
 
-                g.all_in_edges_recursive(end_nid, move |nid| nids_that_go_here.contains(nid))
+                g.all_in_edges_recursive(*end_nid, move |nid| nids_that_go_here.contains(nid))
                     .map(|segment| {
                         segment
                             .into_par_iter()
