@@ -856,7 +856,7 @@ fn main() -> Result<()> {
             &end_point_upstreams,
             &upstream_biggest_end,
             &output_format,
-            &nodeid_pos
+            &nodeid_pos,
         )?;
     }
 
@@ -1211,7 +1211,6 @@ fn do_group_by_ends(
                 })
         });
 
-    
     let output_filename: String = args.output_filename.replace("%s", "grouped-ends");
     let mut f = std::io::BufWriter::new(std::fs::File::create(&output_filename)?);
     let (send, recv) = std::sync::mpsc::channel();
