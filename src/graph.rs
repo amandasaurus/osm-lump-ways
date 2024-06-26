@@ -566,17 +566,32 @@ pub trait DirectedGraphTrait: Send {
         nid: i64,
         incl_nid: impl Fn(&i64) -> bool,
     ) -> impl Iterator<Item = Vec<i64>> {
-        let mut frontier = Vec::new();
+        let mut frontier = VecDeque::new();
         let mut seen_vertexes = HashSet::new();
         if incl_nid(&nid) {
-            frontier.push((nid, None));
+            frontier.push_front((nid, None));
         }
 
+        // Somehow in this, nids are getting added to the frontier many times, and this is causing
+        // massive duplications of part of nodes
+
         std::iter::from_fn(move || {
-            if frontier.is_empty() {
+            let next = loop {
+                match frontier.pop_front() {
+                    None => { break None; },
+                    Some((p, pp)) => {
+                        if seen_vertexes.contains(&p) {
+                            continue;
+                        } else {
+                            break Some((p, pp));
+                        }
+                    },
+                }
+            };
+            if next.is_none() {
                 return None;
             }
-            let (mut curr_point, opt_prev_point) = frontier.pop().unwrap();
+            let (mut curr_point, opt_prev_point) = next.unwrap();
             let mut curr_path = Vec::new();
 
             if let Some(prev_point) = opt_prev_point {
@@ -585,13 +600,12 @@ pub trait DirectedGraphTrait: Send {
             loop {
                 curr_path.push(curr_point);
                 seen_vertexes.insert(curr_point);
-                let mut ins = self.in_neighbours(curr_point);
+                let mut ins = self.in_neighbours(curr_point).filter(|i| !seen_vertexes.contains(i));
                 if let Some(nxt) = ins.next() {
                     // any other out neighbours of this point need to be visited later
                     frontier.extend(
-                        ins.filter(|n| !seen_vertexes.contains(n))
-                            .filter(|n| incl_nid(n))
-                            .map(|in_nid| (in_nid, Some(curr_point))),
+                        ins.filter(|n| incl_nid(n))
+                           .map(|in_nid| (in_nid, Some(curr_point))),
                     );
 
                     curr_point = nxt;
