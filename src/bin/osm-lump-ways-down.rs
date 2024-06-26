@@ -1150,6 +1150,7 @@ fn do_group_by_ends(
     output_format: &OutputFormat,
     nodeid_pos: &impl NodeIdPosition,
 ) -> Result<()> {
+    let started = Instant::now();
     let group_ends_bar = progress_bars.add(
         ProgressBar::new(end_points.len() as u64)
             .with_message("Grouping all waterways by end point")
@@ -1218,19 +1219,22 @@ fn do_group_by_ends(
     std::thread::spawn({
         let output_format = output_format.clone();
         move || {
-            let num_written =
+            let _num_written =
                 write_geojson_features_directly(recv.iter(), &mut f, &output_format).unwrap();
-            info!(
-                "Wrote {} features to output file {}",
-                num_written.to_formatted_string(&Locale::en),
-                output_filename,
-            );
         }
     });
     upstreams_grouped_by_end.for_each_with(send.clone(), |send, val| {
         send.send(val).unwrap();
     });
-    //jh.join().unwrap();
+
+    let grouping_duration = started.elapsed();
+    info!(
+        "Wrote features to output file {} in {}. {:.2} nodes/sec",
+        //num_written.to_formatted_string(&Locale::en),
+        output_filename,
+        formatting::format_duration(grouping_duration),
+        (topologically_sorted_nodes.len() as f64)/grouping_duration.as_secs_f64(),
+    );
 
     Ok(())
 }
