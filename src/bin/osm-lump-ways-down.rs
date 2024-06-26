@@ -1154,15 +1154,17 @@ fn node_group_to_length_m(nids: &[[i64; 2]], pos: &impl NodeIdPosition) -> f64 {
         .sum()
 }
 
+fn linestring_length(coords: &[(f64, f64)]) -> f64 {
+    coords
+        .par_windows(2)
+        .map(|pair| haversine_m(pair[0].1, pair[0].0, pair[1].1, pair[1].0))
+        .sum::<f64>()
+}
+
 fn multilinestring_length(coords: &Vec<Vec<(f64, f64)>>) -> f64 {
     coords
         .par_iter()
-        .map(|coord_string| {
-            coord_string
-                .par_windows(2)
-                .map(|pair| haversine_m(pair[0].1, pair[0].0, pair[1].1, pair[1].0))
-                .sum::<f64>()
-        })
+        .map(|c| linestring_length(c))
         .sum()
 }
 
