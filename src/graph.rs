@@ -578,14 +578,16 @@ pub trait DirectedGraphTrait: Send {
         std::iter::from_fn(move || {
             let next = loop {
                 match frontier.pop_front() {
-                    None => { break None; },
+                    None => {
+                        break None;
+                    }
                     Some((p, pp)) => {
                         if seen_vertexes.contains(&p) {
                             continue;
                         } else {
                             break Some((p, pp));
                         }
-                    },
+                    }
                 }
             };
             if next.is_none() {
@@ -600,12 +602,14 @@ pub trait DirectedGraphTrait: Send {
             loop {
                 curr_path.push(curr_point);
                 seen_vertexes.insert(curr_point);
-                let mut ins = self.in_neighbours(curr_point).filter(|i| !seen_vertexes.contains(i));
+                let mut ins = self
+                    .in_neighbours(curr_point)
+                    .filter(|i| !seen_vertexes.contains(i));
                 if let Some(nxt) = ins.next() {
                     // any other out neighbours of this point need to be visited later
                     frontier.extend(
                         ins.filter(|n| incl_nid(n))
-                           .map(|in_nid| (in_nid, Some(curr_point))),
+                            .map(|in_nid| (in_nid, Some(curr_point))),
                     );
 
                     curr_point = nxt;

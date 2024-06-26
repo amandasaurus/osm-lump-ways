@@ -167,7 +167,7 @@ fn main() -> Result<()> {
 
     #[allow(clippy::iter_nth_zero)]
     let only_these_way_groups_divmod: Option<(i64, i64)> =
-        args.only_these_way_groups_divmod.map(|s| {
+        args.only_these_way_groups_divmod.as_ref().map(|s| {
             (
                 s.split('/').nth(0).unwrap().parse().unwrap(),
                 s.split('/').nth(1).unwrap().parse().unwrap(),
@@ -224,7 +224,7 @@ fn main() -> Result<()> {
         ),
     );
 
-    let mut metrics = args.openmetrics.map(|metrics_path| {
+    let mut metrics = args.openmetrics.as_ref().map(|metrics_path| {
         info!("Writing metrics to file {metrics_path:?}");
         let mut metrics = std::io::BufWriter::new(std::fs::File::create(metrics_path).unwrap());
         writeln!(
@@ -500,7 +500,7 @@ fn main() -> Result<()> {
                 csv_stats.flush()?;
                 info!(
                     "Statistics have been written to file {}",
-                    args.csv_stats_file.unwrap().display()
+                    args.csv_stats_file.as_ref().unwrap().display()
                 );
             }
         }
@@ -846,86 +846,18 @@ fn main() -> Result<()> {
     assert!(upstream_biggest_end.par_iter().all(|end| *end >= 0));
 
     if args.group_by_ends {
-        let group_ends_bar = progress_bars.add(
-            ProgressBar::new(end_points.len() as u64)
-                .with_message("Grouping all waterways by end point")
-                .with_style(style.clone()),
-        );
-        let nodes_bar = progress_bars.add(
-            ProgressBar::new(topologically_sorted_nodes.len() as u64)
-                .with_message("Nodes allocated to a group")
-                .with_style(style.clone()),
-        );
-        let segments_spinner = progress_bars.add(ProgressBar::new_spinner().with_style(
-            ProgressStyle::with_template("       {human_pos} segments output").unwrap(),
-        ));
-
-        let upstreams_grouped_by_end = end_points
-            .par_iter()
-            .zip(end_point_upstreams.par_iter())
-            .enumerate()
-            .inspect(|_| group_ends_bar.inc(1))
-            .filter(|(_end_idx, (_end_nid, end_upstream))| {
-                args.min_upstream_m
-                    .map_or(true, |min| **end_upstream >= min)
-            })
-            .flat_map_iter(|(end_idx, (end_nid, end_upstream))| {
-                let end_idx_i32: i32 = end_idx.try_into().unwrap();
-                let nids_that_go_here: HashSet<i64> = topologically_sorted_nodes
-                    .iter()
-                    .zip(upstream_biggest_end.iter())
-                    .filter_map(|(nid, biggest_end_i32)| {
-                        if *biggest_end_i32 == end_idx_i32 {
-                            Some(nid)
-                        } else {
-                            None
-                        }
-                    })
-                    .copied()
-                    .collect();
-
-                g.all_in_edges_recursive(*end_nid, move |nid| nids_that_go_here.contains(nid))
-                    .map(|segment| {
-                        segment
-                            .into_par_iter()
-                            .map(|nid| nodeid_pos.get(&nid).unwrap())
-                            .collect::<Vec<_>>()
-                    })
-                    .map({
-                        let segments_spinner = segments_spinner.clone();
-                        let nodes_bar = nodes_bar.clone();
-                        move |points| {
-                            segments_spinner.inc(1);
-                            nodes_bar.inc(points.len().saturating_sub(1) as u64);
-                            let props = serde_json::json!({
-                                "biggest_end_nid": end_nid,
-                                "biggest_end_upstream_m": round(end_upstream, 1),
-                            });
-                            (props, points)
-                        }
-                    })
-            })
-            ;
-
-        let mut f = std::io::BufWriter::new(std::fs::File::create(
-            args.output_filename.replace("%s", "grouped-ends"),
-        )?);
-        let (send, recv) = std::sync::mpsc::channel();
-        
-        std::thread::spawn({
-            let output_format = output_format.clone();
-            move || {
-            let num_written =
-                write_geojson_features_directly(recv.iter(), &mut f, &output_format).unwrap();
-            info!(
-                "Wrote {} features to output file {}",
-                num_written.to_formatted_string(&Locale::en),
-                args.output_filename.replace("%s", "grouped-ends")
-            );
-        }});
-        upstreams_grouped_by_end
-            .for_each_with(send.clone(), |send, val| { send.send(val).unwrap();});
-        //jh.join().unwrap();
+        do_group_by_ends(
+            args.clone(),
+            &g,
+            &progress_bars,
+            &style,
+            &end_points,
+            &topologically_sorted_nodes,
+            &end_point_upstreams,
+            &upstream_biggest_end,
+            &output_format,
+            &nodeid_pos
+        )?;
     }
 
     if let Some(upstream_filename) = args.upstreams {
@@ -1162,10 +1094,7 @@ fn linestring_length(coords: &[(f64, f64)]) -> f64 {
 }
 
 fn multilinestring_length(coords: &Vec<Vec<(f64, f64)>>) -> f64 {
-    coords
-        .par_iter()
-        .map(|c| linestring_length(c))
-        .sum()
+    coords.par_iter().map(|c| linestring_length(c)).sum()
 }
 
 /// Round this float to this many places after the decimal point.
@@ -1207,4 +1136,102 @@ where
     result.dedup();
     result.shrink_to_fit();
     result
+}
+
+fn do_group_by_ends(
+    args: cli_args::Args,
+    g: &graph::DirectedGraph2,
+    progress_bars: &MultiProgress,
+    style: &ProgressStyle,
+    end_points: &[i64],
+    topologically_sorted_nodes: &[i64],
+    end_point_upstreams: &[f64],
+    upstream_biggest_end: &[i32],
+    output_format: &OutputFormat,
+    nodeid_pos: &impl NodeIdPosition,
+) -> Result<()> {
+    let group_ends_bar = progress_bars.add(
+        ProgressBar::new(end_points.len() as u64)
+            .with_message("Grouping all waterways by end point")
+            .with_style(style.clone()),
+    );
+    let nodes_bar = progress_bars.add(
+        ProgressBar::new(topologically_sorted_nodes.len() as u64)
+            .with_message("Nodes allocated to a group")
+            .with_style(style.clone()),
+    );
+    let segments_spinner =
+        progress_bars.add(ProgressBar::new_spinner().with_style(
+            ProgressStyle::with_template("       {human_pos} segments output").unwrap(),
+        ));
+
+    let upstreams_grouped_by_end = end_points
+        .par_iter()
+        .zip(end_point_upstreams.par_iter())
+        .enumerate()
+        .inspect(|_| group_ends_bar.inc(1))
+        .filter(|(_end_idx, (_end_nid, end_upstream))| {
+            args.min_upstream_m
+                .map_or(true, |min| **end_upstream >= min)
+        })
+        .flat_map_iter(|(end_idx, (end_nid, end_upstream))| {
+            let end_idx_i32: i32 = end_idx.try_into().unwrap();
+            let nids_that_go_here: HashSet<i64> = topologically_sorted_nodes
+                .iter()
+                .zip(upstream_biggest_end.iter())
+                .filter_map(|(nid, biggest_end_i32)| {
+                    if *biggest_end_i32 == end_idx_i32 {
+                        Some(nid)
+                    } else {
+                        None
+                    }
+                })
+                .copied()
+                .collect();
+
+            g.all_in_edges_recursive(*end_nid, move |nid| nids_that_go_here.contains(nid))
+                .map(|segment| {
+                    segment
+                        .into_par_iter()
+                        .map(|nid| nodeid_pos.get(&nid).unwrap())
+                        .collect::<Vec<_>>()
+                })
+                .map({
+                    let segments_spinner = segments_spinner.clone();
+                    let nodes_bar = nodes_bar.clone();
+                    move |points| {
+                        segments_spinner.inc(1);
+                        nodes_bar.inc(points.len().saturating_sub(1) as u64);
+                        let props = serde_json::json!({
+                            "biggest_end_nid": end_nid,
+                            "biggest_end_upstream_m": round(end_upstream, 1),
+                        });
+                        (props, points)
+                    }
+                })
+        });
+
+    
+    let output_filename: String = args.output_filename.replace("%s", "grouped-ends");
+    let mut f = std::io::BufWriter::new(std::fs::File::create(&output_filename)?);
+    let (send, recv) = std::sync::mpsc::channel();
+
+    std::thread::spawn({
+        let output_format = output_format.clone();
+        move || {
+            let num_written =
+                write_geojson_features_directly(recv.iter(), &mut f, &output_format).unwrap();
+            info!(
+                "Wrote {} features to output file {}",
+                num_written.to_formatted_string(&Locale::en),
+                output_filename,
+            );
+        }
+    });
+    upstreams_grouped_by_end.for_each_with(send.clone(), |send, val| {
+        send.send(val).unwrap();
+    });
+    //jh.join().unwrap();
+
+    Ok(())
 }

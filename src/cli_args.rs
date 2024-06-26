@@ -14,7 +14,7 @@ use crate::taggrouper;
 /// `-g`/`--tag-group-k` to group ways by connectiveness *and* whether that tag key is equal.
 /// `--min-length-m` Only output way groups with a minimum length of this
 /// `--only-longest-n-per-file NUM` Only output the longest `NUM` ways groups.
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
 pub(crate) struct Args {
     /// Input PBF filename
