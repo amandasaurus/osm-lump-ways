@@ -78,7 +78,7 @@ impl Geometry for ((f64, f64), (f64, f64)) {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub(crate) enum OutputFormat {
     GeoJSON,
     GeoJSONSeq,
