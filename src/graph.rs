@@ -527,11 +527,11 @@ pub trait DirectedGraphTrait: Send {
     fn contains_vertex(&self, vid: &i64) -> bool;
 
     /// Iterator over all edges
-    fn edges_iter(&self) -> impl Iterator<Item = (i64, i64)>;
+    fn edges_iter(&self) -> impl Iterator<Item = (i64, i64)> + '_;
     fn edges_par_iter(&self) -> impl ParallelIterator<Item = (i64, i64)>;
 
     /// returns each vertex and the number of out edges
-    fn vertexes_and_num_outs(&self) -> impl Iterator<Item = (i64, usize)>;
+    fn vertexes_and_num_outs(&self) -> impl Iterator<Item = (i64, usize)> + '_;
 
     fn len(&self) -> (usize, usize) {
         (self.num_vertexes(), self.num_edges())
@@ -1154,7 +1154,7 @@ impl DirectedGraphTrait for UniDirectedGraph {
     }
 
     fn in_neighbours(&self, _from_vertex: i64) -> impl Iterator<Item = i64> {
-        unimplemented!();
+        //unimplemented!();
         std::iter::empty()
     }
     fn out_neighbours(&self, from_vertex: i64) -> impl Iterator<Item = i64> {

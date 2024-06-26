@@ -32,7 +32,7 @@ pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
     fn contains_nid(&self, nid: &i64) -> bool;
 
     /// Return all the ways that this node is in.
-    fn ways(&self, nid: &i64) -> impl Iterator<Item = i64>;
+    fn ways(&self, nid: &i64) -> Box<dyn Iterator<Item = i64> + '_>;
 
     // returns true iff this node id is in >1 way
     fn nid_is_in_many(&self, nid: &i64) -> bool;
