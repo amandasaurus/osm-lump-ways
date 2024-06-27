@@ -1190,13 +1190,7 @@ fn do_group_by_ends(
                 .copied()
                 .collect();
 
-            g.all_in_edges_recursive(*end_nid, move |nid| nids_that_go_here.contains(nid))
-                .map(|segment| {
-                    segment
-                        .into_par_iter()
-                        .map(|nid| nodeid_pos.get(&nid).unwrap())
-                        .collect::<Vec<_>>()
-                })
+            g.all_in_edges_recursive(*end_nid, move |nid| nids_that_go_here.contains(nid), nodeid_pos)
                 .map({
                     let segments_spinner = segments_spinner.clone();
                     let nodes_bar = nodes_bar.clone();

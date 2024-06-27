@@ -565,42 +565,32 @@ pub trait DirectedGraphTrait: Send {
         &self,
         nid: i64,
         incl_nid: impl Fn(&i64) -> bool,
-    ) -> impl Iterator<Item = Vec<i64>> {
-        let mut frontier = VecDeque::new();
+        nodeid_pos: &impl NodeIdPosition,
+    ) -> impl Iterator<Item = Vec<(f64, f64)>> {
+        let mut frontier: SmallVec<[_; 1]> = smallvec::smallvec![];
         let mut seen_vertexes = HashSet::new();
         if incl_nid(&nid) {
-            frontier.push_front((nid, None));
+            frontier.push((nid, None));
         }
 
         // Somehow in this, nids are getting added to the frontier many times, and this is causing
         // massive duplications of part of nodes
 
         std::iter::from_fn(move || {
-            let next = loop {
-                match frontier.pop_front() {
-                    None => {
-                        break None;
-                    }
-                    Some((p, pp)) => {
-                        if seen_vertexes.contains(&p) {
-                            continue;
-                        } else {
-                            break Some((p, pp));
-                        }
-                    }
-                }
-            };
-            if next.is_none() {
+            if frontier.is_empty() {
                 return None;
             }
-            let (mut curr_point, opt_prev_point) = next.unwrap();
-            let mut curr_path = Vec::new();
+
+            let (mut curr_point, opt_prev_point) = frontier.pop().unwrap();
+            let mut curr_latlng;
+            let mut curr_path = Vec::with_capacity(10);
 
             if let Some(prev_point) = opt_prev_point {
                 curr_path.push(prev_point);
             }
             loop {
-                curr_path.push(curr_point);
+                curr_latlng = nodeid_pos.get(&curr_point).unwrap();
+                curr_path.push(curr_latlng);
                 seen_vertexes.insert(curr_point);
                 let mut ins = self
                     .in_neighbours(curr_point)
@@ -609,7 +599,7 @@ pub trait DirectedGraphTrait: Send {
                     // any other out neighbours of this point need to be visited later
                     frontier.extend(
                         ins.filter(|n| incl_nid(n))
-                            .map(|in_nid| (in_nid, Some(curr_point))),
+                            .map(|in_nid| (in_nid, Some(curr_latlng))),
                     );
 
                     curr_point = nxt;
