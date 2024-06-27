@@ -608,7 +608,7 @@ fn main() -> Result<()> {
     info_memory_used!();
 
     // Sorted list of all nids which are an end point
-    let end_points: Vec<i64> = collect_into_vec_set(g.vertexes_wo_outgoing_jumbled());
+    let end_points: Vec<i64> = collect_into_vec_set_par(g.vertexes_wo_outgoing_jumbled());
 
     info!(
         "Calculated the {} end points",
@@ -1127,7 +1127,18 @@ fn _bbox_area(points: impl Iterator<Item = (f64, f64)>) -> Option<f64> {
         .map(|delta| delta.0 * delta.1)
 }
 
-fn collect_into_vec_set<T>(it: impl ParallelIterator<Item = T>) -> Vec<T>
+fn collect_into_vec_set_par<T>(it: impl ParallelIterator<Item = T>) -> Vec<T>
+where
+    T: Ord + Send,
+{
+    let mut result: Vec<T> = it.collect();
+    result.sort_unstable();
+    result.dedup();
+    result.shrink_to_fit();
+    result
+}
+
+fn collect_into_vec_set<T>(it: impl Iterator<Item = T>) -> Vec<T>
 where
     T: Ord + Send,
 {
