@@ -3,7 +3,7 @@ use super::*;
 use anyhow::{Context, Result};
 use rayon::prelude::ParallelIterator;
 use smallvec::SmallVec;
-use std::collections::{BTreeMap, BTreeSet, HashSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::iter::once;
 
 use crate::btreemapsplitkey::BTreeMapSplitKey;
