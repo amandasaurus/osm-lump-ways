@@ -1229,7 +1229,7 @@ fn do_group_by_ends(
 
     let grouping_duration = started.elapsed();
     info!(
-        "Wrote features to output file {} in {}. {:.2} nodes/sec",
+        "Wrote end-grouped-features to output file {} in {}. {:.3e} nodes/sec",
         //num_written.to_formatted_string(&Locale::en),
         output_filename,
         formatting::format_duration(grouping_duration),
