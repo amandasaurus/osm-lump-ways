@@ -223,6 +223,14 @@ fn main() -> Result<()> {
             .unwrap(),
         ),
     );
+    let nodes_added = progress_bars.add(
+        ProgressBar::new_spinner().with_style(
+            ProgressStyle::with_template(
+                "           {human_pos} nodes collected so far for later processing",
+            )
+            .unwrap(),
+        ),
+    );
 
     let mut metrics = args.openmetrics.as_ref().map(|metrics_path| {
         info!("Writing metrics to file {metrics_path:?}");
@@ -279,6 +287,7 @@ fn main() -> Result<()> {
         .for_each_with(g.clone(), |g, w| {
             // add the nodes from w to this graph
             let mut g = g.lock().unwrap();
+            nodes_added.inc(w.nodes().len() as u64);
             g.add_edge_chain(w.nodes());
             if let Some(t) = w.timestamp().as_ref().map(|t| t.to_epoch_number()) {
                 latest_timestamp.fetch_max(t, atomic_Ordering::SeqCst);
@@ -286,8 +295,9 @@ fn main() -> Result<()> {
         });
     let way_reading_duration = start_reading_ways.elapsed();
     info!(
-        "Finished reading. {} ways read in {}, {} ways/sec",
+        "Finished reading. {} ways, and {} nodes, read in {}, {} ways/sec",
         ways_added.position().to_formatted_string(&Locale::en),
+        nodes_added.position().to_formatted_string(&Locale::en),
         formatting::format_duration(way_reading_duration),
         ((ways_added.position() as f64 / (way_reading_duration.as_secs_f64())) as u64)
             .to_formatted_string(&Locale::en),
@@ -304,6 +314,8 @@ fn main() -> Result<()> {
     progress_bars.remove(&obj_reader);
     ways_added.finish();
     progress_bars.remove(&ways_added);
+    nodes_added.finish();
+    progress_bars.remove(&nodes_added);
     input_bar.finish();
     progress_bars.remove(&input_bar);
     let g: graph::DirectedGraph2 = Arc::try_unwrap(g).unwrap().into_inner().unwrap();
@@ -1002,6 +1014,14 @@ fn read_with_node_replacements(
             .unwrap(),
         ),
     );
+    let nodes_added = progress_bars.add(
+        ProgressBar::new_spinner().with_style(
+            ProgressStyle::with_template(
+                "           {human_pos} nodes collected so far for later processing",
+            )
+            .unwrap(),
+        ),
+    );
 
     let graph = Arc::new(Mutex::new(graph));
 
@@ -1014,6 +1034,7 @@ fn read_with_node_replacements(
         // TODO support grouping by tag value
         .for_each_with(graph.clone(), |graph, w| {
             let nodes = w.nodes();
+            nodes_added.inc(nodes.len() as u64);
             if nodes.par_iter().any(|nid| node_id_replaces(*nid) != *nid) {
                 let mut new_nodes = nodes
                     .iter()
@@ -1030,9 +1051,11 @@ fn read_with_node_replacements(
             }
         });
     obj_reader.finish();
-    //progress_bars.remove(&obj_reader);
+    progress_bars.remove(&obj_reader);
     ways_added.finish();
     progress_bars.remove(&ways_added);
+    nodes_added.finish();
+    progress_bars.remove(&nodes_added);
 
     Ok(())
 }
