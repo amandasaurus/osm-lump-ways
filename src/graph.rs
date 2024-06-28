@@ -972,20 +972,20 @@ impl DirectedGraph2 {
     pub fn into_vertexes_topologically_sorted(self, sorting_nodes_bar: &ProgressBar) -> Vec<i64> {
         let mut g = self;
         let mut result = Vec::with_capacity(g.num_vertexes());
-        let mut no_incoming: BTreeSet<i64> = BTreeSet::new();
+        let mut frontier: Vec<i64> = Vec::new();
 
         let mut others = SmallNidVec::new();
         loop {
-            no_incoming.extend(
+            frontier.extend(
                 g.vertexes_and_num_ins_outs().filter_map(
                     |(v, num_ins, _num_outs)| if num_ins == 0 { Some(v) } else { None },
                 ),
             );
-            if no_incoming.is_empty() {
+            if frontier.is_empty() {
                 break;
             }
 
-            while let Some(v) = no_incoming.pop_first() {
+            while let Some(v) = frontier.pop() {
                 result.push(v);
                 sorting_nodes_bar.inc(1);
 
@@ -995,7 +995,7 @@ impl DirectedGraph2 {
                 for other in others.drain(..) {
                     g.remove_edge(&v, &other);
                     if g.num_ins_zero(&other) {
-                        no_incoming.insert(other);
+                        frontier.push(other);
                     }
                 }
             }
