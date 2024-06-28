@@ -338,14 +338,10 @@ fn main() -> Result<()> {
         num_vertexes.to_formatted_string(&Locale::en)
     );
 
-    // We need to keep track of which vertexes don't have outgoing nodes, so that we can remember
+    // We used to use a graph that only stored out neighbours, which meant we needed to keep track
+    // of which vertexes don't have outgoing nodes, so that we can remember
     // to save their position.
-    info!("Recording which nodes we need to keep track of later...");
-    let mut nids_we_need: BTreeSet<_> = g.vertexes_wo_outgoing_jumbled().collect();
-    info!(
-        "Remembered {} nodes we need later",
-        nids_we_need.len().to_formatted_string(&Locale::en)
-    );
+    // But not we use something that stores directly both
 
     info!("Splitting this large graph into many smaller non-connected graphs...");
     let splitting_graphs_bar = progress_bars.add(
@@ -539,7 +535,6 @@ fn main() -> Result<()> {
     for cycle in cycles {
         min_nodeid = *cycle.iter().flat_map(|seg| seg.iter()).min().unwrap();
         for nid in cycle.iter().flat_map(|seg| seg.iter()) {
-            nids_we_need.insert(*nid);
             if *nid != min_nodeid {
                 node_id_replaces.insert(*nid, min_nodeid);
             }
@@ -607,16 +602,16 @@ fn main() -> Result<()> {
     let mut nodeid_pos = nodeid_position::default();
     read_node_positions(
         &args.input_filename,
-        |nid| g.contains_vertex(&nid) || nids_we_need.contains(&nid),
+
+        // Previosuly, the g.contains_vertex would be false for nodes without outgoing, so we
+        // needed nids_we_need. But now we don't
+        // |nid| g.contains_vertex(&nid) || nids_we_need.contains(&nid),
+        |nid| g.contains_vertex(&nid),
         &setting_node_pos,
         &mut nodeid_pos,
     )?;
     setting_node_pos.finish();
     progress_bars.remove(&setting_node_pos);
-    info_memory_used!();
-
-    drop(nids_we_need); // don't need you anymore
-
     info_memory_used!();
 
     // Sorted list of all nids which are an end point
