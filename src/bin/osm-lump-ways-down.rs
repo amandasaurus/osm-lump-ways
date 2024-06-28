@@ -1138,6 +1138,7 @@ where
     result
 }
 
+#[allow(dead_code)]
 fn collect_into_vec_set<T>(it: impl Iterator<Item = T>) -> Vec<T>
 where
     T: Ord + Send,
