@@ -11,7 +11,7 @@ use osmio::prelude::*;
 use osmio::OSMObjBase;
 use rayon::prelude::*;
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Write;
 use std::path::Path;
 use std::time::Instant;
