@@ -983,7 +983,7 @@ fn read_with_node_replacements(
                 ProgressStyle::with_template(
         "[{elapsed_precise}] {percent:>3}% done. eta {eta:>4} {bar:10.cyan/blue} {bytes:>7}/{total_bytes:7} {per_sec:>12} {msg}",
             ).unwrap();
-    let input_fp = std::fs::File::open(&input_filename)?;
+    let input_fp = std::fs::File::open(input_filename)?;
     let input_bar = progress_bars.add(
         ProgressBar::new(input_fp.metadata()?.len())
             .with_message("Reading input file")
