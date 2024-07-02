@@ -3,7 +3,7 @@ use super::*;
 use anyhow::{Context, Result};
 use rayon::prelude::ParallelIterator;
 use smallvec::SmallVec;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::iter::once;
 
 use crate::btreemapsplitkey::BTreeMapSplitKey;
@@ -649,12 +649,8 @@ impl DirectedGraph2 {
             .copied()
     }
 
-    pub fn in_neighbours(&self, from_vertex: i64) -> impl Iterator<Item = i64> + '_ {
-        self.edges
-            .get(&from_vertex)
-            .into_iter()
-            .flat_map(|(ins, _outs)| ins.iter())
-            .copied()
+    pub fn in_neighbours_slice(&self, from_vertex: i64) -> &SmallNidVec {
+        &self.edges.get(&from_vertex).unwrap().0
     }
 
     /// Number of in edges to this vertex. (None iff this vertex isn't in the graph)

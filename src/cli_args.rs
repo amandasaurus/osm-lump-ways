@@ -216,7 +216,7 @@ pub(crate) struct Args {
     pub upstreams: Option<PathBuf>,
 
     /// For every upstream, include details on which end point(s) this eventually flows to.
-    #[arg(long, default_value = "false", requires = "upstreams")]
+    #[arg(long, default_value = "false")]
     pub upstream_tag_ends_full: bool,
 
     /// For every upstream, include details on the largest end that this point flows to.
@@ -226,7 +226,6 @@ pub(crate) struct Args {
         long,
         default_value = "false",
         conflicts_with = "upstream_tag_ends_full",
-        requires = "upstreams"
     )]
     pub upstream_tag_biggest_end: bool,
 

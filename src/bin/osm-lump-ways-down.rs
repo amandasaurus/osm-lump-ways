@@ -181,6 +181,7 @@ fn main() -> Result<()> {
         args.ends
             || args.loops
             || args.upstreams.is_some()
+            || args.group_by_ends
             || args.csv_stats_file.is_some()
             || args.openmetrics.is_some(),
         "Nothing to do. You need to specifiy one of --ends/loops/upstreams/etc."
@@ -1181,14 +1182,9 @@ fn do_group_by_ends(
     nodeid_pos: &impl NodeIdPosition,
 ) -> Result<()> {
     let started = Instant::now();
-    let group_ends_bar = progress_bars.add(
-        ProgressBar::new(end_points.len() as u64)
-            .with_message("Grouping all waterways by end point")
-            .with_style(style.clone()),
-    );
     let nodes_bar = progress_bars.add(
         ProgressBar::new(topologically_sorted_nodes.len() as u64)
-            .with_message("Nodes allocated to a group")
+            .with_message("Nodes allocated to an End")
             .with_style(style.clone()),
     );
     let segments_spinner =
@@ -1196,45 +1192,64 @@ fn do_group_by_ends(
             ProgressStyle::with_template("       {human_pos} segments output").unwrap(),
         ));
 
-    let upstreams_grouped_by_end = end_points
-        .par_iter()
-        .zip(end_point_upstreams.par_iter())
-        .enumerate()
-        .inspect(|_| group_ends_bar.inc(1))
-        .filter(|(_end_idx, (_end_nid, end_upstream))| {
-            args.min_upstream_m
-                .map_or(true, |min| **end_upstream >= min)
-        })
-        .flat_map_iter(|(end_idx, (end_nid, end_upstream))| {
-            let end_idx_i32: i32 = end_idx.try_into().unwrap();
-            let nids_that_go_here: HashSet<i64> = topologically_sorted_nodes
-                .iter()
-                .zip(upstream_biggest_end.iter())
-                .filter_map(|(nid, biggest_end_i32)| {
-                    if *biggest_end_i32 == end_idx_i32 {
-                        Some(nid)
-                    } else {
-                        None
-                    }
-                })
-                .copied()
-                .collect();
+    let mut expected_ends: HashMap<i64, HashMap<i32, Vec<i64>>> = HashMap::new();
+    for (end_idx, end_nid)  in end_points.iter().copied().enumerate() {
+        expected_ends.entry(end_nid).or_default().insert(end_idx as i32, vec![]);
+    }
 
-            g.all_in_edges_recursive(*end_nid, move |nid| nids_that_go_here.contains(nid), nodeid_pos)
-                .map({
-                    let segments_spinner = segments_spinner.clone();
-                    let nodes_bar = nodes_bar.clone();
-                    move |points| {
-                        segments_spinner.inc(1);
-                        nodes_bar.inc(points.len().saturating_sub(1) as u64);
-                        let props = serde_json::json!({
-                            "biggest_end_nid": end_nid,
-                            "biggest_end_upstream_m": round(end_upstream, 1),
-                        });
-                        (props, points)
-                    }
-                })
+    let mut nid_end_iter = topologically_sorted_nodes.iter().rev()
+            .zip(upstream_biggest_end.iter().rev());
+
+    let mut possible_ins: SmallVec<[i64; 1]> = smallvec::smallvec![];
+
+    let upstreams_grouped_by_end = std::iter::from_fn(|| {
+        let path: Option<(i64, Vec<i64>)>;
+        loop {
+            //dbg!(expected_ends.len());
+            let (nid, real_end_idx) = match nid_end_iter.next() {
+                None => { return None; },
+                Some(x) => x,
+            };
+            nodes_bar.inc(1);
+            assert!(expected_ends.contains_key(nid));
+            let mut paths_for_this_nid = expected_ends.remove(nid).unwrap();
+            //dbg!(&real_end_idx, &nid, &paths_for_this_nid);
+            assert!(paths_for_this_nid.contains_key(real_end_idx));
+            let mut its_path = paths_for_this_nid.remove(real_end_idx).unwrap();
+            its_path.push(*nid);
+
+            possible_ins.clear();
+            possible_ins.extend(g.in_neighbours(*nid).filter(|n| expected_ends.get(n).map_or(true, |perend| !perend.contains_key(real_end_idx) )));
+            if possible_ins.is_empty() {
+                // no more upstreams
+                its_path.reverse();
+                path = Some((*real_end_idx as i64, its_path));
+                break;
+            } else {
+                for rest_of_upstreams in possible_ins.iter().skip(1) {
+                    expected_ends.entry(*rest_of_upstreams).or_default().insert(*real_end_idx, vec![*nid]);
+                }
+                let nxt = possible_ins[0];
+                assert!(expected_ends.get(&nxt).map_or(true, |x| !x.contains_key(real_end_idx)), "{:?}", expected_ends.get(&nxt).and_then(|x| x.get(real_end_idx)));
+                expected_ends.entry(nxt).or_default().insert(*real_end_idx, its_path);
+            }
+        }
+        assert!(path.is_some());
+        path
+    })
+    .map(|(end_idx, path)| {
+        segments_spinner.inc(1);
+        nodes_bar.inc(path.len().saturating_sub(1) as u64);
+
+        let points = path.into_iter().map(|nid| nodeid_pos.get(&nid).unwrap()).collect::<Vec<_>>();
+        let props = serde_json::json!({
+            "biggest_end_nid": end_points[end_idx as usize],
+            "biggest_end_upstream_m": round(&end_point_upstreams[end_idx as usize], 1),
         });
+        (props, points)
+    })
+    ;
+
 
     let output_filename: String = args.output_filename.replace("%s", "grouped-ends");
     let mut f = std::io::BufWriter::new(std::fs::File::create(&output_filename)?);
@@ -1247,9 +1262,9 @@ fn do_group_by_ends(
                 write_geojson_features_directly(recv.iter(), &mut f, &output_format).unwrap();
         }
     });
-    upstreams_grouped_by_end.for_each_with(send.clone(), |send, val| {
+    for val in upstreams_grouped_by_end {
         send.send(val).unwrap();
-    });
+    }
 
     let grouping_duration = started.elapsed();
     info!(
