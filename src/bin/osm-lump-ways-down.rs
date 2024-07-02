@@ -1168,6 +1168,7 @@ where
     result
 }
 
+#[allow(clippy::too_many_arguments)]
 fn do_group_by_ends(
     args: cli_args::Args,
     g: &graph::DirectedGraph2,
