@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.0.0 (2024-07-02)
 
 * Massive refactor to allow `--upstream-tag-biggest-end` to work with much less
   memory.
