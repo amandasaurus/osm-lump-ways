@@ -225,7 +225,7 @@ pub(crate) struct Args {
     #[arg(
         long,
         default_value = "false",
-        conflicts_with = "upstream_tag_ends_full",
+        conflicts_with = "upstream_tag_ends_full"
     )]
     pub upstream_tag_biggest_end: bool,
 

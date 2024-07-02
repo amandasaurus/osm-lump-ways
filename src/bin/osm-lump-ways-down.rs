@@ -603,7 +603,6 @@ fn main() -> Result<()> {
     let mut nodeid_pos = nodeid_position::default();
     read_node_positions(
         &args.input_filename,
-
         // Previosuly, the g.contains_vertex would be false for nodes without outgoing, so we
         // needed nids_we_need. But now we don't
         // |nid| g.contains_vertex(&nid) || nids_we_need.contains(&nid),
@@ -1193,12 +1192,17 @@ fn do_group_by_ends(
         ));
 
     let mut expected_ends: HashMap<i64, HashMap<i32, Vec<i64>>> = HashMap::new();
-    for (end_idx, end_nid)  in end_points.iter().copied().enumerate() {
-        expected_ends.entry(end_nid).or_default().insert(end_idx as i32, vec![]);
+    for (end_idx, end_nid) in end_points.iter().copied().enumerate() {
+        expected_ends
+            .entry(end_nid)
+            .or_default()
+            .insert(end_idx as i32, vec![]);
     }
 
-    let mut nid_end_iter = topologically_sorted_nodes.iter().rev()
-            .zip(upstream_biggest_end.iter().rev());
+    let mut nid_end_iter = topologically_sorted_nodes
+        .iter()
+        .rev()
+        .zip(upstream_biggest_end.iter().rev());
 
     let mut possible_ins: SmallVec<[i64; 1]> = smallvec::smallvec![];
 
@@ -1207,7 +1211,9 @@ fn do_group_by_ends(
         loop {
             //dbg!(expected_ends.len());
             let (nid, real_end_idx) = match nid_end_iter.next() {
-                None => { return None; },
+                None => {
+                    return None;
+                }
                 Some(x) => x,
             };
             nodes_bar.inc(1);
@@ -1219,7 +1225,11 @@ fn do_group_by_ends(
             its_path.push(*nid);
 
             possible_ins.clear();
-            possible_ins.extend(g.in_neighbours(*nid).filter(|n| expected_ends.get(n).map_or(true, |perend| !perend.contains_key(real_end_idx) )));
+            possible_ins.extend(g.in_neighbours(*nid).filter(|n| {
+                expected_ends
+                    .get(n)
+                    .map_or(true, |perend| !perend.contains_key(real_end_idx))
+            }));
             if possible_ins.is_empty() {
                 // no more upstreams
                 its_path.reverse();
@@ -1227,11 +1237,23 @@ fn do_group_by_ends(
                 break;
             } else {
                 for rest_of_upstreams in possible_ins.iter().skip(1) {
-                    expected_ends.entry(*rest_of_upstreams).or_default().insert(*real_end_idx, vec![*nid]);
+                    expected_ends
+                        .entry(*rest_of_upstreams)
+                        .or_default()
+                        .insert(*real_end_idx, vec![*nid]);
                 }
                 let nxt = possible_ins[0];
-                assert!(expected_ends.get(&nxt).map_or(true, |x| !x.contains_key(real_end_idx)), "{:?}", expected_ends.get(&nxt).and_then(|x| x.get(real_end_idx)));
-                expected_ends.entry(nxt).or_default().insert(*real_end_idx, its_path);
+                assert!(
+                    expected_ends
+                        .get(&nxt)
+                        .map_or(true, |x| !x.contains_key(real_end_idx)),
+                    "{:?}",
+                    expected_ends.get(&nxt).and_then(|x| x.get(real_end_idx))
+                );
+                expected_ends
+                    .entry(nxt)
+                    .or_default()
+                    .insert(*real_end_idx, its_path);
             }
         }
         assert!(path.is_some());
@@ -1241,15 +1263,16 @@ fn do_group_by_ends(
         segments_spinner.inc(1);
         nodes_bar.inc(path.len().saturating_sub(1) as u64);
 
-        let points = path.into_iter().map(|nid| nodeid_pos.get(&nid).unwrap()).collect::<Vec<_>>();
+        let points = path
+            .into_iter()
+            .map(|nid| nodeid_pos.get(&nid).unwrap())
+            .collect::<Vec<_>>();
         let props = serde_json::json!({
             "biggest_end_nid": end_points[end_idx as usize],
             "biggest_end_upstream_m": round(&end_point_upstreams[end_idx as usize], 1),
         });
         (props, points)
-    })
-    ;
-
+    });
 
     let output_filename: String = args.output_filename.replace("%s", "grouped-ends");
     let mut f = std::io::BufWriter::new(std::fs::File::create(&output_filename)?);
@@ -1272,7 +1295,7 @@ fn do_group_by_ends(
         //num_written.to_formatted_string(&Locale::en),
         output_filename,
         formatting::format_duration(grouping_duration),
-        (topologically_sorted_nodes.len() as f64)/grouping_duration.as_secs_f64(),
+        (topologically_sorted_nodes.len() as f64) / grouping_duration.as_secs_f64(),
     );
 
     Ok(())
