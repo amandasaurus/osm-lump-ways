@@ -81,6 +81,22 @@ If a filename ends with `.geojson`, a GeoJSON file
 ([RFC 8142](https://datatracker.ietf.org/doc/html/rfc8142)), aka GeoJSONSeq, file.
 
 
+# Input
+
+The input must be an [OSM PBF](https://wiki.openstreetmap.org/wiki/PBF_Format) file. Use [osmium to convert between OSM file formats](https://osmcode.org/osmium-tool/manual.html#osm-file-formats-and-converting-between-them).
+
+The input
+[object ids](https://wiki.openstreetmap.org/wiki/Elements#:~:text=Description-,id,-integer%20%2864-bit)
+must be positive. OSM import software often uses
+[negative ids](https://wiki.openstreetmap.org/wiki/Elements#:~:text=negative%20values%20%28%3C0%29%20are%20reserved).
+Use [`osmium sort`](https://docs.osmcode.org/osmium/latest/osmium-sort.html)
+and then [`osmium
+renumber`](https://docs.osmcode.org/osmium/latest/osmium-renumber.html) like
+so, to create an acceptable file.
+
+	osmium sort negative-id-file.osm.pbf -o sorted.osm.obf
+	osmium renumber sorted.osm.pbf -o new-input.osm.pbf
+
 # `osm-lump-ways`
 
 # Usage

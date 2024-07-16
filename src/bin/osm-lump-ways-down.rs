@@ -286,6 +286,7 @@ fn main() -> Result<()> {
         .inspect(|_| ways_added.inc(1))
         // TODO support grouping by tag value
         .for_each_with(g.clone(), |g, w| {
+            assert!(w.id() > 0, "This file has a way id < 0. negative ids are not supported in this tool Use osmium sort & osmium renumber to convert this file and run again.");
             // add the nodes from w to this graph
             let mut g = g.lock().unwrap();
             nodes_added.inc(w.nodes().len() as u64);
@@ -1070,6 +1071,7 @@ fn read_node_positions(
         .map(|(nid, pos)| (nid, (pos.1.inner(), pos.0.inner()))) // WTF do I have lat & lon
         // mixed up??
         .for_each_with(nodeid_pos.clone(), |nodeid_pos, (nid, pos)| {
+            assert!(nid > 0, "This file has a node < 0. negative ids are not supported in this tool Use osmium sort & osmium renumber to convert this file and run again.");
             setting_node_pos.inc(1);
             nodeid_pos.lock().unwrap().insert_i32(nid, pos);
         });
