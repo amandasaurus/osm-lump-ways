@@ -529,6 +529,12 @@ fn main() -> Result<()> {
         }
     }
 
+    if !args.ends && !args.upstreams.is_some() && !args.group_by_ends && !args.csv_stats_file.is_some() && !args.openmetrics.is_some() {
+        info!("Nothing more to do. 🙂");
+        // nothing else to do
+        return Ok(())
+    }
+
     info_memory_used!();
     let mut node_id_replaces: HashMap<i64, i64> =
         HashMap::with_capacity(cycles.par_iter().map(|c| c.len() - 1).sum());
