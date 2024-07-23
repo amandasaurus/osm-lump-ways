@@ -73,12 +73,23 @@ filename containing the tag filter func code. e.g. ` -F @myrules.txt `.
 
 Comments start with `#` and continue to the end of the line.
 
-# Output format
+# Output
+
+## File format
 
 If a filename ends with `.geojson`, a GeoJSON file
 ([RFC 7946](https://datatracker.ietf.org/doc/html/rfc7946) will be created. For
 `.geojsons`, a GeoJSON Text Sequences
 ([RFC 8142](https://datatracker.ietf.org/doc/html/rfc8142)), aka GeoJSONSeq, file.
+
+## Geometry format
+
+By default each feature is a `MultiLineString`, representing every way group.
+
+With `--split-into-single-paths`, each way group will be split into 1 or more
+`LineString`s, controlled by the `--split-into-single-paths-by X` argument. By
+default the `as-crow-flies` distance is used. `longest-path` uses the longest
+path in the graph, and this can take days to calculate on large networks.
 
 
 # Input
