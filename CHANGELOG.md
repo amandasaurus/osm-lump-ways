@@ -4,6 +4,7 @@
 
 * Detect & warn about negative object ids. Document how to work with that.
   (cf. issue #2)
+* Default `--split-into-single-paths` uses `as-crow-flies`.
 
 ## v1.0.0 (2024-07-02)
 

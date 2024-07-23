@@ -9,8 +9,8 @@ use way_group::WayGroup;
 
 #[derive(Clone, Debug, Default, clap::ValueEnum)]
 pub(crate) enum SplitPathsMethod {
-    #[default]
     LongestPath,
+    #[default]
     AsCrowFlies,
 }
 
