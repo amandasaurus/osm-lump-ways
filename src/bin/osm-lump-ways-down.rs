@@ -529,10 +529,15 @@ fn main() -> Result<()> {
         }
     }
 
-    if !args.ends && !args.upstreams.is_some() && !args.group_by_ends && !args.csv_stats_file.is_some() && !args.openmetrics.is_some() {
+    if !args.ends
+        && !args.upstreams.is_some()
+        && !args.group_by_ends
+        && !args.csv_stats_file.is_some()
+        && !args.openmetrics.is_some()
+    {
         info!("Nothing more to do. 🙂");
         // nothing else to do
-        return Ok(())
+        return Ok(());
     }
 
     info_memory_used!();
