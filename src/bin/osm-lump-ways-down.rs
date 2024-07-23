@@ -530,10 +530,10 @@ fn main() -> Result<()> {
     }
 
     if !args.ends
-        && !args.upstreams.is_some()
+        && args.upstreams.is_none()
         && !args.group_by_ends
-        && !args.csv_stats_file.is_some()
-        && !args.openmetrics.is_some()
+        && args.csv_stats_file.is_none()
+        && args.openmetrics.is_none()
     {
         info!("Nothing more to do. 🙂");
         // nothing else to do
