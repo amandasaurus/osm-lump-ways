@@ -255,13 +255,20 @@ pub(crate) struct Args {
 /// of which are parsed to type T
 fn opt_read_file<T>(arg_val: &str) -> Result<T, String>
 where
-    T: std::str::FromStr<Err = String>,
+    T: std::str::FromStr<Err = String> + std::fmt::Debug,
 {
     if let Some(filename) = arg_val.strip_prefix('@') {
         let val = std::fs::read_to_string(filename)
             .map_err(|e| format!("Couldn't read filename {}: {}", filename, e))?;
         T::from_str(&val)
     } else {
-        T::from_str(arg_val)
+        let res = T::from_str(arg_val);
+
+        if res.is_err() && std::path::Path::new(arg_val).is_file() {
+            let original_error = res.unwrap_err();
+            Err(format!("Unable to parse {:?}. However that is a filename. Did you mean @{} ? Original Error: {}", arg_val, arg_val, original_error))
+        } else {
+            res
+        }
     }
 }
