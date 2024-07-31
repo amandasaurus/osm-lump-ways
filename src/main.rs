@@ -618,11 +618,11 @@ fn main() -> Result<()> {
                 .with_message("Calculating Frames")
                 .with_style(style.clone()),
         );
-        // Calculate all data in parallel
+        // This can need a lot of memory, so don't calculate in parallel.
         let started_frames_calculation = Instant::now();
         let frames: Vec<_> = way_groups
-            .par_iter()
-            .flat_map_iter(
+            .iter()
+            .flat_map(
                 |wg| -> Box<dyn Iterator<Item = (serde_json::Value, Vec<_>)>> {
                     if let Some(min) = args.frames_group_min_length_m {
                         if wg.length_m.unwrap() < min {
