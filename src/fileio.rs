@@ -208,7 +208,7 @@ where
     let mut buf = Vec::new();
     for (props, geom) in features {
         for col in columns {
-            wtr.write_field(&props[&col].to_string())?;
+            wtr.write_field(props[&col].to_string())?;
         }
         buf.clear();
         geom.write_wkt(&mut buf);
