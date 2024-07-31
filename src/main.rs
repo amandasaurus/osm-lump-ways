@@ -334,8 +334,12 @@ fn main() -> Result<()> {
         return Ok(());
     }
     info!(
-        "Starting the breath-first search. There are {} group(s)",
-        group_wayid_nodes.len()
+        "Starting the breath-first search.{}",
+        if group_wayid_nodes.len() > 1 {
+            format!(" There are {} groups", group_wayid_nodes.len())
+        } else {
+            "".to_string()
+        }
     );
     let grouping = progress_bars.add(
         ProgressBar::new(
