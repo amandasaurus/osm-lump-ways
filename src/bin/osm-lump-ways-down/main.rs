@@ -13,7 +13,8 @@ use osmio::OSMObjBase;
 use rayon::prelude::*;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::io::Write;
+use std::io::{Write, BufWriter};
+use std::fs::File;
 use std::path::Path;
 use std::time::Instant;
 
@@ -38,7 +39,7 @@ use osm_lump_ways::haversine;
 use osm_lump_ways::nodeid_position;
 use osm_lump_ways::tagfilter;
 
-use fileio::{write_csv_features_directly, write_geojson_features_directly, OutputFormat};
+use fileio::{write_csv_features_directly, write_geojson_features_directly};
 use osm_lump_ways::fileio;
 
 use osm_lump_ways::formatting;
@@ -442,18 +443,19 @@ fn main() -> Result<()> {
             }
         }
 
-        if let Some(loops_filename) = args.loops {
+        if let Some(ref loops_filename) = args.loops {
+            let mut f = BufWriter::new(File::create(&loops_filename)?);
             let num_written =
-                write_geojson_features_directly(cycles_output.into_iter(), &mut f, &output_format)?;
+                write_geojson_features_directly(cycles_output.into_iter(), &mut f, &fileio::format_for_filename(&loops_filename))?;
 
             info!(
                 "Wrote {num_written} features to output file {}",
-                args.output_filename.replace("%s", "loops")
+                loops_filename.to_str().unwrap(),
             );
         }
     }
 
-    if !args.ends
+    if !args.ends.is_none()
         && args.upstreams.is_none()
         && !args.group_by_ends
         && args.csv_stats_file.is_none()
@@ -705,7 +707,7 @@ fn main() -> Result<()> {
 
     let empty_smallvec = smallvec::smallvec![];
 
-    if args.ends {
+    if let Some(ref ends_filename) = args.ends {
         let end_points_output = end_points
             .iter()
             .zip(
@@ -730,15 +732,13 @@ fn main() -> Result<()> {
                 (props, pos)
             });
 
-        let mut f = std::io::BufWriter::new(std::fs::File::create(
-            args.output_filename.replace("%s", "ends"),
-        )?);
+        let mut f = BufWriter::new(File::create(&ends_filename)?);
         let num_written =
-            write_geojson_features_directly(end_points_output, &mut f, &output_format)?;
+            write_geojson_features_directly(end_points_output, &mut f, &fileio::format_for_filename(&ends_filename))?;
         info!(
             "Wrote {} features to output file {}",
             num_written.to_formatted_string(&Locale::en),
-            args.output_filename.replace("%s", "ends")
+            ends_filename.to_str().unwrap()
         );
     }
 
@@ -798,7 +798,6 @@ fn main() -> Result<()> {
             &topologically_sorted_nodes,
             &end_point_upstreams,
             &upstream_biggest_end,
-            &output_format,
             &nodeid_pos,
         )?;
     }
@@ -1115,7 +1114,6 @@ fn do_group_by_ends(
     topologically_sorted_nodes: &[i64],
     end_point_upstreams: &[f64],
     upstream_biggest_end: &[i32],
-    output_format: &OutputFormat,
     nodeid_pos: &impl NodeIdPosition,
 ) -> Result<()> {
     let started = Instant::now();
@@ -1212,12 +1210,12 @@ fn do_group_by_ends(
         (props, points)
     });
 
-    let output_filename = args.upstreams.unwrap();
-    let mut f = std::io::BufWriter::new(std::fs::File::create(&output_filename)?);
+    let output_filename = args.upstreams.clone().unwrap();
+    let output_format = fileio::format_for_filename(&output_filename);
+    let mut f = BufWriter::new(File::create(&output_filename)?);
     let (send, recv) = std::sync::mpsc::channel();
 
     std::thread::spawn({
-        let output_format = output_format.clone();
         move || {
             let _num_written =
                 write_geojson_features_directly(recv.iter(), &mut f, &output_format).unwrap();
@@ -1231,7 +1229,7 @@ fn do_group_by_ends(
     info!(
         "Wrote end-grouped-features to output file {} in {}. {:.3e} nodes/sec",
         //num_written.to_formatted_string(&Locale::en),
-        output_filename,
+        output_filename.to_str().unwrap(),
         formatting::format_duration(grouping_duration),
         (topologically_sorted_nodes.len() as f64) / grouping_duration.as_secs_f64(),
     );

@@ -4,7 +4,6 @@ use std::path::PathBuf;
 
 use osm_lump_ways::dij::SplitPathsMethod;
 use osm_lump_ways::tagfilter;
-use osm_lump_ways::taggrouper;
 
 /// Group OSM ways based on shared tags into GeoJSON MultiLineStrings
 ///
