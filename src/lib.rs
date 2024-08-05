@@ -13,7 +13,6 @@ use std::sync::{Arc, Mutex};
 
 use num_format::{Locale, ToFormattedString};
 
-pub mod cli_args;
 pub mod haversine;
 use haversine::haversine_m;
 pub mod dij;

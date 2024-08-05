@@ -24,9 +24,10 @@ use std::sync::{Arc, Mutex};
 
 use num_format::{Locale, ToFormattedString};
 
+mod cli_args;
+
 use nodeid_position::NodeIdPosition;
 use nodeid_wayids::NodeIdWayIds;
-use osm_lump_ways::cli_args;
 use osm_lump_ways::dij;
 use osm_lump_ways::haversine;
 use osm_lump_ways::haversine::haversine_m;

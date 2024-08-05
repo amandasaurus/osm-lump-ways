@@ -28,10 +28,11 @@ use smallvec::SmallVec;
 use country_boundaries::{CountryBoundaries, LatLon, BOUNDARIES_ODBL_360X180};
 use ordered_float::OrderedFloat;
 
+mod cli_args;
+
 use graph::DirectedGraphTrait;
 use haversine::haversine_m;
 use nodeid_position::NodeIdPosition;
-use osm_lump_ways::cli_args;
 use osm_lump_ways::graph;
 use osm_lump_ways::haversine;
 use osm_lump_ways::nodeid_position;
