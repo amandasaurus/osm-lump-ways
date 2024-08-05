@@ -21,13 +21,6 @@ pub struct Args {
     #[arg(short, long, value_name = "FILENAME.osm.pbf")]
     pub input_filename: PathBuf,
 
-    /// Output filename. If `--split-files-by-group` specified, include `%s` for where to place the
-    /// group.
-    /// Filename .geojson will be GeoJSON, .geojsons will be GeoJSONSeq which is faster for
-    /// tippecanoe to read
-    #[arg(short, long, value_name = "OUTPUT.geojson[s]")]
-    pub output_filename: String,
-
     /// Calculated Frames to this file. Only GeoJSONSeq output supported.
     /// Respects the --save-as-linestrings and --frames-group-min-length-m options
     #[arg(long, value_name = "OUTPUT.geojsons")]
@@ -81,14 +74,14 @@ pub struct Args {
     )]
     pub tag_filter_func: Option<tagfilter::TagFilterFunc>,
 
-    /// Group by unique values of this key
-    ///
-    /// Can be specified many times, which will be many groupings.
-    /// specify many keys (separated by commas) to use the first set value as the key
-    /// `-g name:en,name` → The grouping key will be the the `name:en` key if it's set, else the
-    /// `name` key
-    #[arg(short = 'g', long = "tag-group-k", value_name = "key1,key2,…")]
-    pub tag_group_k: Vec<taggrouper::TagGrouper>,
+    ///// Group by unique values of this key
+    /////
+    ///// Can be specified many times, which will be many groupings.
+    ///// specify many keys (separated by commas) to use the first set value as the key
+    ///// `-g name:en,name` → The grouping key will be the the `name:en` key if it's set, else the
+    ///// `name` key
+    //#[arg(short = 'g', long = "tag-group-k", value_name = "key1,key2,…")]
+    //pub tag_group_k: Vec<taggrouper::TagGrouper>,
 
     /// If grouping by a key, set this to also include ways where there is any unset tag (default
     /// to require all to be set)
@@ -138,21 +131,6 @@ pub struct Args {
     #[arg(long, requires = "split_into_single_paths", verbatim_doc_comment)]
     pub split_into_single_paths_by: Option<SplitPathsMethod>,
 
-    /// Only procoess way groups which include these way ids
-    #[arg(long)]
-    pub only_these_way_groups: Vec<i64>,
-
-    /// Only procoess way groups which include these node ids
-    #[arg(long)]
-    pub only_these_way_groups_nodeid: Vec<i64>,
-
-    /// Only procoess way groups where waygroup ID % FIRST = SECOND
-    /// Usage: `--only-these-way-groups-divmod 2/0` which only processes way groups where id % 2 ==
-    /// 0
-    /// Only useful for internal debugging to find problematic way groups
-    #[arg(long)]
-    pub only_these_way_groups_divmod: Option<String>,
-
     /// For each output object, calculate the distance (in m) to the nearest, longer object. This
     /// is increadily long for large complicated networks (e.g. waterways), but is reasonable for
     /// named streets.
@@ -199,12 +177,12 @@ pub struct Args {
     pub openmetrics: Option<PathBuf>,
 
     /// Write the ends file
-    #[arg(long, default_value = "false")]
-    pub ends: bool,
+    #[arg(long, value_name="OUTPUT.geojson[s]")]
+    pub ends: Option<PathBuf>,
 
-    /// Write the loops file
-    #[arg(long, default_value = "false")]
-    pub loops: bool,
+    /// Where to write the loops file
+    #[arg(long, value_name = "OUTPUT.geojson[s]")]
+    pub loops: Option<PathBuf>,
 
     /// The points in the Ends data will have a boolean if they are a member of a way with this
     /// tag. Syntax is the tag filter.

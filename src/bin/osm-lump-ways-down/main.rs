@@ -94,26 +94,7 @@ fn main() -> Result<()> {
 
     let mut reader = osmio::stringpbf::PBFReader::new(rdr);
 
-    if !args.output_filename.contains("%s") {
-        error!("No %s found in output filename ({})", args.output_filename);
-        anyhow::bail!("No %s found in output filename ({})", args.output_filename);
-    }
 
-    if !args.output_filename.ends_with(".geojson") && !args.output_filename.ends_with(".geojsons") {
-        warn!("Output filename '{}' doesn't end with '.geojson' or '.geojsons'. This programme only created GeoJSON or GeoJSONSeq files", args.output_filename);
-    }
-
-    if args.split_files_by_group && args.tag_group_k.is_empty() {
-        warn!("You have asked to split into separate files by group without saying what to group by! Everything will go into one group. Use -g in future.");
-    }
-
-    if !args.split_files_by_group
-        && !args.overwrite
-        && std::path::Path::new(&args.output_filename).exists()
-    {
-        error!("Output file {} already exists and --overwrite not used. Refusing to overwrite, and exiting early", args.output_filename);
-        anyhow::bail!("Output file {} already exists and --overwrite not used. Refusing to overwrite, and exiting early", args.output_filename);
-    }
 
     if !args.input_filename.is_file() {
         error!(
@@ -126,44 +107,9 @@ fn main() -> Result<()> {
         );
     }
 
-    let output_format = if args.output_filename.ends_with(".geojson") {
-        OutputFormat::GeoJSON
-    } else if args.output_filename.ends_with(".geojsons") {
-        OutputFormat::GeoJSONSeq
-    } else {
-        warn!("Unknown output format for file {:?}", args.output_filename);
-        anyhow::bail!("Unknown output format for file {:?}", args.output_filename);
-    };
-    debug!("Output format: {output_format:?}");
-
     anyhow::ensure!(
-        args.only_these_way_groups.is_empty(),
-        "Not currently supported on this tool"
-    );
-    anyhow::ensure!(
-        args.only_these_way_groups_nodeid.is_empty(),
-        "Not currently supported on this tool"
-    );
-    anyhow::ensure!(
-        args.only_these_way_groups_divmod.is_none(),
-        "Not currently supported on this tool"
-    );
-
-    #[allow(clippy::iter_nth_zero)]
-    let only_these_way_groups_divmod: Option<(i64, i64)> =
-        args.only_these_way_groups_divmod.as_ref().map(|s| {
-            (
-                s.split('/').nth(0).unwrap().parse().unwrap(),
-                s.split('/').nth(1).unwrap().parse().unwrap(),
-            )
-        });
-    if let Some((a, b)) = only_these_way_groups_divmod {
-        anyhow::ensure!(a > b);
-    }
-
-    anyhow::ensure!(
-        args.ends
-            || args.loops
+        args.ends.is_some()
+            || args.loops.is_some()
             || args.upstreams.is_some()
             || args.group_by_ends
             || args.csv_stats_file.is_some()
@@ -180,9 +126,6 @@ fn main() -> Result<()> {
         }
     } else {
         info!("Tag filter(s) in operation: {:?}", args.tag_filter);
-    }
-    if !args.tag_group_k.is_empty() {
-        info!("Tag grouping(s) in operation: {:?}", args.tag_group_k);
     }
     if std::env::var("OSM_LUMP_WAYS_FINISH_AFTER_READ").is_ok() {
         warn!("Programme will exit after reading & parsing input");
@@ -499,10 +442,7 @@ fn main() -> Result<()> {
             }
         }
 
-        if args.loops {
-            let mut f = std::io::BufWriter::new(std::fs::File::create(
-                args.output_filename.replace("%s", "loops"),
-            )?);
+        if let Some(loops_filename) = args.loops {
             let num_written =
                 write_geojson_features_directly(cycles_output.into_iter(), &mut f, &output_format)?;
 
@@ -938,7 +878,7 @@ fn main() -> Result<()> {
         if upstream_filename.extension().unwrap() == "geojsons"
             || upstream_filename.extension().unwrap() == "geojson"
         {
-            num_written = write_geojson_features_directly(lines, &mut f, &output_format)?;
+            num_written = write_geojson_features_directly(lines, &mut f, &fileio::format_for_filename(&upstream_filename))?;
         } else if upstream_filename.extension().unwrap() == "csv" {
             let mut csv_columns = vec!["from_upstream_m".to_string()];
             if args.upstream_tag_biggest_end {
@@ -1272,7 +1212,7 @@ fn do_group_by_ends(
         (props, points)
     });
 
-    let output_filename: String = args.output_filename.replace("%s", "grouped-ends");
+    let output_filename = args.upstreams.unwrap();
     let mut f = std::io::BufWriter::new(std::fs::File::create(&output_filename)?);
     let (send, recv) = std::sync::mpsc::channel();
 

@@ -1,6 +1,7 @@
 use anyhow::Result;
 use std::io::Write;
 use std::iter::once;
+use std::path::Path;
 
 /// Some sort of geometry type that can print out it's own coordinates
 pub trait Geometry {
@@ -82,6 +83,16 @@ impl Geometry for ((f64, f64), (f64, f64)) {
 pub enum OutputFormat {
     GeoJSON,
     GeoJSONSeq,
+}
+
+pub fn format_for_filename(f: &Path) -> OutputFormat {
+    if f.extension().unwrap() == "geojsons" {
+        OutputFormat::GeoJSONSeq
+    } else if f.extension().unwrap() == "geojson" {
+        OutputFormat::GeoJSON
+    } else {
+        unimplemented!("Unsupported file extension {:?}", f.extension().unwrap())
+    }
 }
 
 #[allow(clippy::type_complexity)]
