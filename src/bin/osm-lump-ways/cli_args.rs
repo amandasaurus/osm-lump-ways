@@ -198,57 +198,6 @@ pub struct Args {
     #[arg(long, value_name = "FILENAME.prom")]
     pub openmetrics: Option<PathBuf>,
 
-    /// Write the ends file
-    #[arg(long, default_value = "false")]
-    pub ends: bool,
-
-    /// Write the loops file
-    #[arg(long, default_value = "false")]
-    pub loops: bool,
-
-    /// The points in the Ends data will have a boolean if they are a member of a way with this
-    /// tag. Syntax is the tag filter.
-    #[arg(long, value_name = "TAGFILTER", requires = "ends")]
-    pub ends_membership: Vec<tagfilter::TagFilter>,
-
-    /// Calculate & write a file with each upstream line to this file
-    #[arg(long, value_name = "UPSTREAMS_FILENAME")]
-    pub upstreams: Option<PathBuf>,
-
-    /// For every upstream, include details on which end point(s) this eventually flows to.
-    #[arg(long, default_value = "false")]
-    pub upstream_tag_ends_full: bool,
-
-    /// For every upstream, include details on the largest end that this point flows to.
-    /// Less details on other ends than upstream_tag_ends_full, but requires less memory to
-    /// process.
-    #[arg(
-        long,
-        default_value = "false",
-        conflicts_with = "upstream_tag_ends_full"
-    )]
-    pub upstream_tag_biggest_end: bool,
-
-    /// Write the group
-    #[arg(long, default_value = "false", requires = "upstream_tag_biggest_end")]
-    pub group_by_ends: bool,
-
-    /// Include an extra property from_upstream_m_N for every occurance of this argument, with the
-    /// from_upstream_m value rounded to the nearest multiple of N.
-    #[arg(long, requires = "upstreams")]
-    pub upstream_from_upstream_multiple: Vec<i64>,
-
-    /// For all ends, calc the complete upstreams
-    #[arg(long, default_value = "false")]
-    pub ends_upstreams: bool,
-
-    /// Only calc upstream len if this upstream is greater than this
-    #[arg(long)]
-    pub ends_upstreams_min_upstream_m: Option<f64>,
-
-    /// Upstream from each end goes only up this many nodes.
-    #[arg(long)]
-    pub ends_upstreams_max_nodes: Option<i64>,
 }
 
 /// CLI arg parser. If the value starts with @, the rest is assumed to be a filename, the contents
