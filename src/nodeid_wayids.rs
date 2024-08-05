@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::fmt::Debug;
 
 /// Something which stores which nodeids are in which wayid
-pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
+pub trait NodeIdWayIds: Debug + Send + Sync {
     /// Create new version
     fn new() -> Self
     where
@@ -39,7 +39,7 @@ pub(crate) trait NodeIdWayIds: Debug + Send + Sync {
 }
 
 /// Some standard struct for doing this.
-pub(crate) fn default() -> impl NodeIdWayIds {
+pub fn default() -> impl NodeIdWayIds {
     //Box::new(NodeIdWayIdsMultiMap::new())
     NodeIdWayIdsAuto::new()
 }

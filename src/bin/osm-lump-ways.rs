@@ -13,7 +13,6 @@ use rayon::prelude::*;
 
 use kdtree::KdTree;
 
-use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap};
 use std::time::Instant;
 
@@ -25,25 +24,21 @@ use std::sync::{Arc, Mutex};
 
 use num_format::{Locale, ToFormattedString};
 
-mod cli_args;
-mod haversine;
-mod tagfilter;
-use haversine::haversine_m;
-mod dij;
-mod graph;
-mod way_group;
-use way_group::WayGroup;
-mod nodeid_position;
 use nodeid_position::NodeIdPosition;
-mod nodeid_wayids;
 use nodeid_wayids::NodeIdWayIds;
-mod btreemapsplitkey;
-mod kosaraju;
-mod taggrouper;
+use osm_lump_ways::cli_args;
+use osm_lump_ways::dij;
+use osm_lump_ways::haversine;
+use osm_lump_ways::haversine::haversine_m;
+use osm_lump_ways::nodeid_position;
+use osm_lump_ways::nodeid_wayids;
+use osm_lump_ways::tagfilter;
+use osm_lump_ways::way_group;
+use way_group::WayGroup;
 
-mod fileio;
 use fileio::OutputFormat;
-mod formatting;
+use osm_lump_ways::fileio;
+use osm_lump_ways::formatting;
 
 fn main() -> Result<()> {
     let args = cli_args::Args::parse();

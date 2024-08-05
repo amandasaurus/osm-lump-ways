@@ -79,14 +79,14 @@ impl Geometry for ((f64, f64), (f64, f64)) {
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub(crate) enum OutputFormat {
+pub enum OutputFormat {
     GeoJSON,
     GeoJSONSeq,
 }
 
 #[allow(clippy::type_complexity)]
 /// Write a geojson featurecollection, but manually construct it
-pub(crate) fn write_geojson_features_directly<G>(
+pub fn write_geojson_features_directly<G>(
     features: impl Iterator<Item = (serde_json::Value, G)>,
     mut f: &mut impl Write,
     output_format: &OutputFormat,
@@ -117,7 +117,7 @@ where
     Ok(num_written)
 }
 
-fn write_geojson_feature_directly<G>(
+pub fn write_geojson_feature_directly<G>(
     mut f: &mut impl Write,
     feature: &(serde_json::Value, G),
     output_format: &OutputFormat,
@@ -187,7 +187,7 @@ fn write_linestring_coords(
 }
 
 #[allow(dead_code)]
-pub(crate) fn write_csv_features_directly<G>(
+pub fn write_csv_features_directly<G>(
     features: impl Iterator<Item = (serde_json::Value, G)>,
     f: &mut impl Write,
     columns: &[String],

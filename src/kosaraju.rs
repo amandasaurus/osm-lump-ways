@@ -1,6 +1,8 @@
 //! Kosaraju Algorithm to find Strongly Connected Components
 use super::*;
 use crate::graph::{DirectedGraph2, DirectedGraphTrait};
+#[allow(unused_imports)]
+use indicatif::ProgressDrawTarget;
 
 use std::collections::{BTreeMap, HashSet};
 

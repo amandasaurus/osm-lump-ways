@@ -3,6 +3,7 @@ use clap::Parser;
 use get_size::GetSize;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressIterator, ProgressStyle};
 use indicatif_log_bridge::LogWrapper;
+#[allow(unused_imports)]
 use log::{
     debug, error, info, log, trace, warn,
     Level::{Debug, Trace},
@@ -16,7 +17,6 @@ use std::io::Write;
 use std::path::Path;
 use std::time::Instant;
 
-use std::cmp::Ordering;
 use std::sync::atomic::{AtomicI64, Ordering as atomic_Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -28,36 +28,19 @@ use smallvec::SmallVec;
 use country_boundaries::{CountryBoundaries, LatLon, BOUNDARIES_ODBL_360X180};
 use ordered_float::OrderedFloat;
 
-#[path = "../cli_args.rs"]
-mod cli_args;
-#[path = "../haversine.rs"]
-mod haversine;
-#[path = "../tagfilter.rs"]
-mod tagfilter;
-use haversine::haversine_m;
-#[path = "../dij.rs"]
-mod dij;
-#[path = "../graph.rs"]
-mod graph;
 use graph::DirectedGraphTrait;
-#[path = "../nodeid_position.rs"]
-mod nodeid_position;
+use haversine::haversine_m;
 use nodeid_position::NodeIdPosition;
-#[path = "../btreemapsplitkey.rs"]
-mod btreemapsplitkey;
-#[path = "../kosaraju.rs"]
-mod kosaraju;
-#[path = "../taggrouper.rs"]
-mod taggrouper;
-#[path = "../way_group.rs"]
-mod way_group;
+use osm_lump_ways::cli_args;
+use osm_lump_ways::graph;
+use osm_lump_ways::haversine;
+use osm_lump_ways::nodeid_position;
+use osm_lump_ways::tagfilter;
 
-#[path = "../fileio.rs"]
-mod fileio;
 use fileio::{write_csv_features_directly, write_geojson_features_directly, OutputFormat};
+use osm_lump_ways::fileio;
 
-#[path = "../formatting.rs"]
-mod formatting;
+use osm_lump_ways::formatting;
 
 macro_rules! info_memory_used {
     () => {};

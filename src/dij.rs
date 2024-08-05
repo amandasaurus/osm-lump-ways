@@ -8,7 +8,7 @@ use std::collections::BinaryHeap;
 use way_group::WayGroup;
 
 #[derive(Clone, Debug, Default, clap::ValueEnum)]
-pub(crate) enum SplitPathsMethod {
+pub enum SplitPathsMethod {
     LongestPath,
     #[default]
     AsCrowFlies,
@@ -22,7 +22,7 @@ fn min_max<T: PartialOrd>(a: T, b: T) -> (T, T) {
     }
 }
 
-pub(crate) fn into_segments(
+pub fn into_segments(
     wg: &WayGroup,
     nodeid_pos: &impl NodeIdPosition,
     min_length_m: Option<f64>,

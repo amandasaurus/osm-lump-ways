@@ -16,7 +16,7 @@ use crate::taggrouper;
 /// `--only-longest-n-per-file NUM` Only output the longest `NUM` ways groups.
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
-pub(crate) struct Args {
+pub struct Args {
     /// Input PBF filename
     #[arg(short, long, value_name = "FILENAME.osm.pbf")]
     pub input_filename: PathBuf,

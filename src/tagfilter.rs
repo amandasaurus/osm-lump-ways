@@ -248,7 +248,7 @@ impl TagFilterFunc {
     }
 }
 
-pub(crate) fn obj_pass_filters(
+pub fn obj_pass_filters(
     o: &(impl osmio::OSMObjBase + Sync + Send),
     tag_filters: &[TagFilter],
     tag_filter_func: &Option<TagFilterFunc>,
