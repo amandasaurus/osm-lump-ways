@@ -14,6 +14,9 @@ pub trait NodeIdWayIds: Debug + Send + Sync {
 
     /// Number of nodes stored
     fn len(&self) -> usize;
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 
     /// Detailed memory usage of this
     fn detailed_size(&self) -> String;

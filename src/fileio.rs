@@ -130,6 +130,7 @@ where
         f.write_all(b"\x1E")?;
     }
     f.write_all(b"{\"properties\":")?;
+    #[allow(clippy::needless_borrows_for_generic_args)]
     serde_json::to_writer(&mut f, &feature.0)?;
     f.write_all(b", \"geometry\": {\"type\":\"")?;
     f.write_all(feature.1.type_name())?;

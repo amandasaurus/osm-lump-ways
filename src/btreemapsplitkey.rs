@@ -39,6 +39,7 @@ where
             .iter()
             .flat_map(|(k0, i2)| i2.iter().map(|(k1, v)| (join_key(&[*k0, *k1]), v)))
     }
+    #[allow(clippy::should_implement_trait)]
     pub fn into_iter(self) -> impl Iterator<Item = (i64, V)> {
         self.inner
             .into_iter()

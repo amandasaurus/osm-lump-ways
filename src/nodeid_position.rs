@@ -46,6 +46,9 @@ pub trait NodeIdPosition: std::fmt::Debug + std::marker::Send + std::marker::Syn
 
     /// Number of nodes inside
     fn len(&self) -> usize;
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 
     fn detailed_size(&self) -> String;
 

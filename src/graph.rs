@@ -537,6 +537,10 @@ pub trait DirectedGraphTrait: Send {
         (self.num_vertexes(), self.num_edges())
     }
 
+    fn is_empty(&self) -> bool {
+        self.num_vertexes() == 0
+    }
+
     /// Iterator (in any order) of vertexes which are the destination of an edge
     fn dest_vertexes_jumbled(&self) -> impl ParallelIterator<Item = i64> {
         self.edges_par_iter().map(|(_src, dest)| dest)
@@ -617,7 +621,7 @@ pub trait DirectedGraphTrait: Send {
 pub type SmallNidVec = SmallVec<[i64; 1]>;
 
 /// A graph which stores a list of all incoming and outgoing edges
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct DirectedGraph2 {
     // key is vertex id
     // value.0 is list of incoming vertexes  (ie there's an edge from something → key)
