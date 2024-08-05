@@ -455,7 +455,7 @@ fn main() -> Result<()> {
         }
     }
 
-    if !args.ends.is_none()
+    if args.ends.is_none()
         && args.upstreams.is_none()
         && !args.group_by_ends
         && args.csv_stats_file.is_none()
