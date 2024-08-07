@@ -152,9 +152,7 @@ GeoJSONSeq output format only.
 ## `osm-lump-ways-down`
 
 It reads & groups an OSM PBF file, like `osm-lump-ways`, but it uses the
-direction of the OSM way, to produce 
-
-The output filename *must* contain `%s`, which will be replaced 
+direction of the OSM way, to produce many different output files.
 
 ## Output files
 
@@ -207,12 +205,9 @@ contracted together, producing a new graph which is loop-free.
 
 # TODOs
 
-This software isn't finished, here's what I'd like to add. Feel free to send a patch.
-
-* All tags need to be specified in advance to join on. Perhaps add something to
-  match all possible tags? (inspired by
-  [this q](https://en.osm.town/@grischard/110763741292331075)). (“Group by all
-  tags the same” might do it)
+This software isn't finished. Lots is being motivated for
+[WaterwayMap.org](https://waterwaymap.org), a topological analysis of waterways
+in OpenStreetMap.
 
 # External Mentions
 

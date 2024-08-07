@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* osm-lump-ways-down now takes the target filename for `--ends`/`--loops` etc.
+  rather than using the `-o` option.
 * Detect & warn about negative object ids. Document how to work with that.
   (cf. issue #2)
 * Default `--split-into-single-paths` uses `as-crow-flies`.
