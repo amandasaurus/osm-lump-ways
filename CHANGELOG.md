@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.1.0 (2024-08-07)
 
 * osm-lump-ways-down now takes the target filename for `--ends`/`--loops` etc.
   rather than using the `-o` option.
