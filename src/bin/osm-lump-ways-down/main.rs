@@ -792,118 +792,120 @@ fn main() -> Result<()> {
     }
     assert!(upstream_biggest_end.par_iter().all(|end| *end >= 0));
 
-    if args.group_by_ends {
-        do_group_by_ends(
-            args.clone(),
-            &g,
-            &progress_bars,
-            &style,
-            &end_points,
-            &topologically_sorted_nodes,
-            &end_point_upstreams,
-            &upstream_biggest_end,
-            &nodeid_pos,
-        )?;
-    }
 
-    if let Some(upstream_filename) = args.upstreams {
+    if let Some(ref upstream_filename) = args.upstreams {
         debug!("Writing upstreams");
 
-        // we loop over all nodes in topologically_sorted_nodes (which is annotated in
-        // upstream_length_iter with the upstream value) and flat_map that into each line segment
-        // that goes out of that.
-        let lines = upstream_length_iter()
-            .filter(|(_from_nid_idx, _from_nid, upstream_m)| {
-                args.min_upstream_m.map_or(true, |min| *upstream_m >= min)
-            })
-            .flat_map(|(from_nid_idx, from_nid, upstream_len)| {
-                g.out_neighbours(from_nid)
-                    .map(move |to_nid| (from_nid_idx, from_nid, to_nid, upstream_len))
-            })
-            .map(|(from_nid_idx, from_nid, to_nid, upstream_len)| {
-                // Round the upstream to only output 1 decimal place
-                let mut props = serde_json::json!({
-                    "from_upstream_m": round(&upstream_len, 1),
-                });
-
-                for mult in args.upstream_from_upstream_multiple.iter() {
-                    props[format!("from_upstream_m_{}", mult)] =
-                        round_mult(&upstream_len, *mult).into();
-                }
-
-                if args.upstream_tag_biggest_end {
-                    let biggest_end_idx: usize = upstream_biggest_end[from_nid_idx] as usize;
-                    props["biggest_end_upstream_m"] =
-                        round(&end_point_upstreams[biggest_end_idx], 1).into();
-                    props["biggest_end_nid"] = end_points[biggest_end_idx].into();
-                } else if args.upstream_tag_ends_full {
-                    todo!();
-                    //let ends = upstream_ends_full.get(&from_nid).unwrap();
-                    //props["num_ends"] = ends.len().into();
-                    //props["ends"] = ends.iter().copied().collect::<Vec<i64>>().into();
-                    //let mut ends_strs = vec![",".to_string()];
-                    //let mut this_len;
-                    //let mut biggest_end = (upstream_length.get(&ends[0]).unwrap(), ends[0]);
-                    //for end in ends {
-                    //    ends_strs.push(end.to_string());
-                    //    ends_strs.push(",".to_string());
-                    //    this_len = upstream_length.get(&ends[0]).unwrap();
-                    //    if this_len > biggest_end.0 {
-                    //        biggest_end = (this_len, *end);
-                    //    }
-                    //}
-                    //props["ends_s"] = ends_strs.join("").into();
-                    //props["biggest_end_upstream_m"] = round(biggest_end.0, 1).into();
-                    //props["biggest_end_nid"] = biggest_end.1.into();
-                }
-
-                (
-                    props,
-                    (
-                        nodeid_pos.get(&from_nid).unwrap(),
-                        nodeid_pos.get(&to_nid).unwrap(),
-                    ),
-                )
-            });
-        info_memory_used!();
-
-        let writing_upstreams_bar = progress_bars.add(
-            ProgressBar::new(g.num_edges() as u64)
-                .with_message("Writing upstreams geojson(s) file")
-                .with_style(style.clone()),
-        );
-
-        let lines = lines.progress_with(writing_upstreams_bar);
-
-        let mut f = std::io::BufWriter::new(std::fs::File::create(&upstream_filename)?);
-
-        let num_written;
-        if upstream_filename.extension().unwrap() == "geojsons"
-            || upstream_filename.extension().unwrap() == "geojson"
-        {
-            num_written = write_geojson_features_directly(
-                lines,
-                &mut f,
-                &fileio::format_for_filename(&upstream_filename),
+        if args.group_by_ends {
+            do_group_by_ends(
+                args.clone(),
+                &g,
+                &progress_bars,
+                &style,
+                &end_points,
+                &topologically_sorted_nodes,
+                &end_point_upstreams,
+                &upstream_biggest_end,
+                &nodeid_pos,
             )?;
-        } else if upstream_filename.extension().unwrap() == "csv" {
-            let mut csv_columns = vec!["from_upstream_m".to_string()];
-            if args.upstream_tag_biggest_end {
-                csv_columns.push("biggest_end_nid".to_string());
-            }
-            for mult in args.upstream_from_upstream_multiple.iter() {
-                csv_columns.push(format!("from_upstream_m_{}", mult));
-            }
-            num_written = write_csv_features_directly(lines, &mut f, &csv_columns)?;
         } else {
-            anyhow::bail!("Unsupported output format");
-        }
 
-        info!(
-            "Wrote {} features to output file {}",
-            num_written.to_formatted_string(&Locale::en),
-            upstream_filename.display(),
-        );
+            // we loop over all nodes in topologically_sorted_nodes (which is annotated in
+            // upstream_length_iter with the upstream value) and flat_map that into each line segment
+            // that goes out of that.
+            let lines = upstream_length_iter()
+                .filter(|(_from_nid_idx, _from_nid, upstream_m)| {
+                    args.min_upstream_m.map_or(true, |min| *upstream_m >= min)
+                })
+                .flat_map(|(from_nid_idx, from_nid, upstream_len)| {
+                    g.out_neighbours(from_nid)
+                        .map(move |to_nid| (from_nid_idx, from_nid, to_nid, upstream_len))
+                })
+                .map(|(from_nid_idx, from_nid, to_nid, upstream_len)| {
+                    // Round the upstream to only output 1 decimal place
+                    let mut props = serde_json::json!({
+                        "from_upstream_m": round(&upstream_len, 1),
+                    });
+
+                    for mult in args.upstream_from_upstream_multiple.iter() {
+                        props[format!("from_upstream_m_{}", mult)] =
+                            round_mult(&upstream_len, *mult).into();
+                    }
+
+                    if args.upstream_tag_biggest_end {
+                        let biggest_end_idx: usize = upstream_biggest_end[from_nid_idx] as usize;
+                        props["biggest_end_upstream_m"] =
+                            round(&end_point_upstreams[biggest_end_idx], 1).into();
+                        props["biggest_end_nid"] = end_points[biggest_end_idx].into();
+                    } else if args.upstream_tag_ends_full {
+                        todo!();
+                        //let ends = upstream_ends_full.get(&from_nid).unwrap();
+                        //props["num_ends"] = ends.len().into();
+                        //props["ends"] = ends.iter().copied().collect::<Vec<i64>>().into();
+                        //let mut ends_strs = vec![",".to_string()];
+                        //let mut this_len;
+                        //let mut biggest_end = (upstream_length.get(&ends[0]).unwrap(), ends[0]);
+                        //for end in ends {
+                        //    ends_strs.push(end.to_string());
+                        //    ends_strs.push(",".to_string());
+                        //    this_len = upstream_length.get(&ends[0]).unwrap();
+                        //    if this_len > biggest_end.0 {
+                        //        biggest_end = (this_len, *end);
+                        //    }
+                        //}
+                        //props["ends_s"] = ends_strs.join("").into();
+                        //props["biggest_end_upstream_m"] = round(biggest_end.0, 1).into();
+                        //props["biggest_end_nid"] = biggest_end.1.into();
+                    }
+
+                    (
+                        props,
+                        (
+                            nodeid_pos.get(&from_nid).unwrap(),
+                            nodeid_pos.get(&to_nid).unwrap(),
+                        ),
+                    )
+                });
+            info_memory_used!();
+
+            let writing_upstreams_bar = progress_bars.add(
+                ProgressBar::new(g.num_edges() as u64)
+                    .with_message("Writing upstreams geojson(s) file")
+                    .with_style(style.clone()),
+            );
+
+            let lines = lines.progress_with(writing_upstreams_bar);
+
+            let mut f = std::io::BufWriter::new(std::fs::File::create(&upstream_filename)?);
+
+            let num_written;
+            if upstream_filename.extension().unwrap() == "geojsons"
+                || upstream_filename.extension().unwrap() == "geojson"
+            {
+                num_written = write_geojson_features_directly(
+                    lines,
+                    &mut f,
+                    &fileio::format_for_filename(&upstream_filename),
+                )?;
+            } else if upstream_filename.extension().unwrap() == "csv" {
+                let mut csv_columns = vec!["from_upstream_m".to_string()];
+                if args.upstream_tag_biggest_end {
+                    csv_columns.push("biggest_end_nid".to_string());
+                }
+                for mult in args.upstream_from_upstream_multiple.iter() {
+                    csv_columns.push(format!("from_upstream_m_{}", mult));
+                }
+                num_written = write_csv_features_directly(lines, &mut f, &csv_columns)?;
+            } else {
+                anyhow::bail!("Unsupported output format");
+            }
+
+            info!(
+                "Wrote {} features to output file {}",
+                num_written.to_formatted_string(&Locale::en),
+                upstream_filename.display(),
+            );
+        }
     }
 
     info!(
