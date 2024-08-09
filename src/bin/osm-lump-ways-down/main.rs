@@ -77,8 +77,9 @@ fn main() -> Result<()> {
 
     let global_start = Instant::now();
     info!(
-        "Starting osm-lump-ways-down v{}",
-        std::env!("CARGO_PKG_VERSION")
+        "Starting osm-lump-ways-down v{}. Source code: {}",
+        std::env!("CARGO_PKG_VERSION"),
+        std::env!("CARGO_PKG_REPOSITORY"),
     );
 
     let file_reading_style =

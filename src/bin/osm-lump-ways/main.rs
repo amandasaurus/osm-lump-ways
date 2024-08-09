@@ -57,7 +57,11 @@ fn main() -> Result<()> {
     }
 
     let global_start = Instant::now();
-    info!("osm-lump-ways v{}", std::env!("CARGO_PKG_VERSION"));
+    info!(
+        "Starting osm-lump-ways v{}. Source code: {}",
+        std::env!("CARGO_PKG_VERSION"),
+        std::env!("CARGO_PKG_REPOSITORY"),
+    );
 
     let style = ProgressStyle::with_template(
         "[{elapsed_precise}] {percent:>3}% done. eta {eta:>4} {bar:10.cyan/blue} {pos:>7}/{len:7} {per_sec:>12} {msg}",
