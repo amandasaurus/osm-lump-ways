@@ -12,7 +12,7 @@ use osmio::prelude::*;
 use osmio::OSMObjBase;
 use rayon::prelude::*;
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
@@ -367,13 +367,12 @@ fn main() -> Result<()> {
                 if these_boundaries.is_empty() {
                     these_boundaries.push("unknown_area");
                 }
+                let all_nodes: BTreeSet<_> = cycle.iter().flat_map(|seg| seg.iter()).collect();
                 let mut props = serde_json::json!({
                     "root_nid": cycle.iter().flat_map(|seg| seg.iter()).min().unwrap(),
                     "num_nodes": cycle.len(),
                     "length_m": round(&node_group_to_length_m(cycle.as_slice(), &nodeid_pos), 1),
-                    "nodes": cycle
-                                .iter()
-                                .flat_map(|seg| seg.iter())
+                    "nodes": all_nodes.into_iter()
                                 .map(|nid| format!("n{}", nid))
                                 .collect::<Vec<_>>()
                                 .join(","),

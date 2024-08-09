@@ -952,22 +952,7 @@ impl DirectedGraph2 {
                     .collect()
             })
             .collect()
-
-        //components.into_values().map(|v| v.to_vec()).collect()
     }
-
-    //fn into_undirected_graph(self) -> UniDirectedGraph {
-    //    let mut result = UniDirectedGraph::new();
-
-    //    let DirectedGraph2 { edges } = self;
-    //    for (v, (_ins, outs)) in edges.into_iter() {
-    //        for out in outs.into_iter() {
-    //            result.add_edge(v, out);
-    //        }
-    //    }
-
-    //    result
-    //}
 
     pub fn into_vertexes_topologically_sorted(self, sorting_nodes_bar: &ProgressBar) -> Vec<i64> {
         let mut g = self;

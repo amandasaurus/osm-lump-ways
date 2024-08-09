@@ -159,7 +159,27 @@ direction of the OSM way, to produce many different output files.
 ### `loops`
 
 Cycles in the network. Each is a [strongly connected
-component](https://en.wikipedia.org/wiki/Strongly_connected_component).
+component](https://en.wikipedia.org/wiki/Strongly_connected_component), and `MultiLineString`.
+
+#### Feature Properties
+
+* `areas`: Array of Strings. The cycle is geocoded using
+  [`country-borders`](https://github.com/westnordost/country-boundaries-rust).
+  The code for every matching area is included in this array, sorted with longest strings first. e.g.: `["GB-ENG","GB"],`
+* `areas_s`: String. `areas`, but the array has been converted to a string, and comma
+  separated, with a `,` prefix & suffix. e.g. `",GB-ENG,GB,"`. The prefix &
+  suffix ensure you can always search for `,GB,` in that property and get a
+  match.
+* `area_N`: String. One for every element in `areas`, with a numeric suffix and
+  the item itself. e.g. `"areas_s":",GB-ENG,GB,"` then there will be
+  `"area_0":"GB-ENG","area_1":"GB"`. These properties are for software which
+  doesn't support JSON arrays.
+* `length_m`: Float. Total length of this cycle, in metres.
+* `nodes`: String. All the node ids in this cycle, sorted, and deduplicated, and saved
+  e.g. `"n318688661,n5354970286,n1016277960`.
+* `root_node_id`: Integer. Node id of the lowest numbered node in this cycle.
+* `num_nodes`: Integer. Number of nodes in this cycle. incl. duplicates.
+
 
 ### `upstreams`
 

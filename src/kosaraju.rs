@@ -1,4 +1,5 @@
 //! Kosaraju Algorithm to find Strongly Connected Components
+//! https://en.wikipedia.org/wiki/Kosaraju%27s_algorithm
 use super::*;
 use crate::graph::{DirectedGraph2, DirectedGraphTrait};
 #[allow(unused_imports)]
@@ -82,7 +83,7 @@ pub(crate) fn kosaraju_it(
         }
     }
 
-    // We don't need these anymore
+    // We don't need the single-vertex components.
     components.retain(|k, v| k != v);
 
     components

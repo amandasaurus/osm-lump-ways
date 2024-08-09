@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+* Within the loops file, the `nodes` is now a sorted (by nodeid), deduplicated
+  list of node ids.
+
 ## v1.1.0 (2024-08-07)
 
 * osm-lump-ways-down now takes the target filename for `--ends`/`--loops` etc.
