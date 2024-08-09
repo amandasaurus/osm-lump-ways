@@ -81,7 +81,6 @@ pub struct Args {
     ///// `name` key
     //#[arg(short = 'g', long = "tag-group-k", value_name = "key1,key2,…")]
     //pub tag_group_k: Vec<taggrouper::TagGrouper>,
-
     /// If grouping by a key, set this to also include ways where there is any unset tag (default
     /// to require all to be set)
     #[arg(long)]
@@ -176,7 +175,7 @@ pub struct Args {
     pub openmetrics: Option<PathBuf>,
 
     /// Write the ends file
-    #[arg(long, value_name="OUTPUT.geojson[s]")]
+    #[arg(long, value_name = "OUTPUT.geojson[s]")]
     pub ends: Option<PathBuf>,
 
     /// Where to write the loops file

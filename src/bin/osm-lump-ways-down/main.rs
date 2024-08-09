@@ -13,8 +13,8 @@ use osmio::OSMObjBase;
 use rayon::prelude::*;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::io::{Write, BufWriter};
 use std::fs::File;
+use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::time::Instant;
 
@@ -95,8 +95,6 @@ fn main() -> Result<()> {
     let rdr = input_bar.wrap_read(input_fp);
 
     let mut reader = osmio::stringpbf::PBFReader::new(rdr);
-
-
 
     if !args.input_filename.is_file() {
         error!(
@@ -446,8 +444,11 @@ fn main() -> Result<()> {
 
         if let Some(ref loops_filename) = args.loops {
             let mut f = BufWriter::new(File::create(&loops_filename)?);
-            let num_written =
-                write_geojson_features_directly(cycles_output.into_iter(), &mut f, &fileio::format_for_filename(&loops_filename))?;
+            let num_written = write_geojson_features_directly(
+                cycles_output.into_iter(),
+                &mut f,
+                &fileio::format_for_filename(&loops_filename),
+            )?;
 
             info!(
                 "Wrote {num_written} features to output file {}",
@@ -734,8 +735,11 @@ fn main() -> Result<()> {
             });
 
         let mut f = BufWriter::new(File::create(&ends_filename)?);
-        let num_written =
-            write_geojson_features_directly(end_points_output, &mut f, &fileio::format_for_filename(&ends_filename))?;
+        let num_written = write_geojson_features_directly(
+            end_points_output,
+            &mut f,
+            &fileio::format_for_filename(&ends_filename),
+        )?;
         info!(
             "Wrote {} features to output file {}",
             num_written.to_formatted_string(&Locale::en),
@@ -878,7 +882,11 @@ fn main() -> Result<()> {
         if upstream_filename.extension().unwrap() == "geojsons"
             || upstream_filename.extension().unwrap() == "geojson"
         {
-            num_written = write_geojson_features_directly(lines, &mut f, &fileio::format_for_filename(&upstream_filename))?;
+            num_written = write_geojson_features_directly(
+                lines,
+                &mut f,
+                &fileio::format_for_filename(&upstream_filename),
+            )?;
         } else if upstream_filename.extension().unwrap() == "csv" {
             let mut csv_columns = vec!["from_upstream_m".to_string()];
             if args.upstream_tag_biggest_end {

@@ -197,7 +197,6 @@ pub struct Args {
     /// Path to store OpenMetrics/Prometheus metrics
     #[arg(long, value_name = "FILENAME.prom")]
     pub openmetrics: Option<PathBuf>,
-
 }
 
 /// CLI arg parser. If the value starts with @, the rest is assumed to be a filename, the contents
