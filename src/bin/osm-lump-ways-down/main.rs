@@ -434,11 +434,11 @@ fn main() -> Result<()> {
         }
 
         if let Some(ref loops_filename) = args.loops {
-            let mut f = BufWriter::new(File::create(&loops_filename)?);
+            let mut f = BufWriter::new(File::create(loops_filename)?);
             let num_written = write_geojson_features_directly(
                 cycles_output.into_iter(),
                 &mut f,
-                &fileio::format_for_filename(&loops_filename),
+                &fileio::format_for_filename(loops_filename),
             )?;
 
             info!(
@@ -720,11 +720,11 @@ fn main() -> Result<()> {
                 (props, pos)
             });
 
-        let mut f = BufWriter::new(File::create(&ends_filename)?);
+        let mut f = BufWriter::new(File::create(ends_filename)?);
         let num_written = write_geojson_features_directly(
             end_points_output,
             &mut f,
-            &fileio::format_for_filename(&ends_filename),
+            &fileio::format_for_filename(ends_filename),
         )?;
         info!(
             "Wrote {} features to output file {}",
@@ -861,7 +861,7 @@ fn main() -> Result<()> {
 
             let lines = lines.progress_with(writing_upstreams_bar);
 
-            let mut f = std::io::BufWriter::new(std::fs::File::create(&upstream_filename)?);
+            let mut f = std::io::BufWriter::new(std::fs::File::create(upstream_filename)?);
 
             let num_written;
             if upstream_filename.extension().unwrap() == "geojsons"
@@ -870,7 +870,7 @@ fn main() -> Result<()> {
                 num_written = write_geojson_features_directly(
                     lines,
                     &mut f,
-                    &fileio::format_for_filename(&upstream_filename),
+                    &fileio::format_for_filename(upstream_filename),
                 )?;
             } else if upstream_filename.extension().unwrap() == "csv" {
                 let mut csv_columns = vec!["from_upstream_m".to_string()];
