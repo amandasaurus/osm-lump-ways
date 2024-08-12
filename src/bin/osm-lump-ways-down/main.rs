@@ -77,7 +77,7 @@ fn main() -> Result<()> {
 
     let global_start = Instant::now();
     info!(
-        "Starting osm-lump-ways-down v{}. Source code: {}",
+        "Welcome to osm-lump-ways-down v{}. Source code: <{}>. Have fun! :)",
         std::env!("CARGO_PKG_VERSION"),
         std::env!("CARGO_PKG_REPOSITORY"),
     );
@@ -117,7 +117,7 @@ fn main() -> Result<()> {
         "Nothing to do. You need to specifiy one of --ends/loops/upstreams/etc."
     );
 
-    info!("Starting to read {:?}", &args.input_filename);
+    info!("Input file: {:?}", &args.input_filename);
     if args.tag_filter.is_empty() {
         if let Some(ref tff) = args.tag_filter_func {
             info!("Tag filter function in operation: {:?}", tff);
@@ -138,7 +138,7 @@ fn main() -> Result<()> {
     let obj_reader = progress_bars.add(
         ProgressBar::new_spinner().with_style(
             ProgressStyle::with_template(
-                "[{elapsed_precise}] {human_pos} OSM ways read {per_sec:>20}",
+                "           {human_pos} ways read {per_sec:>20}",
             )
             .unwrap(),
         ),
@@ -202,7 +202,6 @@ fn main() -> Result<()> {
 
     let latest_timestamp = AtomicI64::new(0);
 
-    info!("Reading input file...");
     // first step, get all the cycles
     let start_reading_ways = Instant::now();
     reader
@@ -450,7 +449,8 @@ fn main() -> Result<()> {
             )?;
 
             info!(
-                "Wrote {num_written} features to output file {}",
+                "Wrote {} features to output file {}",
+                num_written.to_formatted_string(&Locale::en),
                 loops_filename.to_str().unwrap(),
             );
         }
@@ -462,7 +462,6 @@ fn main() -> Result<()> {
         && args.csv_stats_file.is_none()
         && args.openmetrics.is_none()
     {
-        info!("Nothing more to do. 🙂");
         // nothing else to do
         return Ok(());
     }
