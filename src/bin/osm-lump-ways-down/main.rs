@@ -133,14 +133,9 @@ fn main() -> Result<()> {
         "[{elapsed_precise}] {percent:>3}% done. eta {eta:>4} {bar:10.cyan/blue} {pos:>7}/{len:7} {per_sec:>12} {msg}",
     )
     .unwrap();
-    let obj_reader = progress_bars.add(
-        ProgressBar::new_spinner().with_style(
-            ProgressStyle::with_template(
-                "           {human_pos} ways read {per_sec:>20}",
-            )
-            .unwrap(),
-        ),
-    );
+    let obj_reader = progress_bars.add(ProgressBar::new_spinner().with_style(
+        ProgressStyle::with_template("           {human_pos} ways read {per_sec:>20}").unwrap(),
+    ));
     let ways_added = progress_bars.add(
         ProgressBar::new_spinner().with_style(
             ProgressStyle::with_template(
@@ -454,10 +449,7 @@ fn main() -> Result<()> {
         }
     }
 
-    if args.ends.is_none()
-        && args.upstreams.is_none()
-        && !args.group_by_ends
-    {
+    if args.ends.is_none() && args.upstreams.is_none() && !args.group_by_ends {
         // nothing else to do
         return Ok(());
     }
@@ -787,7 +779,6 @@ fn main() -> Result<()> {
     }
     assert!(upstream_biggest_end.par_iter().all(|end| *end >= 0));
 
-
     if let Some(ref upstream_filename) = args.upstreams {
         debug!("Writing upstreams");
 
@@ -804,7 +795,6 @@ fn main() -> Result<()> {
                 &nodeid_pos,
             )?;
         } else {
-
             // we loop over all nodes in topologically_sorted_nodes (which is annotated in
             // upstream_length_iter with the upstream value) and flat_map that into each line segment
             // that goes out of that.
