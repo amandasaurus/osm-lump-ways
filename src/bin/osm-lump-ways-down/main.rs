@@ -111,10 +111,8 @@ fn main() -> Result<()> {
         args.ends.is_some()
             || args.loops.is_some()
             || args.upstreams.is_some()
-            || args.group_by_ends
-            || args.csv_stats_file.is_some()
-            || args.openmetrics.is_some(),
-        "Nothing to do. You need to specifiy one of --ends/loops/upstreams/etc."
+            || args.group_by_ends,
+        "Nothing to do. You need to specifiy one of --ends/--loops/--upstreams/etc."
     );
 
     info!("Input file: {:?}", &args.input_filename);
@@ -459,8 +457,6 @@ fn main() -> Result<()> {
     if args.ends.is_none()
         && args.upstreams.is_none()
         && !args.group_by_ends
-        && args.csv_stats_file.is_none()
-        && args.openmetrics.is_none()
     {
         // nothing else to do
         return Ok(());
