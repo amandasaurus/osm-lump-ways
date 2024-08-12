@@ -4,6 +4,7 @@
 
 * Within the loops file, the `nodes` is now a sorted (by nodeid), deduplicated
   list of node ids.
+* Minor refactor of calculating loops & CSV stats files
 
 ## v1.1.0 (2024-08-07)
 
