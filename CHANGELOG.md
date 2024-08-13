@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.2.0 (2024-08-13)
 
 * Within the loops file, the `nodes` is now a sorted (by nodeid), deduplicated
   list of node ids.
