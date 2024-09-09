@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.0 (2024-09-08)
+
+* Update OSM PBF reading library
+
 ## v1.2.0 (2024-08-13)
 
 * Within the loops file, the `nodes` is now a sorted (by nodeid), deduplicated
