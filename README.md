@@ -180,6 +180,15 @@ component](https://en.wikipedia.org/wiki/Strongly_connected_component), and `Mul
 * `root_node_id`: Integer. Node id of the lowest numbered node in this cycle.
 * `num_nodes`: Integer. Number of nodes in this cycle. incl. duplicates.
 
+### Loops stats CSV
+
+With `--csv-stats-file FILENAME.csv`, a CSV file with statistics of the loops,
+along with a breakdown per region is created. If the file is already there, the
+data is appended.
+
+See the doc comment
+[`src/bin/osm-lump-ways-down/cli_args.rs`](./blob/main/src/bin/osm-lump-ways-down/cli_args.rs#L158-L171),
+or run `osm-lump-ways-down --help` for the format.
 
 ### `upstreams`
 
