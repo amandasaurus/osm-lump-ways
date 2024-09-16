@@ -1010,8 +1010,9 @@ impl DirectedGraphTrait for DirectedGraph2 {
         }
 
         // assume we never get inconsistant
-        self.edges.entry(vertex2).or_default().0.push(vertex1);
-        self.edges.entry(vertex2).or_default().0.sort();
+        let other = self.edges.entry(vertex2).or_default();
+        other.0.push(vertex1);
+        other.0.sort();
         false
     }
 
