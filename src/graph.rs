@@ -626,7 +626,7 @@ pub struct DirectedGraph2 {
     // key is vertex id
     // value.0 is list of incoming vertexes  (ie there's an edge from something → key)
     // value.1 is list of outgoing vertexes (ie there's an edge from key → something)
-    edges: BTreeMapSplitKey<(SmallNidVec, SmallNidVec)>,
+    edges: BTreeMap<i64, (SmallNidVec, SmallNidVec)>,
 }
 
 impl DirectedGraph2 {
@@ -640,7 +640,7 @@ impl DirectedGraph2 {
     pub fn vertexes_and_num_ins_outs(&self) -> impl Iterator<Item = (i64, usize, usize)> + '_ {
         self.edges
             .iter()
-            .map(|(v, (ins, outs))| (v, ins.len(), outs.len()))
+            .map(|(v, (ins, outs))| (*v, ins.len(), outs.len()))
     }
 
     /// What are the vertexes that we can reach *from* this vertex.
@@ -991,7 +991,7 @@ impl DirectedGraph2 {
 
     /// Iterator over all vertexes
     pub fn vertexes(&self) -> impl Iterator<Item = i64> + '_ {
-        self.edges.keys()
+        self.edges.keys().copied()
     }
 }
 
@@ -1048,18 +1048,18 @@ impl DirectedGraphTrait for DirectedGraph2 {
     fn edges_iter(&self) -> impl Iterator<Item = (i64, i64)> {
         self.edges
             .iter()
-            .flat_map(move |(v, (_ins, outs))| outs.iter().map(move |o| (v, *o)))
+            .flat_map(move |(v, (_ins, outs))| outs.iter().map(move |o| (*v, *o)))
     }
     fn edges_par_iter(&self) -> impl ParallelIterator<Item = (i64, i64)> {
         self.edges
             .iter()
             .par_bridge()
-            .flat_map(move |(v, (_ins, outs))| outs.par_iter().map(move |o| (v, *o)))
+            .flat_map(move |(v, (_ins, outs))| outs.par_iter().map(move |o| (*v, *o)))
     }
 
     /// returns each vertex and the number of out edges
     fn vertexes_and_num_outs(&self) -> impl Iterator<Item = (i64, usize)> {
-        self.edges.iter().map(|(v, (_ins, outs))| (v, outs.len()))
+        self.edges.iter().map(|(v, (_ins, outs))| (*v, outs.len()))
     }
 
     fn vertex_has_outgoing(&self, vid: &i64) -> bool {

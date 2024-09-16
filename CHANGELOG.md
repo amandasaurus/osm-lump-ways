@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* Internal refactoring to attempt to improve performance.
+
 ## v1.3.0 (2024-09-08)
 
 * Update OSM PBF reading library
