@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+* Tag Filter Function's @ format can now include other files
 * Internal refactoring to attempt to improve performance.
 
 ## v1.3.0 (2024-09-08)

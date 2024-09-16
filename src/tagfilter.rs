@@ -1,6 +1,7 @@
 use log::warn;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use regex::Regex;
+use std::path::Path;
 
 #[derive(Debug, Clone)]
 pub enum TagFilter {
@@ -215,8 +216,38 @@ impl std::str::FromStr for TagFilterFunc {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = s.trim();
-        let s = Regex::new("#[^\n]*\n").unwrap().replace_all(s, "");
+        let (filename, contents) = match s.strip_prefix('@') {
+            None => (None, s.to_string()),
+            Some(filename) => {
+                let contents = std::fs::read_to_string(filename)
+                    .map_err(|e| format!("Couldn't read filename {}: {}", filename, e))?;
+                (Some(Path::new(filename)), contents)
+            }
+        };
+
+        let s = contents.trim();
+
+        // remove comments
+        let mut s: String = Regex::new("#[^\n]*\n").unwrap().replace_all(s, "").into_owned();
+
+        loop {
+            //include FILENAME;
+            let new_s = Regex::new("(?m)^include ([^;]+);").unwrap().replace_all(&s, |caps: &regex::Captures| {
+                let incl_filename = &caps[1];
+                let incl_path = filename.expect("Can't do include without using @filename syntax").parent().unwrap().join(incl_filename).canonicalize().unwrap();
+                std::fs::read_to_string(incl_path)
+                    .expect(&format!("Error in include in tagfilter function: Couldn't read filename {:?}", filename))
+            }).into_owned();
+
+            // do it recursively
+            if new_s == s {
+                s = new_s;
+                break;
+            }
+            s = new_s;
+        }
+
+
         let tffs = s
             .split(';')
             .map(|src| src.trim())

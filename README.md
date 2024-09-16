@@ -69,7 +69,10 @@ want a `waterway=canal` iff it also has a `lock=yes` tag.
 `-F "waterway=canal∧lock=yes→T; waterway=canal→F; waterway→T; F`
 
 If the argument to `-F`/`--tag-filter-func` starts with `@`, the rest is a
-filename containing the tag filter func code. e.g. ` -F @myrules.txt `.
+filename containing the tag filter func code. e.g. ` -F @myrules.txt `. In this
+mode, a line `include FILENAME;` will include the contents of another file
+there. `FILENAME` is a path relative to the original filename. It will be
+expanded recursively.
 
 Comments start with `#` and continue to the end of the line.
 
