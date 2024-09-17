@@ -246,10 +246,12 @@ impl std::str::FromStr for TagFilterFunc {
                         .join(incl_filename)
                         .canonicalize()
                         .unwrap();
-                    std::fs::read_to_string(incl_path).expect(&format!(
-                        "Error in include in tagfilter function: Couldn't read filename {:?}",
-                        filename
-                    ))
+                    std::fs::read_to_string(incl_path).unwrap_or_else(|_| {
+                        panic!(
+                            "Error in include in tagfilter function: Couldn't read filename {:?}",
+                            filename
+                        )
+                    })
                 })
                 .into_owned();
 
