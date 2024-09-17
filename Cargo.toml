@@ -9,28 +9,28 @@ description = "Group OpenStreetMap lines based on graph topology and OSM tags"
 keywords = ["openstreetmap", "osm", "topology"]
 
 [dependencies]
-anyhow = "1.0.66"
-clap = { version = "4.0.29", features = ["derive"] }
-clap-verbosity-flag = "2.0.1"
+anyhow = "1.0.89"
+clap = { version = "4.5.17", features = ["derive"] }
+clap-verbosity-flag = "2.2.1"
 country-boundaries = "1.2.0"
 csv = "1.3.0"
-env_logger = "0.11.1"
+env_logger = "0.11.5"
 geo = "0.28.0"
 get-size = { version = "0.1.4", features = ["derive"] }
-indicatif = "0.17.2"
-indicatif-log-bridge = "0.2.2"
+indicatif = "0.17.8"
+indicatif-log-bridge = "0.2.3"
 kdtree = "0.7.0"
-log = "0.4.17"
-memory-stats = "1.1.0"
+log = "0.4.22"
+memory-stats = "1.2.0"
 num-format = "0.4.4"
-ordered-float = "4.1.0"
+ordered-float = "4.2.2"
 osmio = "0.14.0"
-rayon = "1.6.1"
+rayon = "1.10.0"
 read-progress = "0.5.0"
-regex = "1.7.0"
-serde = "1.0.150"
-serde_json = "1.0.89"
-smallvec = "1.12"
+regex = "1.10.6"
+serde = "1.0.210"
+serde_json = "1.0.128"
+smallvec = "1.13"
 vartyint = "0.3.0"
 
 [profile.dev]
