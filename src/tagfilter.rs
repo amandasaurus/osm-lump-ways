@@ -228,16 +228,30 @@ impl std::str::FromStr for TagFilterFunc {
         let s = contents.trim();
 
         // remove comments
-        let mut s: String = Regex::new("#[^\n]*\n").unwrap().replace_all(s, "").into_owned();
+        let mut s: String = Regex::new("#[^\n]*\n")
+            .unwrap()
+            .replace_all(s, "")
+            .into_owned();
 
         loop {
             //include FILENAME;
-            let new_s = Regex::new("(?m)^include ([^;]+);").unwrap().replace_all(&s, |caps: &regex::Captures| {
-                let incl_filename = &caps[1];
-                let incl_path = filename.expect("Can't do include without using @filename syntax").parent().unwrap().join(incl_filename).canonicalize().unwrap();
-                std::fs::read_to_string(incl_path)
-                    .expect(&format!("Error in include in tagfilter function: Couldn't read filename {:?}", filename))
-            }).into_owned();
+            let new_s = Regex::new("(?m)^include ([^;]+);")
+                .unwrap()
+                .replace_all(&s, |caps: &regex::Captures| {
+                    let incl_filename = &caps[1];
+                    let incl_path = filename
+                        .expect("Can't do include without using @filename syntax")
+                        .parent()
+                        .unwrap()
+                        .join(incl_filename)
+                        .canonicalize()
+                        .unwrap();
+                    std::fs::read_to_string(incl_path).expect(&format!(
+                        "Error in include in tagfilter function: Couldn't read filename {:?}",
+                        filename
+                    ))
+                })
+                .into_owned();
 
             // do it recursively
             if new_s == s {
@@ -246,7 +260,6 @@ impl std::str::FromStr for TagFilterFunc {
             }
             s = new_s;
         }
-
 
         let tffs = s
             .split(';')

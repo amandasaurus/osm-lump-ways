@@ -68,7 +68,7 @@ pub struct Args {
         short = 'F',
         long = "tag-filter-func",
         value_name = "FILTER_FUNC",
-        conflicts_with = "tag_filter",
+        conflicts_with = "tag_filter"
     )]
     pub tag_filter_func: Option<tagfilter::TagFilterFunc>,
 
