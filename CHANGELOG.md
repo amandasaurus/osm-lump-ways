@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.4.0 (2024-09-16)
 
 * Tag Filter Function's @ format can now include other files
 * Internal refactoring to attempt to improve performance.
