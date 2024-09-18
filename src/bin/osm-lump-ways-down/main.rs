@@ -231,13 +231,10 @@ fn main() -> Result<()> {
         "Latest timestamp is {} / {}",
         latest_timestamp, latest_timestamp_iso
     );
-    obj_reader.finish();
-    progress_bars.remove(&obj_reader);
-    ways_added.finish();
-    progress_bars.remove(&ways_added);
-    nodes_added.finish();
-    progress_bars.remove(&nodes_added);
-    input_bar.finish();
+    obj_reader.finish_and_clear();
+    ways_added.finish_and_clear();
+    nodes_added.finish_and_clear();
+    input_bar.finish_and_clear();
     progress_bars.remove(&input_bar);
     let g: graph::DirectedGraph2 = Arc::try_unwrap(g).unwrap().into_inner().unwrap();
 
@@ -275,8 +272,7 @@ fn main() -> Result<()> {
         .into_disconnected_graphs()
         .inspect(|g| splitting_graphs_bar.inc(g.num_vertexes() as u64))
         .collect::<Vec<_>>();
-    splitting_graphs_bar.finish();
-    progress_bars.remove(&splitting_graphs_bar);
+    splitting_graphs_bar.finish_and_clear();
     info!(
         "Split the graph into {} different disconnected graphs",
         graphs.len().to_formatted_string(&Locale::en)
@@ -319,10 +315,8 @@ fn main() -> Result<()> {
     );
     info_memory_used!();
 
-    calc_components_bar.finish();
-    graphs_processed.finish();
-    progress_bars.remove(&calc_components_bar);
-    progress_bars.remove(&graphs_processed);
+    calc_components_bar.finish_and_clear();
+    graphs_processed.finish_and_clear();
 
     if !cycles.is_empty() {
         let mut wanted_nodeids: HashSet<i64> =
@@ -343,8 +337,7 @@ fn main() -> Result<()> {
             &setting_node_pos,
             &mut nodeid_pos,
         )?;
-        setting_node_pos.finish();
-        progress_bars.remove(&setting_node_pos);
+        setting_node_pos.finish_and_clear();
         info_memory_used!();
 
         #[allow(clippy::type_complexity)]
@@ -495,8 +488,7 @@ fn main() -> Result<()> {
     //// TODO this graph (g) can be split into disconnected components
     let orig_num_vertexes = g.num_vertexes();
     let topologically_sorted_nodes = g.into_vertexes_topologically_sorted(&sorting_nodes_bar);
-    sorting_nodes_bar.finish();
-    progress_bars.remove(&sorting_nodes_bar);
+    sorting_nodes_bar.finish_and_clear();
     info!(
         "All {} nodes have been sorted topographically. Size of sorted nodes: {} bytes = {}",
         topologically_sorted_nodes
@@ -536,8 +528,7 @@ fn main() -> Result<()> {
         &setting_node_pos,
         &mut nodeid_pos,
     )?;
-    setting_node_pos.finish();
-    progress_bars.remove(&setting_node_pos);
+    setting_node_pos.finish_and_clear();
     info_memory_used!();
 
     // Sorted list of all nids which are an end point
@@ -614,10 +605,8 @@ fn main() -> Result<()> {
             calc_all_upstream_bar.inc(1);
         }
     }
-    calc_all_upstream_bar.finish();
-    calc_upstream_ends_bar.finish();
-    progress_bars.remove(&calc_all_upstream_bar);
-    progress_bars.remove(&calc_upstream_ends_bar);
+    calc_all_upstream_bar.finish_and_clear();
+    calc_upstream_ends_bar.finish_and_clear();
     info!(
         "Calculated the upstream value for {} nodes",
         topologically_sorted_nodes
@@ -975,12 +964,9 @@ fn read_with_node_replacements(
                 graph.add_edge_chain(nodes);
             }
         });
-    obj_reader.finish();
-    progress_bars.remove(&obj_reader);
-    ways_added.finish();
-    progress_bars.remove(&ways_added);
-    nodes_added.finish();
-    progress_bars.remove(&nodes_added);
+    obj_reader.finish_and_clear();
+    ways_added.finish_and_clear();
+    nodes_added.finish_and_clear();
 
     Ok(())
 }
@@ -1008,7 +994,7 @@ fn read_node_positions(
     let nodeid_pos = Arc::try_unwrap(nodeid_pos).unwrap().into_inner().unwrap();
     nodeid_pos.finished_inserting();
 
-    setting_node_pos.finish();
+    setting_node_pos.finish_and_clear();
 
     debug!("{}", nodeid_pos.detailed_size());
 

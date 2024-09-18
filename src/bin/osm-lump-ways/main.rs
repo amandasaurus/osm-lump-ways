@@ -250,10 +250,8 @@ fn main() -> Result<()> {
         formatting::format_duration(started_reading_ways.elapsed()),
         (num_ways_read as f64) / started_reading_ways.elapsed().as_secs_f64(),
     );
-    ways_added.finish();
-    progress_bars.remove(&ways_added);
-    input_bar.finish();
-    progress_bars.remove(&input_bar);
+    ways_added.finish_and_clear();
+    input_bar.finish_and_clear();
     let nodeid_wayids = Arc::try_unwrap(nodeid_wayids)
         .unwrap()
         .into_inner()
@@ -304,8 +302,7 @@ fn main() -> Result<()> {
     nodeid_pos.finished_inserting();
     let nodeid_pos = nodeid_pos;
 
-    setting_node_pos.finish();
-    progress_bars.remove(&setting_node_pos);
+    setting_node_pos.finish_and_clear();
     info!(
         "Finshed reading all node positions. {} nodes read in {}, {:.3e} nodes/sec",
         setting_node_pos.position().to_formatted_string(&Locale::en),
@@ -445,9 +442,8 @@ fn main() -> Result<()> {
         })
         .collect::<Vec<WayGroup>>();
     // ↑ The breath first search is done
-    grouping.finish();
-    progress_bars.remove(&grouping);
-    progress_bars.remove(&total_groups_found);
+    grouping.finish_and_clear();
+    total_groups_found.finish_and_clear();
     drop(nodeid_wayids);
 
     let way_groups: Vec<_> = way_groups
@@ -504,8 +500,7 @@ fn main() -> Result<()> {
             }
         })
         .collect();
-    reorder_segments_bar.finish();
-    progress_bars.remove(&reorder_segments_bar);
+    reorder_segments_bar.finish_and_clear();
 
     // ↓ Split into paths if needed
     let way_groups: Vec<_> = way_groups.into_par_iter()
@@ -665,10 +660,8 @@ fn main() -> Result<()> {
                 skipped_way_groups_length_sum.into_inner(),
             )
         }
-        frames_bar.finish();
-        frames_all_nodes_bar.finish();
-        progress_bars.remove(&frames_bar);
-        progress_bars.remove(&frames_all_nodes_bar);
+        frames_bar.finish_and_clear();
+        frames_all_nodes_bar.finish_and_clear();
 
         // Then write it
         let frames_writing_bar = progress_bars.add(
@@ -758,7 +751,7 @@ fn main() -> Result<()> {
                     points_distance_idx.add(coords, wg_id).unwrap();
                     prog.inc(1);
                 }
-                prog.finish();
+                prog.finish_and_clear();
 
                 let prog = progress_bars.add(
                     ProgressBar::new(
@@ -796,7 +789,7 @@ fn main() -> Result<()> {
                         min
                     })
                     .collect::<Vec<_>>();
-                prog.finish();
+                prog.finish_and_clear();
 
                 // set the longer distance
                 way_groups
