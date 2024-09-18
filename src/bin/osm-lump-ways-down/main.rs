@@ -1108,13 +1108,7 @@ fn do_group_by_ends(
             ProgressStyle::with_template("       {human_pos} segments output").unwrap(),
         ));
 
-    let mut expected_ends: HashMap<i64, HashMap<i32, Vec<i64>>> = HashMap::new();
-    for (end_idx, end_nid) in end_points.iter().copied().enumerate() {
-        expected_ends
-            .entry(end_nid)
-            .or_default()
-            .insert(end_idx as i32, vec![]);
-    }
+    let mut in_progress_lines: HashMap<i64, Vec<Vec<i64>>> = HashMap::new();
 
     anyhow::ensure!(
         !upstream_biggest_end.is_empty(),
@@ -1126,60 +1120,72 @@ fn do_group_by_ends(
         .rev()
         .zip(upstream_biggest_end.iter().rev());
 
-    let mut possible_ins: SmallVec<[i64; 1]> = smallvec::smallvec![];
+    let mut possible_ins: SmallVec<[i64; 5]> = smallvec::smallvec![];
+    let mut results_to_pop: SmallVec<[(i64, Vec<i64>); 3]> = smallvec::smallvec![];
 
     let upstreams_grouped_by_end = std::iter::from_fn(|| {
-        let path: Option<(i64, Vec<i64>)>;
+        // ↓ This code definitly does too many allocations (incl. for Vec's) and could be optimised
         loop {
-            //dbg!(expected_ends.len());
+            if let Some(mut result) = results_to_pop.pop() {
+                // we have something to return.
+                result.1.reverse();
+                return Some(result);
+            }
             let (nid, real_end_idx) = match nid_end_iter.next() {
                 None => {
+                    // finished all the nodes
                     return None;
                 }
                 Some(x) => x,
             };
-            nodes_bar.inc(1);
-            assert!(expected_ends.contains_key(nid));
-            let mut paths_for_this_nid = expected_ends.remove(nid).unwrap();
-            //dbg!(&real_end_idx, &nid, &paths_for_this_nid);
-            assert!(paths_for_this_nid.contains_key(real_end_idx));
-            let mut its_path = paths_for_this_nid.remove(real_end_idx).unwrap();
-            its_path.push(*nid);
+
+            // which in progress lines are there for this node
+            let mut lines_to_here = in_progress_lines.remove(nid).unwrap_or_default();
+            if *nid == end_points[*real_end_idx as usize] {
+                // this node is an end node (and it is it's own end node)
+
+                assert!(lines_to_here.is_empty()); // sanity check
+
+                // Give us something to work with later. This is the start of the lines that start
+                // here.
+                lines_to_here.push(vec![]);
+            }
+
+            // include this point in every line so far
+            for line in lines_to_here.iter_mut() {
+                line.push(*nid);
+            }
+
+            // If >1 line is ending here, end all lines (bar the first one) here
+            while lines_to_here.len() > 1 {
+                results_to_pop.push((*real_end_idx as i64, lines_to_here.pop().unwrap()));
+            }
+
+            // this is the only line we continue with
+            let line_to_here = lines_to_here.pop().unwrap();
+            assert!(lines_to_here.is_empty());
 
             possible_ins.clear();
-            possible_ins.extend(g.in_neighbours(*nid).filter(|n| {
-                expected_ends
-                    .get(n)
-                    .map_or(true, |perend| !perend.contains_key(real_end_idx))
-            }));
-            if possible_ins.is_empty() {
-                // no more upstreams
-                its_path.reverse();
-                path = Some((*real_end_idx as i64, its_path));
-                break;
-            } else {
-                for rest_of_upstreams in possible_ins.iter().skip(1) {
-                    expected_ends
-                        .entry(*rest_of_upstreams)
-                        .or_default()
-                        .insert(*real_end_idx, vec![*nid]);
-                }
-                let nxt = possible_ins[0];
-                assert!(
-                    expected_ends
-                        .get(&nxt)
-                        .map_or(true, |x| !x.contains_key(real_end_idx)),
-                    "{:?}",
-                    expected_ends.get(&nxt).and_then(|x| x.get(real_end_idx))
-                );
-                expected_ends
-                    .entry(nxt)
+            possible_ins.extend(g.in_neighbours(*nid));
+            // for the 2nd+ ups, create new paths that start on this node
+            for later_upstream_nodes in possible_ins.iter().skip(1) {
+                in_progress_lines
+                    .entry(*later_upstream_nodes)
                     .or_default()
-                    .insert(*real_end_idx, its_path);
+                    .push(vec![*nid]);
+            }
+
+            if possible_ins.is_empty() {
+                // no upstreams, so finish it.
+                results_to_pop.push((*real_end_idx as i64, line_to_here));
+                continue;
+            } else {
+                // We have >0 upstreams, we've already done something with the 2nd+, so the first
+                // upstream is part of the only line here.
+                let nxt = possible_ins[0];
+                in_progress_lines.entry(nxt).or_default().push(line_to_here);
             }
         }
-        assert!(path.is_some());
-        path
     })
     .map(|(end_idx, path)| {
         segments_spinner.inc(1);
