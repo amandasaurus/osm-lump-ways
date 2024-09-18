@@ -1130,6 +1130,11 @@ fn do_group_by_ends(
             .insert(end_idx as i32, vec![]);
     }
 
+    anyhow::ensure!(
+        !upstream_biggest_end.is_empty(),
+        "The upstream_biggest_ends is empty. Has this not been calculated?"
+    );
+
     let mut nid_end_iter = topologically_sorted_nodes
         .iter()
         .rev()
