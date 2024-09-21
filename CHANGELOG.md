@@ -3,6 +3,8 @@
 ## Unreleased
 
 * Added `--upstream-assign-end-by-tag TAGNAME`.
+* Added `--end_tag TAG` which marks ends, upstreams, and grouped ends with the
+  tag values which go through this end point.
 * Renamed properties in upstream output (when `--group-by-ends`):
     `biggest_end_nid` → `end_nid`
     `biggest_end_upstream_m` → `end_upstream_m`.

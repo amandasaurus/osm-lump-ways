@@ -186,6 +186,16 @@ pub struct Args {
     #[arg(long, value_name = "TAGFILTER", requires = "ends")]
     pub ends_membership: Vec<tagfilter::TagFilter>,
 
+    /// For each end point point, for each way which is included, record the value of this OSM tag
+    /// on that end point as the GeoJSON property `tag:$TAG`. If the upstreams, or grouped
+    /// upstreams are calculated, that will be included in the `end_tag:X` property
+    ///
+    /// e.g. --ends-tag NAME will add the value of the `name` tag from each OSM way which ends at a
+    /// point to that point, and any upstream points. This makes the output in `grouped-ends` more
+    /// human readable.
+    #[arg(long, value_name = "TAG")]
+    pub ends_tag: Vec<String>,
+
     /// Calculate & write a file with each upstream line to this file
     #[arg(long, value_name = "UPSTREAMS_FILENAME")]
     pub upstreams: Option<PathBuf>,

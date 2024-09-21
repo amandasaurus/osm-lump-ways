@@ -198,64 +198,70 @@ fn main() -> Result<()> {
     let g = graph::DirectedGraph2::new();
     let g = Arc::new(Mutex::new(g));
 
+    // Stores the tagvalue group for each segment.
+    // OSM tag vaules are strings, but we don't need to store the strings. We give each string a
+    // unique id (i32) and store that. We don't need to know what the tagvalue for 2 segments is,
+    // we only need to know if they are the same or not.
     // FIXME replace this with a sorted vec, rather than hashmap
-    let mut nid_pair_to_name_group: HashMap<(i64, i64), i32> = HashMap::new();
+    let mut nid_pair_to_endtag_group: HashMap<(i64, i64), i32> = HashMap::new();
+
     if let Some(ref upstream_assign_end_by_tag) = args.upstream_assign_end_by_tag {
         // read all the ways to get a list of which nid pairs are in which name tag
         let rdr = std::fs::File::open(&args.input_filename)?;
         let mut reader = osmio::stringpbf::PBFReader::new(rdr);
-        let name_to_edges = reader
+
+        // Produces a HashMap<tagvalue: String, Vec<(nid1,nid2)>> each unique tagvalue.
+        let tagvalues_to_edges = reader
             .ways()
             .par_bridge()
             .inspect(|_| obj_reader.inc(1))
             .filter(|w| tagfilter::obj_pass_filters(w, &args.tag_filter, &args.tag_filter_func))
             .filter(|w| w.has_tag(upstream_assign_end_by_tag))
             .inspect(|_| ways_added.inc(1))
-            // TODO support grouping by tag value
             .fold(
                 || HashMap::new() as HashMap<String, HashSet<(i64, i64)>>,
-                |mut seen_names, w| {
-                    let seen = seen_names
+                |mut seen_tagvalues, w| {
+                    let seen = seen_tagvalues
                         .entry(w.tag(upstream_assign_end_by_tag).unwrap().to_string())
                         .or_default();
                     for pair in w.nodes().windows(2) {
                         seen.insert((pair[0], pair[1]));
                     }
-                    seen_names
+                    seen_tagvalues
                 },
             )
             .reduce(HashMap::new, |mut a, b| {
-                let mut this_name;
-                for (name, mut pair_set) in b.into_iter() {
-                    this_name = a.entry(name).or_default();
-                    this_name.extend(pair_set.drain());
+                let mut pairs_in_this_value;
+                for (tag_value, mut pair_set) in b.into_iter() {
+                    pairs_in_this_value = a.entry(tag_value).or_default();
+                    pairs_in_this_value.extend(pair_set.drain());
                 }
                 a
             });
-        assert!(name_to_edges.len() < i32::MAX as usize);
+        assert!(tagvalues_to_edges.len() < i32::MAX as usize);
 
-        let total_num_pairs = name_to_edges
+        let total_num_pairs = tagvalues_to_edges
             .par_iter()
-            .map(|(_name, pairs)| pairs.len())
+            .map(|(_tagvalue, pairs)| pairs.len())
             .sum();
-        nid_pair_to_name_group.reserve(total_num_pairs);
+        nid_pair_to_endtag_group.reserve(total_num_pairs);
 
         info!(
             "Have following {} unique '{}' tags in {} node pairs",
-            name_to_edges.len().to_formatted_string(&Locale::en),
+            tagvalues_to_edges.len().to_formatted_string(&Locale::en),
             upstream_assign_end_by_tag,
             total_num_pairs.to_formatted_string(&Locale::en),
         );
-        for (_name, pairs) in name_to_edges.into_iter() {
-            let curr_id = nid_pair_to_name_group.len();
+        for (_tagvalue, pairs) in tagvalues_to_edges.into_iter() {
+            let curr_id = nid_pair_to_endtag_group.len();
             for pair in pairs.into_iter() {
-                nid_pair_to_name_group.insert(pair, curr_id as i32);
+                nid_pair_to_endtag_group.insert(pair, curr_id as i32);
             }
         }
         info!(
             "Total size of the '{}' lookup: {} bytes",
             upstream_assign_end_by_tag,
-            nid_pair_to_name_group
+            nid_pair_to_endtag_group
                 .get_size()
                 .to_formatted_string(&Locale::en)
         );
@@ -622,6 +628,16 @@ fn main() -> Result<()> {
         );
     }
 
+    // Vec, one for each end point (same index as end_points), with the tag values for the ways
+    // which go through there.
+    let mut end_point_tag_values: Vec<smallvec::SmallVec<[Option<String>; 1]>> = Vec::new();
+    if !args.ends_tag.is_empty() {
+        end_point_tag_values.resize(
+            end_points.len(),
+            smallvec::smallvec![None; args.ends_tag.len()],
+        );
+    }
+
     // This is an iterator that returns the total upstream length for all nodes.
     // it keeps track of an intermediate value which is the length of items “further downstream”.
     // It's a function because we want to create it many times.
@@ -686,9 +702,10 @@ fn main() -> Result<()> {
     info_memory_used!();
 
     let end_point_memberships = Arc::new(std::sync::RwLock::new(end_point_memberships));
+    let end_point_tag_values = Arc::new(std::sync::RwLock::new(end_point_tag_values));
 
-    if !ends_membership_filters.is_empty() {
-        info!("Rereading file to add memberships for ends");
+    if !ends_membership_filters.is_empty() || !args.ends_tag.is_empty() {
+        info!("Rereading file to add memberships, or tag values, for ends");
         info!(
             "Adding the following {} attributes for each end: {}",
             ends_membership_filters.len(),
@@ -704,35 +721,73 @@ fn main() -> Result<()> {
             .ways()
             // ↑ all the ways
             .par_bridge()
-            .filter(|w| tagfilter::obj_pass_filters(w, &ends_membership_filters, &None))
-            // ↑ .. which match at least one end-membership filter
+            //
+            // ↓ .. which match at least one end-membership filter, or match the regular tag
+            // filter, and have a desired tag
+            .filter(|w| {
+                tagfilter::obj_pass_filters(w, &ends_membership_filters, &None)
+                    || (tagfilter::obj_pass_filters(w, &args.tag_filter, &args.tag_filter_func)
+                        && args.ends_tag.iter().any(|end_tag| w.has_tag(end_tag)))
+            })
+            //
+            // ↓ .. which have at least one node in the end points
             .filter(|w| {
                 w.nodes()
                     .iter()
                     .any(|nid| end_points.binary_search(nid).is_ok())
             })
-            // ↑ .. which have at least one node in the end points
-            .for_each_with(end_point_memberships.clone(), |end_point_memberships, w| {
-                let filter_results = ends_membership_filters
-                    .iter()
-                    .map(|f| f.filter(&w))
-                    .collect::<SmallVec<[bool; 2]>>();
-                for end_point_idx in w
-                    .nodes()
-                    .iter()
-                    .filter_map(|nid| end_points.binary_search(nid).ok())
-                {
-                    let mut curr_mbmrs_all = end_point_memberships.write().unwrap();
-                    let curr_mbmrs = curr_mbmrs_all.get_mut(end_point_idx).unwrap();
-                    for (new, old) in filter_results.iter().zip(curr_mbmrs.iter_mut()) {
-                        *old |= new;
+            .for_each_with(
+                (end_point_memberships.clone(), end_point_tag_values.clone()),
+                |(end_point_memberships, end_point_tag_values), w| {
+                    let filter_results = ends_membership_filters
+                        .iter()
+                        .map(|f| f.filter(&w))
+                        .collect::<SmallVec<[bool; 2]>>();
+                    for end_point_idx in w
+                        .nodes()
+                        .iter()
+                        .filter_map(|nid| end_points.binary_search(nid).ok())
+                    {
+                        let mut curr_mbmrs_all = end_point_memberships.write().unwrap();
+                        if !curr_mbmrs_all.is_empty() {
+                            let curr_mbmrs = curr_mbmrs_all.get_mut(end_point_idx).unwrap();
+                            for (new, old) in filter_results.iter().zip(curr_mbmrs.iter_mut()) {
+                                *old |= new;
+                            }
+                        }
+
+                        let mut curr_tags_all = end_point_tag_values.write().unwrap();
+                        if !curr_tags_all.is_empty() {
+                            let curr_tags = curr_tags_all.get_mut(end_point_idx).unwrap();
+                            for (tag_key, tag_value) in
+                                args.ends_tag.iter().zip(curr_tags.iter_mut())
+                            {
+                                if let Some(val) = w.tag(tag_key) {
+                                    *tag_value = match tag_value {
+                                        None => Some(val.to_string()),
+                                        // There are mulitple ways that go through here, so join
+                                        // do semicolon style concatination.
+                                        Some(old_val) => Some(format!("{};{}", old_val, val)),
+                                    }
+                                }
+                            }
+                        }
                     }
-                }
-            });
+                },
+            );
+    }
+    let end_point_memberships = Arc::try_unwrap(end_point_memberships)
+        .unwrap()
+        .into_inner()
+        .unwrap();
+    let end_point_tag_values = Arc::try_unwrap(end_point_tag_values)
+        .unwrap()
+        .into_inner()
+        .unwrap();
+
+    if !end_point_memberships.is_empty() {
         // How many have ≥1 true value (versus all default of false)
         let num_nodes_attributed = end_point_memberships
-            .read()
-            .unwrap()
             .par_iter()
             .filter(|membs| membs.par_iter().any(|m| *m))
             .count();
@@ -747,12 +802,10 @@ fn main() -> Result<()> {
             );
         }
     }
-    let end_point_memberships = Arc::try_unwrap(end_point_memberships)
-        .unwrap()
-        .into_inner()
-        .unwrap();
 
-    let empty_smallvec = smallvec::smallvec![];
+    // needed for default values later
+    let empty_smallvec_bool = smallvec::smallvec![];
+    let empty_smallvec_str = smallvec::smallvec![];
 
     if let Some(ref ends_filename) = args.ends {
         let end_points_output = end_points
@@ -762,12 +815,21 @@ fn main() -> Result<()> {
                 // anything. using chain(repeat(…)) to always give something
                 end_point_memberships
                     .iter()
-                    .chain(std::iter::repeat(&empty_smallvec)),
+                    .chain(std::iter::repeat(&empty_smallvec_bool)),
+            )
+            .zip(
+                end_point_tag_values
+                    .iter()
+                    .chain(std::iter::repeat(&empty_smallvec_str)),
             )
             .zip(end_point_upstreams.iter())
-            .filter(|((_nid, _mbms), len)| args.min_upstream_m.map_or(true, |min| *len >= &min))
-            .map(|((nid, mbms), len)| (nid, mbms, len, nodeid_pos.get(nid).unwrap()))
-            .map(|(nid, mbms, len, pos)| {
+            .filter(|(((_nid, _mbms), _end_tgs), len)| {
+                args.min_upstream_m.map_or(true, |min| *len >= &min)
+            })
+            .map(|(((nid, mbms), end_tags), len)| {
+                (nid, mbms, end_tags, len, nodeid_pos.get(nid).unwrap())
+            })
+            .map(|(nid, mbms, end_tags, len, pos)| {
                 // Round the upstream to only output 1 decimal place
                 let mut props = serde_json::json!({"upstream_m": round(len, 1), "nid": nid});
                 if !ends_membership_filters.is_empty() {
@@ -775,6 +837,11 @@ fn main() -> Result<()> {
                         props[format!("is_in:{}", end_attr_filter)] = (*res).into();
                     }
                     props["is_in_count"] = mbms.iter().filter(|m| **m).count().into();
+                }
+                if !args.ends_tag.is_empty() {
+                    for (tag_key, tag_value) in args.ends_tag.iter().zip(end_tags.into_iter()) {
+                        props[format!("tag:{}", tag_key)] = tag_value.clone().into();
+                    }
                 }
                 (props, pos)
             });
@@ -802,6 +869,8 @@ fn main() -> Result<()> {
     // We store the index as a i32 to save space. We assume we will have <2³² end points
     // -1 = no known end point (yet).
     // (biggest end point = end point with the largest upstream value)
+    // NB: This is a top level variable (for scoping reasons), but remains empty if we're not doing
+    // anything
     // TODO replace this with nonzerou32
     let mut upstream_assigned_end: Vec<i32> = Vec::new();
 
@@ -844,7 +913,8 @@ fn main() -> Result<()> {
         // based on the name, bool=false → assignemnt is based on largest end
         let mut tmp_biggest_end: HashMap<i64, (bool, i32)> = HashMap::new();
 
-        // Doing topologically_sorted_nodes in reverse, means we are “walking upstream”. We will
+        // Doing topologically_sorted_nodes in reverse, means we are “walking upstream”. This
+        // ensures we visit an end point before we visit any node upstream of it.
         for (nid_idx, &nid) in topologically_sorted_nodes.iter().enumerate().rev() {
             // if this node is an end point then save that
             // otherwise, use the value from the cache
@@ -856,19 +926,16 @@ fn main() -> Result<()> {
                 .unwrap();
             upstream_assigned_end[nid_idx] = curr_biggest;
 
-            // FIXME Currently it assigns, to this node, the end which has the largest inflow.
-            // FIXME change to follow the name tag of the vertexes
-
             let downstream_nid_opt = g.out_neighbours(nid).next();
             if g.out_neighbours(nid).count() == 1
-                && nid_pair_to_name_group.contains_key(&(nid, downstream_nid_opt.unwrap()))
+                && nid_pair_to_endtag_group.contains_key(&(nid, downstream_nid_opt.unwrap()))
             {
-                let name_id = nid_pair_to_name_group
+                let name_id = nid_pair_to_endtag_group
                     .get(&(nid, downstream_nid_opt.unwrap()))
                     .unwrap();
                 // This node (nid) has 1 outgoing vertex, which has name name_id
                 for upper in g.in_neighbours(nid) {
-                    if nid_pair_to_name_group.get(&(upper, nid)) == Some(name_id) {
+                    if nid_pair_to_endtag_group.get(&(upper, nid)) == Some(name_id) {
                         // The vertex from upper to nid, also has the same name.
                         // assign upper to this end, regardless of which is bigger
                         tmp_biggest_end.insert(upper, (true, curr_biggest));
@@ -924,6 +991,8 @@ fn main() -> Result<()> {
             &end_point_upstreams,
             &upstream_assigned_end,
             &nodeid_pos,
+            &end_point_tag_values,
+            &args.ends_tag,
         )?;
     }
 
@@ -954,6 +1023,16 @@ fn main() -> Result<()> {
                     let end_idx: usize = upstream_assigned_end[from_nid_idx] as usize;
                     props["end_upstream_m"] = round(&end_point_upstreams[end_idx], 1).into();
                     props["end_nid"] = end_points[end_idx].into();
+
+                    for (tag_key, tag_value) in args
+                        .ends_tag
+                        .iter()
+                        .zip(end_point_tag_values[end_idx].iter())
+                    {
+                        if let Some(tag_value) = tag_value {
+                            props[format!("end_tag:{}", tag_key)] = tag_value.clone().into();
+                        }
+                    }
                 } else if args.upstream_output_ends_full {
                     todo!();
                     //let ends = upstream_ends_full.get(&from_nid).unwrap();
@@ -1012,6 +1091,10 @@ fn main() -> Result<()> {
             for mult in args.upstream_from_upstream_multiple.iter() {
                 csv_columns.push(format!("from_upstream_m_{}", mult));
             }
+            if !args.ends_tag.is_empty() {
+                warn!("Adding the end tag values has not been implemented for CSV files yet.");
+            }
+
             num_written = write_csv_features_directly(lines, &mut f, &csv_columns)?;
         } else {
             anyhow::bail!("Unsupported output format");
@@ -1238,6 +1321,8 @@ fn do_group_by_ends(
     end_point_upstreams: &[f64],
     upstream_biggest_end: &[i32],
     nodeid_pos: &impl NodeIdPosition,
+    end_point_tag_values: &[SmallVec<[Option<String>; 1]>],
+    ends_tags: &[String],
 ) -> Result<()> {
     let started = Instant::now();
     let nodes_bar = progress_bars.add(
@@ -1347,10 +1432,18 @@ fn do_group_by_ends(
             .into_iter()
             .map(|nid| nodeid_pos.get(&nid).unwrap())
             .collect::<Vec<_>>();
-        let props = serde_json::json!({
+        let mut props = serde_json::json!({
             "end_nid": end_points[end_idx as usize],
             "end_upstream_m": round(&end_point_upstreams[end_idx as usize], 1),
         });
+        for (tag_key, tag_value) in ends_tags
+            .iter()
+            .zip(end_point_tag_values[end_idx as usize].iter())
+        {
+            if let Some(tag_value) = tag_value {
+                props[format!("end_tag:{}", tag_key)] = tag_value.clone().into();
+            }
+        }
         (props, points)
     });
 
