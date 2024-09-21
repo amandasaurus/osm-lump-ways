@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+* Added `--upstream-assign-end-by-tag TAGNAME`.
+* Changed upstream (when `--group-by-ends`) the `biggest_end_nid` &
+  `biggest_end_upstream_m` to just `end_nid`, `end_upstream_m`.
 * Fix bug in group by ends, where some little segments were being dropped.
 
 ## v1.4.0 (2024-09-16)

@@ -159,7 +159,9 @@ direction of the OSM way, to produce many different output files.
 
 ## Output files
 
-### `loops`
+It can output different files, depending on the options:
+
+### `--loops FILENAME`
 
 Cycles in the network. Each is a [strongly connected
 component](https://en.wikipedia.org/wiki/Strongly_connected_component), and `MultiLineString`.
@@ -193,18 +195,31 @@ See the doc comment
 [`src/bin/osm-lump-ways-down/cli_args.rs`](./blob/main/src/bin/osm-lump-ways-down/cli_args.rs#L158-L171),
 or run `osm-lump-ways-down --help` for the format.
 
-### `upstreams`
+### `--upstreams FILENAME`
 
 Each way segment (a 2 point `LineString`) with the upstream data.
+With `--upstream-output-ends-full`, each segement get information about all the end
+point(s) that the segment eventually flows into.
 
-with `--upstream-tag-ends`, each segement get information about the end
-point(s) for that segment.
+#### Assigning to an end point
 
-### `upstreams-points`
+With `--upstream-outpout-biggest-end`, each segment will be assigned to the end
+point that it flows into which has the largest total outflow value.
 
-Above, but just the first point. Each feature a Point.
+With `--upstream-assign-end-by-tag TAG`, it will attempt to follow the same OSM
+tag upstream from an end point. When used with the `name` tag, this usually
+produces maps that are more like what people expect.
 
-### `ends`
+### `--grouped\_ends FILENAME`
+
+Ways grouped by downhill and the end point they flow into. The upstream value
+of each segment isn't included, and it attemptes to generate long LineStrings,
+grouped by the end point that it flows into.
+
+See the `--upstream-outpout-biggest-end` & `--upstream-assign-end-by-tag TAG`
+arguments.
+
+### `--ends FILENAME`
 
 Points where waterways end.
 

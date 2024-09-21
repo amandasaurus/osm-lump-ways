@@ -94,8 +94,6 @@ fn main() -> Result<()> {
     );
     let rdr = input_bar.wrap_read(input_fp);
 
-    let mut reader = osmio::stringpbf::PBFReader::new(rdr);
-
     if !args.input_filename.is_file() {
         error!(
             "Input file ( {} ) is not a file we can read",
@@ -111,9 +109,16 @@ fn main() -> Result<()> {
         args.ends.is_some()
             || args.loops.is_some()
             || args.upstreams.is_some()
-            || args.group_by_ends,
+            || args.grouped_ends.is_some(),
         "Nothing to do. You need to specifiy one of --ends/--loops/--upstreams/etc."
     );
+
+    if args.grouped_ends.is_some()
+        && !(args.upstream_output_biggest_end || args.upstream_assign_end_by_tag.is_some())
+    {
+        error!("If you have upstreams which are grouped by ends, you must specificy one of --upstream-output-biggest-end or --upstream-assign-end-by-tag TAG");
+        anyhow::bail!("If you have upstreams which are grouped by ends, you must specificy one of --upstream-output-biggest-end or --upstream-assign-end-by-tag TAG");
+    }
 
     info!("Input file: {:?}", &args.input_filename);
     if args.tag_filter.is_empty() {
@@ -193,10 +198,73 @@ fn main() -> Result<()> {
     let g = graph::DirectedGraph2::new();
     let g = Arc::new(Mutex::new(g));
 
-    let latest_timestamp = AtomicI64::new(0);
+    // FIXME replace this with a sorted vec, rather than hashmap
+    let mut nid_pair_to_name_group: HashMap<(i64, i64), i32> = HashMap::new();
+    if let Some(ref upstream_assign_end_by_tag) = args.upstream_assign_end_by_tag {
+        // read all the ways to get a list of which nid pairs are in which name tag
+        let rdr = std::fs::File::open(&args.input_filename)?;
+        let mut reader = osmio::stringpbf::PBFReader::new(rdr);
+        let name_to_edges = reader
+            .ways()
+            .par_bridge()
+            .inspect(|_| obj_reader.inc(1))
+            .filter(|w| tagfilter::obj_pass_filters(w, &args.tag_filter, &args.tag_filter_func))
+            .filter(|w| w.has_tag(upstream_assign_end_by_tag))
+            .inspect(|_| ways_added.inc(1))
+            // TODO support grouping by tag value
+            .fold(
+                || HashMap::new() as HashMap<String, HashSet<(i64, i64)>>,
+                |mut seen_names, w| {
+                    let seen = seen_names
+                        .entry(w.tag(upstream_assign_end_by_tag).unwrap().to_string())
+                        .or_default();
+                    for pair in w.nodes().windows(2) {
+                        seen.insert((pair[0], pair[1]));
+                    }
+                    seen_names
+                },
+            )
+            .reduce(HashMap::new, |mut a, b| {
+                let mut this_name;
+                for (name, mut pair_set) in b.into_iter() {
+                    this_name = a.entry(name).or_default();
+                    this_name.extend(pair_set.drain());
+                }
+                a
+            });
+        assert!(name_to_edges.len() < i32::MAX as usize);
+
+        let total_num_pairs = name_to_edges
+            .par_iter()
+            .map(|(_name, pairs)| pairs.len())
+            .sum();
+        nid_pair_to_name_group.reserve(total_num_pairs);
+
+        info!(
+            "Have following {} unique '{}' tags in {} node pairs",
+            name_to_edges.len().to_formatted_string(&Locale::en),
+            upstream_assign_end_by_tag,
+            total_num_pairs.to_formatted_string(&Locale::en),
+        );
+        for (_name, pairs) in name_to_edges.into_iter() {
+            let curr_id = nid_pair_to_name_group.len();
+            for pair in pairs.into_iter() {
+                nid_pair_to_name_group.insert(pair, curr_id as i32);
+            }
+        }
+        info!(
+            "Total size of the '{}' lookup: {} bytes",
+            upstream_assign_end_by_tag,
+            nid_pair_to_name_group
+                .get_size()
+                .to_formatted_string(&Locale::en)
+        );
+    }
 
     // first step, get all the cycles
+    let latest_timestamp = AtomicI64::new(0);
     let start_reading_ways = Instant::now();
+    let mut reader = osmio::stringpbf::PBFReader::new(rdr);
     reader
         .ways()
         .par_bridge()
@@ -442,7 +510,7 @@ fn main() -> Result<()> {
         }
     }
 
-    if args.ends.is_none() && args.upstreams.is_none() && !args.group_by_ends {
+    if args.ends.is_none() && args.upstreams.is_none() && args.grouped_ends.is_none() {
         // nothing else to do
         return Ok(());
     }
@@ -569,6 +637,8 @@ fn main() -> Result<()> {
             |tmp_upstream_length, (nid_idx, nid)| {
                 let curr_upstream = tmp_upstream_length.remove(&nid).unwrap_or(0.);
 
+                // FIXME rather than split the upstream value equally between all out-edges, look
+                // at the name tag (cf nid_pair_to_name_group)
                 let num_outs = g.out_neighbours(nid).count() as f64;
                 let per_downstream = curr_upstream / num_outs;
                 let curr_pos = nodeid_pos.get(&nid).unwrap();
@@ -733,10 +803,10 @@ fn main() -> Result<()> {
     // -1 = no known end point (yet).
     // (biggest end point = end point with the largest upstream value)
     // TODO replace this with nonzerou32
-    let mut upstream_biggest_end: Vec<i32> = Vec::new();
+    let mut upstream_assigned_end: Vec<i32> = Vec::new();
 
-    if args.upstream_tag_biggest_end {
-        upstream_biggest_end.resize(topologically_sorted_nodes.len(), -1);
+    if args.upstream_output_biggest_end {
+        upstream_assigned_end.resize(topologically_sorted_nodes.len(), -1);
 
         // this is a cache of values as we walk upstream
         let mut tmp_biggest_end: HashMap<i64, i32> = HashMap::new();
@@ -747,7 +817,7 @@ fn main() -> Result<()> {
             // otherwise, use the value from the cache
             let this_end_idx = end_points.binary_search(&nid).ok().map(|i| i as i32);
             let curr_biggest = tmp_biggest_end.remove(&nid).or(this_end_idx).unwrap();
-            upstream_biggest_end[nid_idx] = curr_biggest;
+            upstream_assigned_end[nid_idx] = curr_biggest;
 
             for upper in g.in_neighbours(nid) {
                 tmp_biggest_end
@@ -765,121 +835,193 @@ fn main() -> Result<()> {
                     .or_insert(curr_biggest);
             }
         }
+    } else if args.upstream_assign_end_by_tag.is_some() {
+        upstream_assigned_end.resize(topologically_sorted_nodes.len(), -1);
+
+        // this is a cache of values as we walk upstream
+        // key: i64 = the node id
+        // value: (bool, i32), i32 is the endidx for the best guess. bool=true → this assignment is
+        // based on the name, bool=false → assignemnt is based on largest end
+        let mut tmp_biggest_end: HashMap<i64, (bool, i32)> = HashMap::new();
+
+        // Doing topologically_sorted_nodes in reverse, means we are “walking upstream”. We will
+        for (nid_idx, &nid) in topologically_sorted_nodes.iter().enumerate().rev() {
+            // if this node is an end point then save that
+            // otherwise, use the value from the cache
+            let this_end_idx = end_points.binary_search(&nid).ok().map(|i| i as i32);
+            let curr_biggest = tmp_biggest_end
+                .remove(&nid)
+                .map(|(_, i)| i)
+                .or(this_end_idx)
+                .unwrap();
+            upstream_assigned_end[nid_idx] = curr_biggest;
+
+            // FIXME Currently it assigns, to this node, the end which has the largest inflow.
+            // FIXME change to follow the name tag of the vertexes
+
+            let downstream_nid_opt = g.out_neighbours(nid).next();
+            if g.out_neighbours(nid).count() == 1
+                && nid_pair_to_name_group.contains_key(&(nid, downstream_nid_opt.unwrap()))
+            {
+                let name_id = nid_pair_to_name_group
+                    .get(&(nid, downstream_nid_opt.unwrap()))
+                    .unwrap();
+                // This node (nid) has 1 outgoing vertex, which has name name_id
+                for upper in g.in_neighbours(nid) {
+                    if nid_pair_to_name_group.get(&(upper, nid)) == Some(name_id) {
+                        // The vertex from upper to nid, also has the same name.
+                        // assign upper to this end, regardless of which is bigger
+                        tmp_biggest_end.insert(upper, (true, curr_biggest));
+                    } else {
+                        // assign only if this is bigger
+                        tmp_biggest_end
+                            .entry(upper)
+                            .and_modify(|(prev_is_name_based, prev_biggest_end_idx)| {
+                                // Only set the value if the previous value wasn't based on names
+                                if !*prev_is_name_based {
+                                    // for all nodes which are one step upstream of this node, check the
+                                    // previously calcualted best and update if needed.
+                                    if end_point_upstreams[*prev_biggest_end_idx as usize]
+                                        < end_point_upstreams[curr_biggest as usize]
+                                    {
+                                        *prev_biggest_end_idx = curr_biggest;
+                                    }
+                                }
+                            })
+                            // or just store this end point.
+                            .or_insert((false, curr_biggest));
+                    }
+                }
+            } else {
+                for upper in g.in_neighbours(nid) {
+                    tmp_biggest_end
+                        .entry(upper)
+                        .and_modify(|(_prev_is_name_based, prev_biggest_end_idx)| {
+                            // for all nodes which are one step upstream of this node, check the
+                            // previously calcualted best and update if needed.
+                            if end_point_upstreams[*prev_biggest_end_idx as usize]
+                                < end_point_upstreams[curr_biggest as usize]
+                            {
+                                *prev_biggest_end_idx = curr_biggest;
+                            }
+                        })
+                        // or just store this end point.
+                        .or_insert((false, curr_biggest));
+                }
+            }
+        }
     }
-    assert!(upstream_biggest_end.par_iter().all(|end| *end >= 0));
+    assert!(upstream_assigned_end.par_iter().all(|end| *end >= 0));
+
+    if let Some(ref grouped_ends) = args.grouped_ends {
+        do_group_by_ends(
+            grouped_ends,
+            &g,
+            &progress_bars,
+            &style,
+            &end_points,
+            &topologically_sorted_nodes,
+            &end_point_upstreams,
+            &upstream_assigned_end,
+            &nodeid_pos,
+        )?;
+    }
 
     if let Some(ref upstream_filename) = args.upstreams {
-        debug!("Writing upstreams");
-
-        if args.group_by_ends {
-            do_group_by_ends(
-                args.clone(),
-                &g,
-                &progress_bars,
-                &style,
-                &end_points,
-                &topologically_sorted_nodes,
-                &end_point_upstreams,
-                &upstream_biggest_end,
-                &nodeid_pos,
-            )?;
-        } else {
-            // we loop over all nodes in topologically_sorted_nodes (which is annotated in
-            // upstream_length_iter with the upstream value) and flat_map that into each line segment
-            // that goes out of that.
-            let lines = upstream_length_iter()
-                .filter(|(_from_nid_idx, _from_nid, upstream_m)| {
-                    args.min_upstream_m.map_or(true, |min| *upstream_m >= min)
-                })
-                .flat_map(|(from_nid_idx, from_nid, upstream_len)| {
-                    g.out_neighbours(from_nid)
-                        .map(move |to_nid| (from_nid_idx, from_nid, to_nid, upstream_len))
-                })
-                .map(|(from_nid_idx, from_nid, to_nid, upstream_len)| {
-                    // Round the upstream to only output 1 decimal place
-                    let mut props = serde_json::json!({
-                        "from_upstream_m": round(&upstream_len, 1),
-                    });
-
-                    for mult in args.upstream_from_upstream_multiple.iter() {
-                        props[format!("from_upstream_m_{}", mult)] =
-                            round_mult(&upstream_len, *mult).into();
-                    }
-
-                    if args.upstream_tag_biggest_end {
-                        let biggest_end_idx: usize = upstream_biggest_end[from_nid_idx] as usize;
-                        props["biggest_end_upstream_m"] =
-                            round(&end_point_upstreams[biggest_end_idx], 1).into();
-                        props["biggest_end_nid"] = end_points[biggest_end_idx].into();
-                    } else if args.upstream_tag_ends_full {
-                        todo!();
-                        //let ends = upstream_ends_full.get(&from_nid).unwrap();
-                        //props["num_ends"] = ends.len().into();
-                        //props["ends"] = ends.iter().copied().collect::<Vec<i64>>().into();
-                        //let mut ends_strs = vec![",".to_string()];
-                        //let mut this_len;
-                        //let mut biggest_end = (upstream_length.get(&ends[0]).unwrap(), ends[0]);
-                        //for end in ends {
-                        //    ends_strs.push(end.to_string());
-                        //    ends_strs.push(",".to_string());
-                        //    this_len = upstream_length.get(&ends[0]).unwrap();
-                        //    if this_len > biggest_end.0 {
-                        //        biggest_end = (this_len, *end);
-                        //    }
-                        //}
-                        //props["ends_s"] = ends_strs.join("").into();
-                        //props["biggest_end_upstream_m"] = round(biggest_end.0, 1).into();
-                        //props["biggest_end_nid"] = biggest_end.1.into();
-                    }
-
-                    (
-                        props,
-                        (
-                            nodeid_pos.get(&from_nid).unwrap(),
-                            nodeid_pos.get(&to_nid).unwrap(),
-                        ),
-                    )
+        // we loop over all nodes in topologically_sorted_nodes (which is annotated in
+        // upstream_length_iter with the upstream value) and flat_map that into each line segment
+        // that goes out of that.
+        let lines = upstream_length_iter()
+            .filter(|(_from_nid_idx, _from_nid, upstream_m)| {
+                args.min_upstream_m.map_or(true, |min| *upstream_m >= min)
+            })
+            .flat_map(|(from_nid_idx, from_nid, upstream_len)| {
+                g.out_neighbours(from_nid)
+                    .map(move |to_nid| (from_nid_idx, from_nid, to_nid, upstream_len))
+            })
+            .map(|(from_nid_idx, from_nid, to_nid, upstream_len)| {
+                // Round the upstream to only output 1 decimal place
+                let mut props = serde_json::json!({
+                    "from_upstream_m": round(&upstream_len, 1),
                 });
-            info_memory_used!();
 
-            let writing_upstreams_bar = progress_bars.add(
-                ProgressBar::new(g.num_edges() as u64)
-                    .with_message("Writing upstreams geojson(s) file")
-                    .with_style(style.clone()),
-            );
-
-            let lines = lines.progress_with(writing_upstreams_bar);
-
-            let mut f = std::io::BufWriter::new(std::fs::File::create(upstream_filename)?);
-
-            let num_written;
-            if upstream_filename.extension().unwrap() == "geojsons"
-                || upstream_filename.extension().unwrap() == "geojson"
-            {
-                num_written = write_geojson_features_directly(
-                    lines,
-                    &mut f,
-                    &fileio::format_for_filename(upstream_filename),
-                )?;
-            } else if upstream_filename.extension().unwrap() == "csv" {
-                let mut csv_columns = vec!["from_upstream_m".to_string()];
-                if args.upstream_tag_biggest_end {
-                    csv_columns.push("biggest_end_nid".to_string());
-                }
                 for mult in args.upstream_from_upstream_multiple.iter() {
-                    csv_columns.push(format!("from_upstream_m_{}", mult));
+                    props[format!("from_upstream_m_{}", mult)] =
+                        round_mult(&upstream_len, *mult).into();
                 }
-                num_written = write_csv_features_directly(lines, &mut f, &csv_columns)?;
-            } else {
-                anyhow::bail!("Unsupported output format");
-            }
 
-            info!(
-                "Wrote {} features to output file {}",
-                num_written.to_formatted_string(&Locale::en),
-                upstream_filename.display(),
-            );
+                if upstream_assigned_end.len() >= from_nid_idx {
+                    let end_idx: usize = upstream_assigned_end[from_nid_idx] as usize;
+                    props["end_upstream_m"] = round(&end_point_upstreams[end_idx], 1).into();
+                    props["end_nid"] = end_points[end_idx].into();
+                } else if args.upstream_output_ends_full {
+                    todo!();
+                    //let ends = upstream_ends_full.get(&from_nid).unwrap();
+                    //props["num_ends"] = ends.len().into();
+                    //props["ends"] = ends.iter().copied().collect::<Vec<i64>>().into();
+                    //let mut ends_strs = vec![",".to_string()];
+                    //let mut this_len;
+                    //let mut biggest_end = (upstream_length.get(&ends[0]).unwrap(), ends[0]);
+                    //for end in ends {
+                    //    ends_strs.push(end.to_string());
+                    //    ends_strs.push(",".to_string());
+                    //    this_len = upstream_length.get(&ends[0]).unwrap();
+                    //    if this_len > biggest_end.0 {
+                    //        biggest_end = (this_len, *end);
+                    //    }
+                    //}
+                    //props["ends_s"] = ends_strs.join("").into();
+                    //props["biggest_end_upstream_m"] = round(biggest_end.0, 1).into();
+                    //props["biggest_end_nid"] = biggest_end.1.into();
+                }
+
+                (
+                    props,
+                    (
+                        nodeid_pos.get(&from_nid).unwrap(),
+                        nodeid_pos.get(&to_nid).unwrap(),
+                    ),
+                )
+            });
+        info_memory_used!();
+
+        let writing_upstreams_bar = progress_bars.add(
+            ProgressBar::new(g.num_edges() as u64)
+                .with_message("Writing upstreams geojson(s) file")
+                .with_style(style.clone()),
+        );
+
+        let lines = lines.progress_with(writing_upstreams_bar);
+
+        let mut f = std::io::BufWriter::new(std::fs::File::create(upstream_filename)?);
+
+        let num_written;
+        if upstream_filename.extension().unwrap() == "geojsons"
+            || upstream_filename.extension().unwrap() == "geojson"
+        {
+            num_written = write_geojson_features_directly(
+                lines,
+                &mut f,
+                &fileio::format_for_filename(upstream_filename),
+            )?;
+        } else if upstream_filename.extension().unwrap() == "csv" {
+            let mut csv_columns = vec!["from_upstream_m".to_string()];
+            if args.upstream_output_biggest_end {
+                csv_columns.push("biggest_end_nid".to_string());
+            }
+            for mult in args.upstream_from_upstream_multiple.iter() {
+                csv_columns.push(format!("from_upstream_m_{}", mult));
+            }
+            num_written = write_csv_features_directly(lines, &mut f, &csv_columns)?;
+        } else {
+            anyhow::bail!("Unsupported output format");
         }
+
+        info!(
+            "Wrote {} features to output file {}",
+            num_written.to_formatted_string(&Locale::en),
+            upstream_filename.display(),
+        );
     }
 
     info!(
@@ -1087,7 +1229,7 @@ where
 
 #[allow(clippy::too_many_arguments)]
 fn do_group_by_ends(
-    args: cli_args::Args,
+    output_filename: &Path,
     g: &graph::DirectedGraph2,
     progress_bars: &MultiProgress,
     style: &ProgressStyle,
@@ -1115,6 +1257,15 @@ fn do_group_by_ends(
         "The upstream_biggest_ends is empty. Has this not been calculated?"
     );
 
+    anyhow::ensure!(
+        !upstream_biggest_end.is_empty(),
+        "The upstream_biggest_ends is empty. Has this not been calculated?"
+    );
+    anyhow::ensure!(
+        upstream_biggest_end.len() == topologically_sorted_nodes.len(),
+        "Lengths not equal, something will be lost"
+    );
+
     let mut nid_end_iter = topologically_sorted_nodes
         .iter()
         .rev()
@@ -1123,6 +1274,7 @@ fn do_group_by_ends(
     let mut possible_ins: SmallVec<[i64; 5]> = smallvec::smallvec![];
     let mut results_to_pop: SmallVec<[(i64, Vec<i64>); 3]> = smallvec::smallvec![];
 
+    // Iterator that yields (end_node_id, and a path of nids which end in this nid)
     let upstreams_grouped_by_end = std::iter::from_fn(|| {
         // ↓ This code definitly does too many allocations (incl. for Vec's) and could be optimised
         loop {
@@ -1196,31 +1348,32 @@ fn do_group_by_ends(
             .map(|nid| nodeid_pos.get(&nid).unwrap())
             .collect::<Vec<_>>();
         let props = serde_json::json!({
-            "biggest_end_nid": end_points[end_idx as usize],
-            "biggest_end_upstream_m": round(&end_point_upstreams[end_idx as usize], 1),
+            "end_nid": end_points[end_idx as usize],
+            "end_upstream_m": round(&end_point_upstreams[end_idx as usize], 1),
         });
         (props, points)
     });
 
-    let output_filename = args.upstreams.clone().unwrap();
-    let output_format = fileio::format_for_filename(&output_filename);
-    let mut f = BufWriter::new(File::create(&output_filename)?);
+    let output_format = fileio::format_for_filename(output_filename);
+    let mut f = BufWriter::new(File::create(output_filename)?);
     let (send, recv) = std::sync::mpsc::channel();
 
     std::thread::spawn({
         move || {
-            let _num_written =
+            let _total_written =
                 write_geojson_features_directly(recv.iter(), &mut f, &output_format).unwrap();
         }
     });
+    let mut num_written = 0;
     for val in upstreams_grouped_by_end {
         send.send(val).unwrap();
+        num_written += 1;
     }
 
     let grouping_duration = started.elapsed();
     info!(
-        "Wrote end-grouped-features to output file {} in {}. {:.3e} nodes/sec",
-        //num_written.to_formatted_string(&Locale::en),
+        "Wrote {} end-grouped-features to output file {} in {}. {:.3e} nodes/sec",
+        num_written.to_formatted_string(&Locale::en),
         output_filename.to_str().unwrap(),
         formatting::format_duration(grouping_duration),
         (topologically_sorted_nodes.len() as f64) / grouping_duration.as_secs_f64(),

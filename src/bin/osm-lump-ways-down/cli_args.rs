@@ -192,24 +192,34 @@ pub struct Args {
 
     /// For every upstream, include details on which end point(s) this eventually flows to.
     #[arg(long, default_value = "false")]
-    pub upstream_tag_ends_full: bool,
+    pub upstream_output_ends_full: bool,
 
     /// For every upstream, include details on the largest end that this point flows to.
-    /// Less details on other ends than upstream_tag_ends_full, but requires less memory to
+    /// Less details on other ends than upstream_output_ends_full, but requires less memory to
     /// process.
     #[arg(
         long,
         default_value = "false",
-        conflicts_with = "upstream_tag_ends_full"
+      conflicts_with_all=["upstream_output_ends_full", "upstream_assign_end_by_tag"],
     )]
-    pub upstream_tag_biggest_end: bool,
+    pub upstream_output_biggest_end: bool,
 
-    /// Write the group
-    #[arg(long, default_value = "false", requires = "upstream_tag_biggest_end")]
-    pub group_by_ends: bool,
+    /// Assign lines to an end which matches the value of this OSM tag
+    #[arg(long,
+          conflicts_with_all=["upstream_assign_ends_full", "upstream_output_biggest_end"],
+    )]
+    pub upstream_assign_end_by_tag: Option<String>,
+
+    /// Calculate and write ways which are based on which end point each line eventually flows
+    /// into, based on the `upstream_assign_end_by_tag` or `upstream_output_biggest_end` (for
+    /// biggest end).
+    #[arg(long)]
+    pub grouped_ends: Option<PathBuf>,
 
     /// Include an extra property from_upstream_m_N for every occurance of this argument, with the
     /// from_upstream_m value rounded to the nearest multiple of N.
+    /// e.g. `--upstream-from-upstream-multiple 100` will cause `from_upstream_m_100` value to be
+    /// the `upstream_m` value, but rounded to the nearest multiple of 100.
     #[arg(long, requires = "upstreams")]
     pub upstream_from_upstream_multiple: Vec<i64>,
 
