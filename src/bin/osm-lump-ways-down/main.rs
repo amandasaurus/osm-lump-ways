@@ -1250,7 +1250,7 @@ fn do_group_by_ends(
             ProgressStyle::with_template("       {human_pos} segments output").unwrap(),
         ));
 
-    let mut in_progress_lines: HashMap<i64, Vec<Vec<i64>>> = HashMap::new();
+    let mut in_progress_lines: HashMap<i64, SmallVec<[Vec<i64>; 2]>> = HashMap::new();
 
     anyhow::ensure!(
         !upstream_biggest_end.is_empty(),
