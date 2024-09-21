@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.5.0 (2024-09-22)
 
 * Added `--upstream-assign-end-by-tag TAGNAME`.
 * Added `--end_tag TAG` which marks ends, upstreams, and grouped ends with the
