@@ -31,6 +31,7 @@ regex = "1.10.6"
 serde = "1.0.210"
 serde_json = "1.0.128"
 smallvec = "1.13"
+smol_str = "0.3.1"
 vartyint = "0.3.0"
 
 [profile.dev]

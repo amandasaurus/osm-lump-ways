@@ -2,18 +2,19 @@ use log::warn;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use regex::Regex;
 use std::path::Path;
+use smol_str::SmolStr;
 
 #[derive(Debug, Clone)]
 pub enum TagFilter {
-    HasK(String),
+    HasK(SmolStr),
     HasReK(Regex),
-    NotHasK(String),
+    NotHasK(SmolStr),
     NotHasReK(Regex),
-    KV(String, String),
-    KinV(String, Vec<String>),
-    KnotInV(String, Vec<String>),
-    KneV(String, String),
-    KreV(String, Regex),
+    KV(SmolStr, SmolStr),
+    KinV(SmolStr, Vec<SmolStr>),
+    KnotInV(SmolStr, Vec<SmolStr>),
+    KneV(SmolStr, SmolStr),
+    KreV(SmolStr, Regex),
     And(Vec<TagFilter>),
     Or(Vec<TagFilter>),
 }
@@ -99,27 +100,27 @@ impl std::str::FromStr for TagFilter {
         } else if s.contains('=') {
             let s = s.splitn(2, '=').collect::<Vec<_>>();
             if s[1].contains(',') {
-                let vs = s[1].split(',').map(String::from).collect::<Vec<_>>();
-                Ok(TagFilter::KinV(s[0].to_string(), vs))
+                let vs = s[1].split(',').map(SmolStr::from).collect::<Vec<_>>();
+                Ok(TagFilter::KinV(s[0].into(), vs))
             } else {
-                Ok(TagFilter::KV(s[0].to_string(), s[1].to_string()))
+                Ok(TagFilter::KV(s[0].into(), s[1].into()))
             }
         } else if s.contains('∈') {
             let s = s.splitn(2, '∈').collect::<Vec<_>>();
-            let vs = s[1].split(',').map(String::from).collect::<Vec<_>>();
-            Ok(TagFilter::KinV(s[0].to_string(), vs))
+            let vs = s[1].split(',').map(SmolStr::from).collect::<Vec<_>>();
+            Ok(TagFilter::KinV(s[0].into(), vs))
         } else if s.contains('≠') {
             let s = s.splitn(2, '≠').collect::<Vec<_>>();
             if s[1].contains(',') {
-                let vs = s[1].split(',').map(String::from).collect::<Vec<_>>();
-                Ok(TagFilter::KnotInV(s[0].to_string(), vs))
+                let vs = s[1].split(',').map(SmolStr::from).collect::<Vec<_>>();
+                Ok(TagFilter::KnotInV(s[0].into(), vs))
             } else {
-                Ok(TagFilter::KneV(s[0].to_string(), s[1].to_string()))
+                Ok(TagFilter::KneV(s[0].into(), s[1].into()))
             }
         } else if s.contains('∉') {
             let s = s.splitn(2, '∉').collect::<Vec<_>>();
-            let vs = s[1].split(',').map(String::from).collect::<Vec<_>>();
-            Ok(TagFilter::KnotInV(s[0].to_string(), vs))
+            let vs = s[1].split(',').map(SmolStr::from).collect::<Vec<_>>();
+            Ok(TagFilter::KnotInV(s[0].into(), vs))
         } else if let Some(regex) = s.strip_prefix('~') {
             let regex = Regex::new(regex).map_err(|_| "Invalid regex")?;
             Ok(TagFilter::HasReK(regex))
@@ -130,17 +131,17 @@ impl std::str::FromStr for TagFilter {
             let regex = Regex::new(regex).map_err(|_| "Invalid regex")?;
             Ok(TagFilter::NotHasReK(regex))
         } else if let Some(key) = s.strip_prefix('∃') {
-            Ok(TagFilter::HasK(key.to_string()))
+            Ok(TagFilter::HasK(key.into()))
         } else if let Some(key) = s.strip_prefix('∄') {
-            Ok(TagFilter::NotHasK(key.to_string()))
+            Ok(TagFilter::NotHasK(key.into()))
         } else if s.contains('~') {
             let s = s.splitn(2, '~').collect::<Vec<_>>();
             let regex = Regex::new(s[1]).map_err(|_| "Invalid regex")?;
-            Ok(TagFilter::KreV(s[0].to_string(), regex))
+            Ok(TagFilter::KreV(s[0].into(), regex))
         } else if s.is_empty() {
             Err("An empty string is not a valid tag filter".to_string())
         } else {
-            Ok(TagFilter::HasK(s.to_string()))
+            Ok(TagFilter::HasK(s.into()))
         }
     }
 }
@@ -323,34 +324,34 @@ mod tests {
         };
     }
 
-    test_parse!(simple1, "name", TagFilter::HasK("name".to_string()));
+    test_parse!(simple1, "name", TagFilter::HasK("name".into()));
     test_parse!(
         simple_w_space1,
         " name",
-        TagFilter::HasK("name".to_string())
+        TagFilter::HasK("name".into())
     );
     test_parse!(
         simple_w_space2,
         " name  \t",
-        TagFilter::HasK("name".to_string())
+        TagFilter::HasK("name".into())
     );
-    test_parse!(parse1, "∃name", TagFilter::HasK("name".to_string()));
+    test_parse!(parse1, "∃name", TagFilter::HasK("name".into()));
     test_parse!(
         parse2,
         "highway=motorway",
-        TagFilter::KV("highway".to_string(), "motorway".to_string())
+        TagFilter::KV("highway".into(), "motorway".into())
     );
     test_parse!(
         parse3,
         "highway≠motorway",
-        TagFilter::KneV("highway".to_string(), "motorway".to_string())
+        TagFilter::KneV("highway".into(), "motorway".into())
     );
     test_parse!(
         parse4,
         "highway=motorway,primary",
         TagFilter::KinV(
-            "highway".to_string(),
-            vec!["motorway".to_string(), "primary".to_string()]
+            "highway".into(),
+            vec!["motorway".into(), "primary".into()]
         )
     );
 
@@ -381,47 +382,47 @@ mod tests {
         assert_eq!(
             "highway∈motorway,primary".parse::<TagFilter>().unwrap(),
             TagFilter::KinV(
-                "highway".to_string(),
-                vec!["motorway".to_string(), "primary".to_string()]
+                "highway".into(),
+                vec!["motorway".into(), "primary".into()]
             )
         );
         assert_eq!(
             "highway≠motorway,primary".parse::<TagFilter>().unwrap(),
             TagFilter::KnotInV(
-                "highway".to_string(),
-                vec!["motorway".to_string(), "primary".to_string()]
+                "highway".into(),
+                vec!["motorway".into(), "primary".into()]
             )
         );
         assert_eq!(
             "highway∉motorway,primary".parse::<TagFilter>().unwrap(),
             TagFilter::KnotInV(
-                "highway".to_string(),
-                vec!["motorway".to_string(), "primary".to_string()]
+                "highway".into(),
+                vec!["motorway".into(), "primary".into()]
             )
         );
 
         assert_eq!(
             "highway~motorway".parse::<TagFilter>().unwrap(),
-            TagFilter::KreV("highway".to_string(), Regex::new("motorway").unwrap())
+            TagFilter::KreV("highway".into(), Regex::new("motorway").unwrap())
         );
         assert_eq!(
             "∄name".parse::<TagFilter>().unwrap(),
-            TagFilter::NotHasK("name".to_string())
+            TagFilter::NotHasK("name".into())
         );
 
         assert_eq!(
             "name∨highway".parse::<TagFilter>().unwrap(),
             TagFilter::Or(vec![
-                TagFilter::HasK("name".to_string()),
-                TagFilter::HasK("highway".to_string())
+                TagFilter::HasK("name".into()),
+                TagFilter::HasK("highway".into())
             ])
         );
 
         assert_eq!(
             "name∧highway".parse::<TagFilter>().unwrap(),
             TagFilter::And(vec![
-                TagFilter::HasK("name".to_string()),
-                TagFilter::HasK("highway".to_string())
+                TagFilter::HasK("name".into()),
+                TagFilter::HasK("highway".into())
             ])
         );
     }
@@ -438,17 +439,17 @@ mod tests {
         );
         assert_eq!(
             "highway→T".parse::<TagFilterFuncElement>().unwrap(),
-            TagFilterFuncElement::FilterMatchThenTrue(TagFilter::HasK("highway".to_string()))
+            TagFilterFuncElement::FilterMatchThenTrue(TagFilter::HasK("highway".into()))
         );
         assert_eq!(
             "waterway→F".parse::<TagFilterFuncElement>().unwrap(),
-            TagFilterFuncElement::FilterMatchThenFalse(TagFilter::HasK("waterway".to_string()))
+            TagFilterFuncElement::FilterMatchThenFalse(TagFilter::HasK("waterway".into()))
         );
         assert_eq!(
             "waterway=canal→F".parse::<TagFilterFuncElement>().unwrap(),
             TagFilterFuncElement::FilterMatchThenFalse(TagFilter::KV(
-                "waterway".to_string(),
-                "canal".to_string()
+                "waterway".into(),
+                "canal".into()
             ))
         );
         assert_eq!(
@@ -456,8 +457,8 @@ mod tests {
                 .parse::<TagFilterFuncElement>()
                 .unwrap(),
             TagFilterFuncElement::FilterMatchThenFalse(TagFilter::And(vec![
-                TagFilter::KV("waterway".to_string(), "canal".to_string()),
-                TagFilter::KV("lock".to_string(), "yes".to_string())
+                TagFilter::KV("waterway".into(), "canal".into()),
+                TagFilter::KV("lock".into(), "yes".into())
             ]))
         );
         assert_eq!(
@@ -465,10 +466,10 @@ mod tests {
                 .parse::<TagFilterFuncElement>()
                 .unwrap(),
             TagFilterFuncElement::FilterMatchThenFalse(TagFilter::And(vec![
-                TagFilter::KV("waterway".to_string(), "canal".to_string()),
+                TagFilter::KV("waterway".into(), "canal".into()),
                 TagFilter::KinV(
-                    "usage".to_string(),
-                    vec!["headrace".to_string(), "tailrace".to_string()]
+                    "usage".into(),
+                    vec!["headrace".into(), "tailrace".into()]
                 )
             ]))
         );
@@ -514,7 +515,7 @@ mod tests {
         assert_eq!(
             "waterway→T;F".parse::<TagFilterFunc>().unwrap(),
             TagFilterFunc(vec![
-                TagFilterFuncElement::FilterMatchThenTrue(TagFilter::HasK("waterway".to_string())),
+                TagFilterFuncElement::FilterMatchThenTrue(TagFilter::HasK("waterway".into())),
                 TagFilterFuncElement::AlwaysFalse
             ])
         );
