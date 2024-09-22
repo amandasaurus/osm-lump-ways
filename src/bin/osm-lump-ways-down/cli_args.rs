@@ -216,7 +216,7 @@ pub struct Args {
 
     /// Assign lines to an end which matches the value of this OSM tag
     #[arg(long,
-          conflicts_with_all=["upstream_assign_ends_full", "upstream_output_biggest_end"],
+          conflicts_with_all=["upstream_output_biggest_end"],
     )]
     pub upstream_assign_end_by_tag: Option<String>,
 
