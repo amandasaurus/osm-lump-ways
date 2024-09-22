@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.5.1 (2024-09-22)
+
+* Correct typo in CLI arguments, causing `osm-lump-ways-down` to always fail.
+
 ## v1.5.0 (2024-09-22)
 
 * Added `--upstream-assign-end-by-tag TAGNAME`.
