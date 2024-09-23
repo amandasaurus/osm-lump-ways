@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.5.2 (2024-09-23)
+
+* Fix bug when generating grouped ends without an end tag
+
 ## v1.5.1 (2024-09-22)
 
 * Correct typo in CLI arguments, causing `osm-lump-ways-down` to always fail.
