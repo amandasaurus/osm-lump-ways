@@ -1436,12 +1436,14 @@ fn do_group_by_ends(
             "end_nid": end_points[end_idx as usize],
             "end_upstream_m": round(&end_point_upstreams[end_idx as usize], 1),
         });
-        for (tag_key, tag_value) in ends_tags
-            .iter()
-            .zip(end_point_tag_values[end_idx as usize].iter())
-        {
-            if let Some(tag_value) = tag_value {
-                props[format!("end_tag:{}", tag_key)] = tag_value.clone().into();
+        if !ends_tags.is_empty() {
+            for (tag_key, tag_value) in ends_tags
+                .iter()
+                .zip(end_point_tag_values[end_idx as usize].iter())
+            {
+                if let Some(tag_value) = tag_value {
+                    props[format!("end_tag:{}", tag_key)] = tag_value.clone().into();
+                }
             }
         }
         (props, points)
