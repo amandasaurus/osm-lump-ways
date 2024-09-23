@@ -4,7 +4,7 @@
 
 * Correct typo in CLI arguments, causing `osm-lump-ways-down` to always fail.
 
-## v1.5.0 (2024-09-22)
+## v1.5.0 (2024-09-22) (yanked)
 
 * Added `--upstream-assign-end-by-tag TAGNAME`.
 * Added `--end_tag TAG` which marks ends, upstreams, and grouped ends with the
