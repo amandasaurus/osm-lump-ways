@@ -130,6 +130,8 @@ fn main() -> Result<()> {
     } else {
         info!("Tag filter(s) in operation: {:?}", args.tag_filter);
     }
+    // Attempt to speed up reading, by replacing this Vec with a SmallVec
+    let tag_filter: SmallVec<[tagfilter::TagFilter; 3]> = args.tag_filter.clone().into();
     if std::env::var("OSM_LUMP_WAYS_FINISH_AFTER_READ").is_ok() {
         warn!("Programme will exit after reading & parsing input");
     }
@@ -215,7 +217,7 @@ fn main() -> Result<()> {
             .ways()
             .par_bridge()
             .inspect(|_| obj_reader.inc(1))
-            .filter(|w| tagfilter::obj_pass_filters(w, &args.tag_filter, &args.tag_filter_func))
+            .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, &args.tag_filter_func))
             .filter(|w| w.has_tag(upstream_assign_end_by_tag))
             .inspect(|_| ways_added.inc(1))
             .fold(
@@ -275,7 +277,7 @@ fn main() -> Result<()> {
         .ways()
         .par_bridge()
         .inspect(|_| obj_reader.inc(1))
-        .filter(|w| tagfilter::obj_pass_filters(w, &args.tag_filter, &args.tag_filter_func))
+        .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, &args.tag_filter_func))
         .inspect(|_| ways_added.inc(1))
         // TODO support grouping by tag value
         .for_each_with(g.clone(), |g, w| {
@@ -544,7 +546,7 @@ fn main() -> Result<()> {
     let mut g = graph::DirectedGraph2::new();
     read_with_node_replacements(
         &args.input_filename,
-        &args.tag_filter,
+        &tag_filter,
         &args.tag_filter_func,
         &|nid| *node_id_replaces.get(&nid).unwrap_or(&nid),
         &progress_bars,
@@ -579,7 +581,7 @@ fn main() -> Result<()> {
     let mut g = graph::DirectedGraph2::new();
     read_with_node_replacements(
         &args.input_filename,
-        &args.tag_filter,
+        &tag_filter,
         &args.tag_filter_func,
         &|nid| *node_id_replaces.get(&nid).unwrap_or(&nid),
         &progress_bars,
@@ -619,7 +621,7 @@ fn main() -> Result<()> {
     // Upstream value for every end point
     let mut end_point_upstreams: Vec<f64> = vec![0.; end_points.len()];
 
-    let mut ends_membership_filters = args.ends_membership.clone();
+    let mut ends_membership_filters: SmallVec<[tagfilter::TagFilter; 3]> = args.ends_membership.clone().into();
     ends_membership_filters.sort_by_key(|tf| tf.to_string());
     if !ends_membership_filters.is_empty() {
         end_point_memberships.resize(
@@ -726,7 +728,7 @@ fn main() -> Result<()> {
             // filter, and have a desired tag
             .filter(|w| {
                 tagfilter::obj_pass_filters(w, &ends_membership_filters, &None)
-                    || (tagfilter::obj_pass_filters(w, &args.tag_filter, &args.tag_filter_func)
+                    || (tagfilter::obj_pass_filters(w, &tag_filter, &args.tag_filter_func)
                         && args.ends_tag.iter().any(|end_tag| w.has_tag(end_tag)))
             })
             //
@@ -1117,7 +1119,7 @@ fn main() -> Result<()> {
 
 fn read_with_node_replacements(
     input_filename: &Path,
-    tag_filter: &[tagfilter::TagFilter],
+    tag_filter: &SmallVec<[tagfilter::TagFilter; 3]>,
     tag_filter_func: &Option<tagfilter::TagFilterFunc>,
     node_id_replaces: &(impl Fn(i64) -> i64 + Sync),
     progress_bars: &MultiProgress,

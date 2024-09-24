@@ -10,7 +10,7 @@ use log::{
 use osmio::prelude::*;
 use osmio::OSMObjBase;
 use rayon::prelude::*;
-
+use smallvec::SmallVec;
 use kdtree::KdTree;
 
 use std::collections::{BTreeSet, HashMap};
@@ -163,6 +163,8 @@ fn main() -> Result<()> {
     } else {
         info!("Tag filter(s) in operation: {:?}", args.tag_filter);
     }
+    // Attempt to speed up reading, by replacing this Vec with a SmallVec
+    let tag_filter: SmallVec<[tagfilter::TagFilter; 3]> = args.tag_filter.clone().into();
     if !args.tag_group_k.is_empty() {
         info!("Tag grouping(s) in operation: {:?}", args.tag_group_k);
     }
@@ -213,7 +215,7 @@ fn main() -> Result<()> {
     reader
         .ways()
         .par_bridge()
-        .filter(|w| tagfilter::obj_pass_filters(w, &args.tag_filter, &args.tag_filter_func))
+        .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, &args.tag_filter_func))
         .map(|w| {
             let group = args
                 .tag_group_k

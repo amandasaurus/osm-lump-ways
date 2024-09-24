@@ -3,6 +3,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use regex::Regex;
 use std::path::Path;
 use smol_str::SmolStr;
+use smallvec::SmallVec;
 
 #[derive(Debug, Clone)]
 pub enum TagFilter {
@@ -297,7 +298,7 @@ impl TagFilterFunc {
 
 pub fn obj_pass_filters(
     o: &(impl osmio::OSMObjBase + Sync + Send),
-    tag_filters: &[TagFilter],
+    tag_filters: &SmallVec<[TagFilter; 3]>,
     tag_filter_func: &Option<TagFilterFunc>,
 ) -> bool {
     if !tag_filters.is_empty() {
