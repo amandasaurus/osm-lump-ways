@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.5.3 (2024-09-26)
 
 * Fix bug when including tag filter func files with comments (fixes #68)
 
