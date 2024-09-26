@@ -1,9 +1,9 @@
 use log::warn;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use regex::Regex;
-use std::path::Path;
-use smol_str::SmolStr;
 use smallvec::SmallVec;
+use smol_str::SmolStr;
+use std::path::Path;
 
 #[derive(Debug, Clone)]
 pub enum TagFilter {
@@ -326,16 +326,8 @@ mod tests {
     }
 
     test_parse!(simple1, "name", TagFilter::HasK("name".into()));
-    test_parse!(
-        simple_w_space1,
-        " name",
-        TagFilter::HasK("name".into())
-    );
-    test_parse!(
-        simple_w_space2,
-        " name  \t",
-        TagFilter::HasK("name".into())
-    );
+    test_parse!(simple_w_space1, " name", TagFilter::HasK("name".into()));
+    test_parse!(simple_w_space2, " name  \t", TagFilter::HasK("name".into()));
     test_parse!(parse1, "∃name", TagFilter::HasK("name".into()));
     test_parse!(
         parse2,
@@ -350,10 +342,7 @@ mod tests {
     test_parse!(
         parse4,
         "highway=motorway,primary",
-        TagFilter::KinV(
-            "highway".into(),
-            vec!["motorway".into(), "primary".into()]
-        )
+        TagFilter::KinV("highway".into(), vec!["motorway".into(), "primary".into()])
     );
 
     test_parse!(
@@ -382,24 +371,15 @@ mod tests {
         assert!("".parse::<TagFilter>().is_err());
         assert_eq!(
             "highway∈motorway,primary".parse::<TagFilter>().unwrap(),
-            TagFilter::KinV(
-                "highway".into(),
-                vec!["motorway".into(), "primary".into()]
-            )
+            TagFilter::KinV("highway".into(), vec!["motorway".into(), "primary".into()])
         );
         assert_eq!(
             "highway≠motorway,primary".parse::<TagFilter>().unwrap(),
-            TagFilter::KnotInV(
-                "highway".into(),
-                vec!["motorway".into(), "primary".into()]
-            )
+            TagFilter::KnotInV("highway".into(), vec!["motorway".into(), "primary".into()])
         );
         assert_eq!(
             "highway∉motorway,primary".parse::<TagFilter>().unwrap(),
-            TagFilter::KnotInV(
-                "highway".into(),
-                vec!["motorway".into(), "primary".into()]
-            )
+            TagFilter::KnotInV("highway".into(), vec!["motorway".into(), "primary".into()])
         );
 
         assert_eq!(
@@ -468,10 +448,7 @@ mod tests {
                 .unwrap(),
             TagFilterFuncElement::FilterMatchThenFalse(TagFilter::And(vec![
                 TagFilter::KV("waterway".into(), "canal".into()),
-                TagFilter::KinV(
-                    "usage".into(),
-                    vec!["headrace".into(), "tailrace".into()]
-                )
+                TagFilter::KinV("usage".into(), vec!["headrace".into(), "tailrace".into()])
             ]))
         );
 

@@ -621,7 +621,8 @@ fn main() -> Result<()> {
     // Upstream value for every end point
     let mut end_point_upstreams: Vec<f64> = vec![0.; end_points.len()];
 
-    let mut ends_membership_filters: SmallVec<[tagfilter::TagFilter; 3]> = args.ends_membership.clone().into();
+    let mut ends_membership_filters: SmallVec<[tagfilter::TagFilter; 3]> =
+        args.ends_membership.clone().into();
     ends_membership_filters.sort_by_key(|tf| tf.to_string());
     if !ends_membership_filters.is_empty() {
         end_point_memberships.resize(

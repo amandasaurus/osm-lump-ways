@@ -3,6 +3,7 @@ use clap::Parser;
 use get_size::GetSize;
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use indicatif_log_bridge::LogWrapper;
+use kdtree::KdTree;
 use log::{
     debug, error, info, log, trace, warn,
     Level::{Debug, Trace},
@@ -11,7 +12,6 @@ use osmio::prelude::*;
 use osmio::OSMObjBase;
 use rayon::prelude::*;
 use smallvec::SmallVec;
-use kdtree::KdTree;
 
 use std::collections::{BTreeSet, HashMap};
 use std::time::Instant;
