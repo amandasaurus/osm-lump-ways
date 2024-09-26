@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* Fix bug when including tag filter func files with comments (fixes #68)
+
 ## v1.5.2 (2024-09-23)
 
 * Fix bug when generating grouped ends without an end tag

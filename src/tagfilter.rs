@@ -227,13 +227,7 @@ impl std::str::FromStr for TagFilterFunc {
             }
         };
 
-        let s = contents.trim();
-
-        // remove comments
-        let mut s: String = Regex::new("#[^\n]*\n")
-            .unwrap()
-            .replace_all(s, "")
-            .into_owned();
+        let mut s = contents.trim().to_owned();
 
         loop {
             //include FILENAME;
@@ -264,6 +258,12 @@ impl std::str::FromStr for TagFilterFunc {
             }
             s = new_s;
         }
+
+        // remove comments
+        let s: String = Regex::new("#[^\n]*\n")
+            .unwrap()
+            .replace_all(&s, "")
+            .into_owned();
 
         let tffs = s
             .split(';')
