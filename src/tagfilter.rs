@@ -565,4 +565,10 @@ mod tests {
         [("waterway", "canal")],
         Some(false)
     );
+    test_parse_tag_filter_func_list!(
+        tffl_parse7,
+        "# This is a test comment\nwaterway=canal→F;waterway→T;F",
+        [("waterway", "canal")],
+        Some(false)
+    );
 }
