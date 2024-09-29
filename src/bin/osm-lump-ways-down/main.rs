@@ -1364,6 +1364,7 @@ fn do_group_by_ends(
     // Lines we are drawing
     // key: i64: the last point in the line
     // value: Vec of all lines (which is the end idx for that line, and then the points (node ids)) which are ending here
+    #[allow(clippy::type_complexity)]
     let mut in_progress_lines: HashMap<i64, SmallVec<[(i32, Vec<i64>); 2]>> = HashMap::new();
     // walks upstream
     let mut nid_end_iter = topologically_sorted_nodes
