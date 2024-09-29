@@ -542,6 +542,7 @@ fn main() -> Result<()> {
     );
 
     info_memory_used!();
+    let started_reread = Instant::now();
     info!("Re-reading file to generate upstreams etc");
     let mut g = graph::DirectedGraph2::new();
     read_with_node_replacements(
@@ -552,7 +553,7 @@ fn main() -> Result<()> {
         &progress_bars,
         &mut g,
     )?;
-    info!("Re-read nodes with replacements.",);
+    info!("Re-read all nodes with replacements in {}", formatting::format_duration(started_reread.elapsed()));
 
     // TODO do we need to sort topologically? Why not just calc lengths from upstreams
     let sorting_nodes_bar = progress_bars.add(
@@ -560,16 +561,18 @@ fn main() -> Result<()> {
             .with_message("Sorting nodes topologically")
             .with_style(style.clone()),
     );
+    let started_sorting = Instant::now();
     info!("Sorting all vertexes topologically...");
     //// TODO this graph (g) can be split into disconnected components
     let orig_num_vertexes = g.num_vertexes();
     let topologically_sorted_nodes = g.into_vertexes_topologically_sorted(&sorting_nodes_bar);
     sorting_nodes_bar.finish_and_clear();
     info!(
-        "All {} nodes have been sorted topographically. Size of sorted nodes: {} bytes = {}",
+        "All {} nodes have been sorted topographically in {}. Size of sorted nodes: {} bytes = {}",
         topologically_sorted_nodes
             .len()
             .to_formatted_string(&Locale::en),
+        formatting::format_duration(started_sorting.elapsed()),
         topologically_sorted_nodes.get_size(),
         topologically_sorted_nodes
             .get_size()
