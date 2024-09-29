@@ -1008,36 +1008,38 @@ fn main() -> Result<()> {
         // upstream_length_iter with the upstream value) and flat_map that into each line segment
         // that goes out of that.
         let lines = upstream_length_iter()
-            .filter(|(_from_nid_idx, _from_nid, upstream_m)| {
+            .filter(|(_to_nid_idx, _to_nid, upstream_m)| {
                 args.min_upstream_m.map_or(true, |min| *upstream_m >= min)
             })
-            .flat_map(|(from_nid_idx, from_nid, upstream_len)| {
-                g.out_neighbours(from_nid)
-                    .map(move |to_nid| (from_nid_idx, from_nid, to_nid, upstream_len))
+            .flat_map(|(to_nid_idx, to_nid, upstream_len)| {
+                g.in_neighbours(to_nid)
+                    .map(move |from_nid| (to_nid_idx, from_nid, to_nid, upstream_len))
             })
-            .map(|(from_nid_idx, from_nid, to_nid, upstream_len)| {
+            .map(|(to_nid_idx, from_nid, to_nid, upstream_len)| {
                 // Round the upstream to only output 1 decimal place
                 let mut props = serde_json::json!({
-                    "from_upstream_m": round(&upstream_len, 1),
+                    "to_upstream_m": round(&upstream_len, 1),
                 });
 
                 for mult in args.upstream_from_upstream_multiple.iter() {
-                    props[format!("from_upstream_m_{}", mult)] =
+                    props[format!("to_upstream_m_{}", mult)] =
                         round_mult(&upstream_len, *mult).into();
                 }
 
-                if upstream_assigned_end.len() >= from_nid_idx {
-                    let end_idx: usize = upstream_assigned_end[from_nid_idx] as usize;
+                if upstream_assigned_end.len() >= to_nid_idx {
+                    let end_idx: usize = upstream_assigned_end[to_nid_idx] as usize;
                     props["end_upstream_m"] = round(&end_point_upstreams[end_idx], 1).into();
                     props["end_nid"] = end_points[end_idx].into();
 
-                    for (tag_key, tag_value) in args
-                        .ends_tag
-                        .iter()
-                        .zip(end_point_tag_values[end_idx].iter())
-                    {
-                        if let Some(tag_value) = tag_value {
-                            props[format!("end_tag:{}", tag_key)] = tag_value.clone().into();
+                    if !args.ends_tag.is_empty() {
+                        for (tag_key, tag_value) in args
+                            .ends_tag
+                            .iter()
+                            .zip(end_point_tag_values[end_idx].iter())
+                        {
+                            if let Some(tag_value) = tag_value {
+                                props[format!("end_tag:{}", tag_key)] = tag_value.clone().into();
+                            }
                         }
                     }
                 } else if args.upstream_output_ends_full {
