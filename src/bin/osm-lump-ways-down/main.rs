@@ -553,7 +553,10 @@ fn main() -> Result<()> {
         &progress_bars,
         &mut g,
     )?;
-    info!("Re-read all nodes with replacements in {}", formatting::format_duration(started_reread.elapsed()));
+    info!(
+        "Re-read all nodes with replacements in {}",
+        formatting::format_duration(started_reread.elapsed())
+    );
 
     // TODO do we need to sort topologically? Why not just calc lengths from upstreams
     let sorting_nodes_bar = progress_bars.add(
@@ -1343,7 +1346,6 @@ fn do_group_by_ends(
         progress_bars.add(ProgressBar::new_spinner().with_style(
             ProgressStyle::with_template("       {human_pos} segments output").unwrap(),
         ));
-
 
     anyhow::ensure!(
         !upstream_assigned_end.is_empty(),
