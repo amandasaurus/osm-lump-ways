@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleaed
+
+* Fix bug with assigning the end when there's a split
+
 ## v1.5.3 (2024-09-26)
 
 * Fix bug when including tag filter func files with comments (fixes #68)
