@@ -1325,7 +1325,7 @@ fn do_group_by_ends(
     end_points: &[i64],
     topologically_sorted_nodes: &[i64],
     end_point_upstreams: &[f64],
-    upstream_biggest_end: &[i32],
+    upstream_assigned_end: &[i32],
     nodeid_pos: &impl NodeIdPosition,
     end_point_tag_values: &[SmallVec<[Option<String>; 1]>],
     ends_tags: &[String],
@@ -1344,23 +1344,23 @@ fn do_group_by_ends(
     let mut in_progress_lines: HashMap<i64, SmallVec<[Vec<i64>; 2]>> = HashMap::new();
 
     anyhow::ensure!(
-        !upstream_biggest_end.is_empty(),
+        !upstream_assigned_end.is_empty(),
         "The upstream_biggest_ends is empty. Has this not been calculated?"
     );
 
     anyhow::ensure!(
-        !upstream_biggest_end.is_empty(),
+        !upstream_assigned_end.is_empty(),
         "The upstream_biggest_ends is empty. Has this not been calculated?"
     );
     anyhow::ensure!(
-        upstream_biggest_end.len() == topologically_sorted_nodes.len(),
+        upstream_assigned_end.len() == topologically_sorted_nodes.len(),
         "Lengths not equal, something will be lost"
     );
 
     let mut nid_end_iter = topologically_sorted_nodes
         .iter()
         .rev()
-        .zip(upstream_biggest_end.iter().rev());
+        .zip(upstream_assigned_end.iter().rev());
 
     let mut possible_ins: SmallVec<[i64; 5]> = smallvec::smallvec![];
     let mut results_to_pop: SmallVec<[(i64, Vec<i64>); 3]> = smallvec::smallvec![];
