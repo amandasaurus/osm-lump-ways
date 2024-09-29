@@ -1344,7 +1344,6 @@ fn do_group_by_ends(
             ProgressStyle::with_template("       {human_pos} segments output").unwrap(),
         ));
 
-    let mut in_progress_lines: HashMap<i64, SmallVec<[Vec<i64>; 2]>> = HashMap::new();
 
     anyhow::ensure!(
         !upstream_assigned_end.is_empty(),
@@ -1360,6 +1359,10 @@ fn do_group_by_ends(
         "Lengths not equal, something will be lost"
     );
 
+    // Lines we are drawing
+    // key: i64: the last point in the line
+    // value: Vec of all lines (which is the end idx for that line, and then the points (node ids)) which are ending here
+    let mut in_progress_lines: HashMap<i64, SmallVec<[(i32, Vec<i64>); 2]>> = HashMap::new();
     // walks upstream
     let mut nid_end_iter = topologically_sorted_nodes
         .iter()
@@ -1367,7 +1370,7 @@ fn do_group_by_ends(
         .zip(upstream_assigned_end.iter().rev());
 
     let mut possible_ins: SmallVec<[i64; 5]> = smallvec::smallvec![];
-    let mut results_to_pop: SmallVec<[(i64, Vec<i64>); 3]> = smallvec::smallvec![];
+    let mut results_to_pop: SmallVec<[(i32, Vec<i64>); 3]> = smallvec::smallvec![];
 
     // Iterator that yields (end_node_id, and a path of nids which end in this nid)
     let upstreams_grouped_by_end = std::iter::from_fn(|| {
@@ -1378,7 +1381,7 @@ fn do_group_by_ends(
                 result.1.reverse();
                 return Some(result);
             }
-            let (nid, real_end_idx) = match nid_end_iter.next() {
+            let (nid, this_end_idx) = match nid_end_iter.next() {
                 None => {
                     // finished all the nodes
                     return None;
@@ -1388,24 +1391,40 @@ fn do_group_by_ends(
 
             // which in progress lines are there for this node
             let mut lines_to_here = in_progress_lines.remove(nid).unwrap_or_default();
-            if *nid == end_points[*real_end_idx as usize] {
+            if *nid == end_points[*this_end_idx as usize] {
                 // this node is an end node (and it is it's own end node)
 
                 assert!(lines_to_here.is_empty()); // sanity check
 
                 // Give us something to work with later. This is the start of the lines that start
                 // here.
-                lines_to_here.push(vec![]);
+                lines_to_here.push((*this_end_idx, vec![]));
             }
 
             // include this point in every line so far
-            for line in lines_to_here.iter_mut() {
-                line.push(*nid);
+            for (_line_end, line_points) in lines_to_here.iter_mut() {
+                line_points.push(*nid);
             }
 
-            // If >1 line is ending here, end all lines (bar the first one) here
+            // All the lines that come to here, but are from another group, we end them here.
+            //
+            // SmallVec::drain_filter is documentated, but doesn't exist?
+            let mut i = 0;
+            while i < lines_to_here.len() {
+                if lines_to_here[i].0 != *this_end_idx {
+                    // this line ends here and is for another end, so remove it.
+                    let (other_end_idx, other_points) = lines_to_here.remove(i);
+                    results_to_pop.push((other_end_idx, other_points));
+                } else {
+                    i += 1;
+                }
+            }
+
+            // Now all the lines that end here are in the end group, but we need to have only one
             while lines_to_here.len() > 1 {
-                results_to_pop.push((*real_end_idx as i64, lines_to_here.pop().unwrap()));
+                assert_eq!(lines_to_here.last().unwrap().0, *this_end_idx);
+                let (end_idx, points) = lines_to_here.pop().unwrap();
+                results_to_pop.push((end_idx, points));
             }
 
             // this is the only line we continue with
@@ -1419,12 +1438,12 @@ fn do_group_by_ends(
                 in_progress_lines
                     .entry(*later_upstream_nodes)
                     .or_default()
-                    .push(vec![*nid]);
+                    .push((*this_end_idx, vec![*nid]));
             }
 
             if possible_ins.is_empty() {
                 // no upstreams, so finish it.
-                results_to_pop.push((*real_end_idx as i64, line_to_here));
+                results_to_pop.push((*this_end_idx, line_to_here.1));
                 continue;
             } else {
                 // We have >0 upstreams, we've already done something with the 2nd+, so the first
