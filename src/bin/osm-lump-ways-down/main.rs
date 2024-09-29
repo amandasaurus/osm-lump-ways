@@ -916,7 +916,8 @@ fn main() -> Result<()> {
         // this is a cache of values as we walk upstream
         // key: i64 = the node id
         // value: (bool, i32), i32 is the endidx for the best guess. bool=true → this assignment is
-        // based on the name, bool=false → assignemnt is based on largest end
+        // based on the tag value, bool=false → assignment is based on largest end (used when
+        // there's no tag)
         let mut tmp_biggest_end: HashMap<i64, (bool, i32)> = HashMap::new();
 
         // Doing topologically_sorted_nodes in reverse, means we are “walking upstream”. This
@@ -1357,6 +1358,7 @@ fn do_group_by_ends(
         "Lengths not equal, something will be lost"
     );
 
+    // walks upstream
     let mut nid_end_iter = topologically_sorted_nodes
         .iter()
         .rev()
