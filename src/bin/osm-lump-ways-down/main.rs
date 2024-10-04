@@ -866,6 +866,7 @@ fn main() -> Result<()> {
                         .ends_tag
                         .iter()
                         .zip(end_tags.into_iter())
+                        .filter(|(_k, v)| v.is_some())
                     {
                         props[format!("tag:{}", tag_key)] = tag_value.clone().into();
                     }
