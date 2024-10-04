@@ -738,21 +738,28 @@ fn main() -> Result<()> {
             //
             // ↓ .. which match at least one end-membership filter, or match the regular tag
             // filter, and have a desired tag
-            .filter(|w| {
-                tagfilter::obj_pass_filters(w, &ends_membership_filters, &None)
-                    || (tagfilter::obj_pass_filters(w, &tag_filter, &args.tag_filter_func)
-                        && args.ends_tag.iter().any(|end_tag| w.has_tag(end_tag)))
+            .map(|w| {
+                let has_end_member_tags =
+                    tagfilter::obj_pass_filters(&w, &ends_membership_filters, &None);
+                let has_end_point_tags =
+                    tagfilter::obj_pass_filters(&w, &tag_filter, &args.tag_filter_func)
+                        && args.ends_tag.iter().any(|end_tag| w.has_tag(end_tag));
+                (w, has_end_member_tags, has_end_point_tags)
+            })
+            .filter(|(_w, has_end_member_tags, has_end_point_tags)| {
+                *has_end_member_tags || *has_end_point_tags
             })
             //
             // ↓ .. which have at least one node in the end points
-            .filter(|w| {
+            .filter(|(w, _has_end_member_tags, _has_end_point_tags)| {
                 w.nodes()
                     .iter()
                     .any(|nid| end_points.binary_search(nid).is_ok())
             })
             .for_each_with(
                 (end_point_memberships.clone(), end_point_tag_values.clone()),
-                |(end_point_memberships, end_point_tag_values), w| {
+                |(end_point_memberships, end_point_tag_values),
+                 (w, has_end_member_tags, has_end_point_tags)| {
                     let filter_results = ends_membership_filters
                         .iter()
                         .map(|f| f.filter(&w))
@@ -762,16 +769,16 @@ fn main() -> Result<()> {
                         .iter()
                         .filter_map(|nid| end_points.binary_search(nid).ok())
                     {
-                        let mut curr_mbmrs_all = end_point_memberships.write().unwrap();
-                        if !curr_mbmrs_all.is_empty() {
+                        if !ends_membership_filters.is_empty() && has_end_member_tags {
+                            let mut curr_mbmrs_all = end_point_memberships.write().unwrap();
                             let curr_mbmrs = curr_mbmrs_all.get_mut(end_point_idx).unwrap();
                             for (new, old) in filter_results.iter().zip(curr_mbmrs.iter_mut()) {
                                 *old |= new;
                             }
                         }
 
-                        let mut curr_tags_all = end_point_tag_values.write().unwrap();
-                        if !curr_tags_all.is_empty() {
+                        if !args.ends_tag.is_empty() && has_end_point_tags {
+                            let mut curr_tags_all = end_point_tag_values.write().unwrap();
                             let curr_tags = curr_tags_all.get_mut(end_point_idx).unwrap();
                             for (tag_key, this_end_tag_value) in
                                 args.ends_tag.iter().zip(curr_tags.iter_mut())

@@ -4,6 +4,7 @@
 
 * end tag values have less duplicates
 * end tag values won't include null/unset tags
+* Fix bug with the wrong end tag being set.
 
 ## v1.6.0 (2024-09-30)
 
