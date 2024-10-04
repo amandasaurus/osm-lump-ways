@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+* end tag values have less duplicates
 
 ## v1.6.0 (2024-09-30)
 

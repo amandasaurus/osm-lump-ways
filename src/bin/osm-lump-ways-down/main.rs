@@ -779,6 +779,13 @@ fn main() -> Result<()> {
                                 if let Some(way_tag_value) = w.tag(tag_key) {
                                     *this_end_tag_value = match this_end_tag_value {
                                         None => Some(way_tag_value.to_string()),
+                                        // If 2 ways with the same tag value come here, don't
+                                        // duplicate it.
+                                        Some(old_end_tag_value)
+                                            if old_end_tag_value == way_tag_value =>
+                                        {
+                                            Some(way_tag_value.to_string())
+                                        }
                                         // There are mulitple ways that go through here, so join
                                         // do semicolon style concatination.
                                         Some(old_end_tag_value) => {
