@@ -715,15 +715,20 @@ fn main() -> Result<()> {
 
     if !ends_membership_filters.is_empty() || !args.ends_tag.is_empty() {
         info!("Rereading file to add memberships, or tag values, for ends");
-        info!(
-            "Adding the following {} attributes for each end: {}",
-            ends_membership_filters.len(),
-            ends_membership_filters
-                .iter()
-                .map(|f| f.to_string())
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
+        if !ends_membership_filters.is_empty() {
+            info!(
+                "Adding the following {} attributes for each end: {}",
+                ends_membership_filters.len(),
+                ends_membership_filters
+                    .iter()
+                    .map(|f| f.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+        }
+        if !args.ends_tag.is_empty() {
+            info!("Adding the following tags to each end: {:?}", args.ends_tag,);
+        }
         let reader = read_progress::BufReaderWithSize::from_path(&args.input_filename)?;
         let mut reader = osmio::stringpbf::PBFReader::new(reader);
         reader
