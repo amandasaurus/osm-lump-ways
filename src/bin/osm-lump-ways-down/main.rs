@@ -768,15 +768,17 @@ fn main() -> Result<()> {
                         let mut curr_tags_all = end_point_tag_values.write().unwrap();
                         if !curr_tags_all.is_empty() {
                             let curr_tags = curr_tags_all.get_mut(end_point_idx).unwrap();
-                            for (tag_key, tag_value) in
+                            for (tag_key, this_end_tag_value) in
                                 args.ends_tag.iter().zip(curr_tags.iter_mut())
                             {
-                                if let Some(val) = w.tag(tag_key) {
-                                    *tag_value = match tag_value {
-                                        None => Some(val.to_string()),
+                                if let Some(way_tag_value) = w.tag(tag_key) {
+                                    *this_end_tag_value = match this_end_tag_value {
+                                        None => Some(way_tag_value.to_string()),
                                         // There are mulitple ways that go through here, so join
                                         // do semicolon style concatination.
-                                        Some(old_val) => Some(format!("{};{}", old_val, val)),
+                                        Some(old_end_tag_value) => {
+                                            Some(format!("{};{}", old_end_tag_value, way_tag_value))
+                                        }
                                     }
                                 }
                             }
@@ -848,7 +850,11 @@ fn main() -> Result<()> {
                     props["is_in_count"] = mbms.iter().filter(|m| **m).count().into();
                 }
                 if !args.ends_tag.is_empty() {
-                    for (tag_key, tag_value) in args.ends_tag.iter().zip(end_tags.into_iter()) {
+                    for (tag_key, tag_value) in args
+                        .ends_tag
+                        .iter()
+                        .zip(end_tags.into_iter())
+                    {
                         props[format!("tag:{}", tag_key)] = tag_value.clone().into();
                     }
                 }
