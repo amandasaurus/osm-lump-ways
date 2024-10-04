@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+
+
 ## v1.6.0 (2024-09-30)
 
 * Fix bug with assigning the end when there's a split
