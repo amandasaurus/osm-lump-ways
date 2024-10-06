@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.7.0 (2024-10-06)
 
 * end tag values have less duplicates
 * end tag values won't include null/unset tags
