@@ -44,6 +44,7 @@ use osm_lump_ways::fileio;
 
 use osm_lump_ways::formatting;
 
+mod loops_csv_stats;
 mod openmetrics;
 
 macro_rules! info_memory_used {
@@ -163,23 +164,7 @@ fn main() -> Result<()> {
     );
 
     let mut metrics = args.openmetrics.as_ref().map(openmetrics::init);
-
-    let mut csv_stats = args.csv_stats_file.as_ref().map(|csv_stats_file| {
-        info!("Writing CSV stats to file {csv_stats_file:?}");
-        if !csv_stats_file.exists() {
-            let mut wtr = csv::Writer::from_writer(std::fs::File::create(csv_stats_file).unwrap());
-            wtr.write_record(["timestamp", "iso_datetime", "area", "metric", "value"])
-                .unwrap();
-            wtr.flush().unwrap();
-            drop(wtr);
-        }
-        csv::Writer::from_writer(std::io::BufWriter::new(
-            std::fs::File::options()
-                .append(true)
-                .open(csv_stats_file)
-                .unwrap(),
-        ))
-    });
+    let mut csv_stats = args.csv_stats_file.as_ref().map(loops_csv_stats::init);
 
     let boundaries = CountryBoundaries::from_reader(BOUNDARIES_ODBL_360X180)?;
 
@@ -450,20 +435,14 @@ fn main() -> Result<()> {
             }
             for (boundary, (count, len)) in per_boundary.into_iter() {
                 if let Some(ref mut csv_stats) = csv_stats {
-                    csv_stats.write_record(&[
-                        latest_timestamp.to_string(),
-                        latest_timestamp_iso.to_string(),
-                        boundary.to_string(),
-                        "loops_count".to_string(),
-                        count.to_string(),
-                    ])?;
-                    csv_stats.write_record(&[
-                        latest_timestamp.to_string(),
-                        latest_timestamp_iso.to_string(),
-                        boundary.to_string(),
-                        "loops_length_m".to_string(),
-                        format!("{:.1}", len),
-                    ])?;
+                    loops_csv_stats::write_boundary(
+                        csv_stats,
+                        boundary,
+                        latest_timestamp,
+                        &latest_timestamp_iso,
+                        count,
+                        len,
+                    )?;
                 }
                 if let Some(ref mut metrics) = metrics {
                     openmetrics::write_boundary(metrics, boundary, latest_timestamp, count, len)?;
