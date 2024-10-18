@@ -14,7 +14,7 @@ use rayon::prelude::*;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs::File;
-use std::io::{BufWriter, Write};
+use std::io::BufWriter;
 use std::path::Path;
 use std::time::Instant;
 
@@ -43,6 +43,8 @@ use fileio::{write_csv_features_directly, write_geojson_features_directly};
 use osm_lump_ways::fileio;
 
 use osm_lump_ways::formatting;
+
+mod openmetrics;
 
 macro_rules! info_memory_used {
     () => {};
@@ -160,23 +162,7 @@ fn main() -> Result<()> {
         ),
     );
 
-    let mut metrics = args.openmetrics.as_ref().map(|metrics_path| {
-        info!("Writing metrics to file {metrics_path:?}");
-        let mut metrics = std::io::BufWriter::new(std::fs::File::create(metrics_path).unwrap());
-        writeln!(
-            metrics,
-            "# HELP waterwaymap_loops_count number of cycles/loops in this area"
-        )
-        .unwrap();
-        writeln!(metrics, "# TYPE waterwaymap_loops_count gauge").unwrap();
-        writeln!(
-            metrics,
-            "# HELP waterwaymap_loops_length_m Length of all loops (in metres) in this area)"
-        )
-        .unwrap();
-        writeln!(metrics, "# TYPE waterwaymap_loops_length_m gauge").unwrap();
-        metrics
-    });
+    let mut metrics = args.openmetrics.as_ref().map(openmetrics::init);
 
     let mut csv_stats = args.csv_stats_file.as_ref().map(|csv_stats_file| {
         info!("Writing CSV stats to file {csv_stats_file:?}");
@@ -480,16 +466,7 @@ fn main() -> Result<()> {
                     ])?;
                 }
                 if let Some(ref mut metrics) = metrics {
-                    writeln!(
-                        metrics,
-                        "waterwaymap_loops_count{{area=\"{}\"}} {} {}",
-                        boundary, count, latest_timestamp
-                    )?;
-                    writeln!(
-                        metrics,
-                        "waterwaymap_loops_length_m{{area=\"{}\"}} {} {}",
-                        boundary, len, latest_timestamp
-                    )?;
+                    openmetrics::write_boundary(metrics, boundary, latest_timestamp, count, len)?;
                 }
             }
 
