@@ -1,3 +1,5 @@
+use ordered_float::OrderedFloat;
+
 pub fn haversine_m(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
     if lat1 == lat2 && lon1 == lon2 {
         return 0.;
@@ -19,6 +21,14 @@ pub fn haversine_m_arr(lat_lon1: &[f64], lat_lon2: &[f64]) -> f64 {
 }
 
 #[allow(dead_code)]
-pub(crate) fn haversine_m_fpair(lat_lon1: (f64, f64), lat_lon2: (f64, f64)) -> f64 {
+pub fn haversine_m_fpair(lat_lon1: (f64, f64), lat_lon2: (f64, f64)) -> f64 {
     haversine_m(lat_lon1.0, lat_lon1.1, lat_lon2.0, lat_lon2.1)
+}
+
+#[allow(dead_code)]
+pub(crate) fn haversine_m_fpair_ord(
+    lat_lon1: (f64, f64),
+    lat_lon2: (f64, f64),
+) -> OrderedFloat<f64> {
+    OrderedFloat(haversine_m_fpair(lat_lon1, lat_lon2))
 }

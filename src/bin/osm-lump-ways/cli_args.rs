@@ -99,6 +99,10 @@ pub struct Args {
     #[arg(long, value_name = "NUMBER")]
     pub min_length_m: Option<f64>,
 
+    /// Only include (in the output) lines which are this length (in metres) or less.
+    #[arg(long, value_name = "NUMBER")]
+    pub max_length_m: Option<f64>,
+
     /// Only include (in the output) lines which have a dist_to_nearer greater than or equal to
     /// this
     #[arg(long, value_name = "NUMBER", requires = "incl_dist_to_longer")]
@@ -135,8 +139,13 @@ pub struct Args {
     /// The `longest-path` for motorways can produce technically correct, but unwanted, results by
     /// going up one lane of the motorway, and then down the other side. Here, `as-crow-flies` is
     /// often what people expect.
-    #[arg(long, requires = "split_into_single_paths", verbatim_doc_comment)]
-    pub split_into_single_paths_by: Option<SplitPathsMethod>,
+    #[arg(
+        long,
+        requires = "split_into_single_paths",
+        verbatim_doc_comment,
+        default_value = "as-crow-flies"
+    )]
+    pub split_into_single_paths_by: SplitPathsMethod,
 
     /// Only procoess way groups which include these way ids
     #[arg(long)]

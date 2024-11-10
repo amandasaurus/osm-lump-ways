@@ -548,4 +548,10 @@ mod tests {
         [("waterway", "canal")],
         Some(false)
     );
+    test_parse_tag_filter_func_list!(
+        tffl_parse_semicolon,
+        r"waterway=put_in\u{3B}egress→F;waterway→T;F",
+        [("waterway", "canal")],
+        Some(true)
+    );
 }

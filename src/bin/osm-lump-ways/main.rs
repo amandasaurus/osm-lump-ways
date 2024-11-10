@@ -1,38 +1,41 @@
+#![allow(warnings)]
 use anyhow::{Context, Result};
 use clap::Parser;
 use get_size::GetSize;
-use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use indicatif_log_bridge::LogWrapper;
+use itertools::Itertools;
 use kdtree::KdTree;
 use log::{
     debug, error, info, log, trace, warn,
     Level::{Debug, Trace},
 };
+use osm_lump_ways::inter_store;
 use osmio::prelude::*;
 use osmio::OSMObjBase;
 use rayon::prelude::*;
 use smallvec::SmallVec;
+use std::iter;
 
 use std::collections::{BTreeSet, HashMap};
 use std::time::Instant;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering as atomic_Ordering};
 use std::sync::{Arc, Mutex};
 
 //use get_size_derive::*;
 
 use num_format::{Locale, ToFormattedString};
+use std::collections::HashSet;
 
 mod cli_args;
 
 use nodeid_position::NodeIdPosition;
-use nodeid_wayids::NodeIdWayIds;
 use osm_lump_ways::dij;
-use osm_lump_ways::haversine;
-use osm_lump_ways::haversine::haversine_m;
+use osm_lump_ways::haversine::{haversine_m, haversine_m_fpair};
 use osm_lump_ways::nodeid_position;
-use osm_lump_ways::nodeid_wayids;
+use osm_lump_ways::sorted_slice_store::SortedSliceSet;
 use osm_lump_ways::tagfilter;
 use osm_lump_ways::way_group;
 use way_group::WayGroup;
@@ -40,6 +43,7 @@ use way_group::WayGroup;
 use fileio::OutputFormat;
 use osm_lump_ways::fileio;
 use osm_lump_ways::formatting;
+use osm_lump_ways::graph::Graph2;
 
 fn main() -> Result<()> {
     let args = cli_args::Args::parse();
@@ -65,21 +69,19 @@ fn main() -> Result<()> {
 
     let style = ProgressStyle::with_template(
         "[{elapsed_precise}] {percent:>3}% done. eta {eta:>4} {bar:10.cyan/blue} {pos:>7}/{len:7} {per_sec:>12} {msg}",
-    ).unwrap();
+        ).unwrap();
     let file_reading_style =
-                ProgressStyle::with_template(
-        "[{elapsed_precise}] {percent:>3}% done. eta {eta:>4} {bar:10.cyan/blue} {bytes:>7}/{total_bytes:7} {per_sec:>12} {msg}",
+        ProgressStyle::with_template(
+            "[{elapsed_precise}] {percent:>3}% done. eta {eta:>4} {bar:10.cyan/blue} {bytes:>7}/{total_bytes:7} {per_sec:>12} {msg}",
             ).unwrap();
-    let input_fp = std::fs::File::open(&args.input_filename)?;
-    let input_bar = progress_bars.add(
-        ProgressBar::new(input_fp.metadata()?.len())
-            .with_message("Reading input file")
-            .with_style(file_reading_style.clone()),
-    );
-    let rdr = input_bar.wrap_read(input_fp);
-
-    //let reader = read_progress::BufReaderWithSize::from_path(&args.input_filename)?;
-    let mut reader = osmio::stringpbf::PBFReader::new(rdr);
+    //let input_fp = std::fs::File::open(&args.input_filename)?;
+    //let input_bar = progress_bars.add(
+    //    ProgressBar::new(input_fp.metadata()?.len())
+    //        .with_message("Reading input file")
+    //        .with_style(file_reading_style.clone()),
+    //);
+    //let rdr = input_bar.wrap_read(input_fp);
+    //let mut reader = osmio::stringpbf::PBFReader::new(rdr);
 
     if args.split_files_by_group && !args.output_filename.contains("%s") {
         error!("No %s found in output filename ({})", args.output_filename);
@@ -199,9 +201,6 @@ fn main() -> Result<()> {
 
     let nodeid_pos = nodeid_position::default();
 
-    let nodeid_wayids = nodeid_wayids::default();
-    let nodeid_wayids = Arc::new(Mutex::new(nodeid_wayids));
-
     let ways_added = progress_bars.add(
         ProgressBar::new_spinner().with_style(
             ProgressStyle::with_template(
@@ -211,6 +210,64 @@ fn main() -> Result<()> {
         ),
     );
 
+    let started_reading_for_pillar_nodes = Instant::now();
+    let input_fp = std::fs::File::open(&args.input_filename)?;
+    let input_bar = progress_bars.add(
+        ProgressBar::new(input_fp.metadata()?.len())
+            .with_message("Reading input file")
+            .with_style(file_reading_style.clone()),
+    );
+    let rdr = input_bar.wrap_read(input_fp);
+    let mut reader = osmio::stringpbf::PBFReader::new(rdr);
+    let nid2nways = Arc::new(Mutex::new(HashMap::<i64, u8>::new()));
+    reader
+        .ways()
+        .par_bridge()
+        .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, &args.tag_filter_func))
+        // TODO support grouping by tag value
+        .for_each_with(nid2nways.clone(), |nid2nways, w| {
+            assert!(w.id() > 0, "This file has a way id < 0. negative ids are not supported in this tool Use osmium sort & osmium renumber to convert this file and run again.");
+
+            let nids = w.nodes();
+            let mut nid2nways = nid2nways.lock().unwrap();
+            nid2nways.entry(nids[0]).and_modify(|v| {*v = v.saturating_add(1);}).or_insert(1);
+            nid2nways.entry(*nids.last().unwrap()).and_modify(|v| {*v= v.saturating_add(1);}).or_insert(1);
+            for n in &nids[1..nids.len()] {
+                nid2nways.entry(*n).and_modify(|v| {*v=v.saturating_add(2);}).or_insert(2);
+            }
+        });
+    input_bar.finish();
+    progress_bars.remove(&input_bar);
+    let nid2nways = Arc::try_unwrap(nid2nways).unwrap().into_inner().unwrap();
+    let num_nids = nid2nways.len();
+    let mut nids_in_ne2_ways: SortedSliceSet<i64> =
+        SortedSliceSet::from(nid2nways.into_iter().filter_map(|(nid, nvertexes)| {
+            if nvertexes != 2 {
+                Some(nid)
+            } else {
+                None
+            }
+        }));
+    info!(
+        "There are {} nodes in total, but only {} ({:.1}%) are pillar nodes. It took {} to do this first read",
+        num_nids.to_formatted_string(&Locale::en),
+        nids_in_ne2_ways.len().to_formatted_string(&Locale::en),
+        (nids_in_ne2_ways.len() as f64) * 100. / (num_nids as f64),
+        formatting::format_duration(started_reading_for_pillar_nodes.elapsed()),
+    );
+
+    let input_fp = std::fs::File::open(&args.input_filename)?;
+    let input_bar = progress_bars.add(
+        ProgressBar::new(input_fp.metadata()?.len())
+            .with_message("Reading input file")
+            .with_style(file_reading_style.clone()),
+    );
+    let rdr = input_bar.wrap_read(input_fp);
+    let mut reader = osmio::stringpbf::PBFReader::new(rdr);
+    let graphs: HashMap<Box<[Option<String>]>, Graph2> = Default::default();
+    let graphs = Arc::new(Mutex::new(graphs));
+    let inter_store = inter_store::InterStore::new();
+    let inter_store = Arc::new(Mutex::new(inter_store));
     let started_reading_ways = Instant::now();
     reader
         .ways()
@@ -222,68 +279,79 @@ fn main() -> Result<()> {
                 .par_iter()
                 .map(|tg| tg.get_values(&w))
                 .collect::<Vec<Option<String>>>();
+            let group = group.into_boxed_slice();
             (w, group)
         })
         .filter(|(_w, group)| args.incl_unset_group || !group.iter().any(|x| x.is_none()))
-        .for_each_with(
-            (nodeid_wayids.clone(), group_wayid_nodes.clone()),
-            |(nodeid_wayids, group_wayid_nodes), (w, group)| {
-                trace!("Got a way {}, in group {:?}", w.id(), group);
-                rayon::join(
-                    || {
-                        nodeid_wayids.lock().unwrap().insert_many(w.id(), w.nodes());
-                    },
-                    || {
-                        group_wayid_nodes
-                            .lock()
-                            .unwrap()
-                            .entry(group)
-                            .or_default()
-                            .insert(w.id(), w.nodes().to_owned());
-                    },
-                );
-                ways_added.inc(1);
-            },
-        );
+        .for_each_with((graphs.clone(), inter_store.clone()), |(graphs, inter_store), (w, group)| {
+            let mut graphs = graphs.lock().unwrap();
+            let graph = graphs.entry(group).or_default();
+            let mut inter_store = inter_store.lock().unwrap();
+
+            let mut nodes = w.nodes();
+            let _orig_len = nodes.len();
+            if nodes.len() <= 2 {
+                for w in nodes.windows(2) {
+                    graph.add_edge(w[0], w[1]);
+                }
+            } else {
+                while nodes.len() >= 2 {
+                    let i_opt = nodes.iter().skip(1).position(|nid| nids_in_ne2_ways.contains(nid));
+                    let mut i = i_opt.unwrap() + 1;
+                    // can happen when a river splits and then joins again. try to stop reducing
+                    // this little tributary away.
+                    while graph.contains_edge(nodes[0], nodes[i]) && i > 1 {
+                        i -= 1;
+                    }
+                    // 2 nodes after another with nothing in between? That can happen with someone
+                    // double maps a river. But assert a differnet problem, which shows our ability
+                    // to contract edges has problems
+                    if i > 1 {
+                        assert!(!graph.contains_edge(nodes[0], nodes[i]), "already existing edge from {} to {} (there are {} nodes in the middle) i={}",nodes[0], nodes[i], nodes.len(), i);
+                    }
+                    assert!(i != 0);
+                    graph.add_edge(nodes[0], nodes[i]);
+                    inter_store.insert_undirected((nodes[0], nodes[i]), &nodes[1..i]);
+                    nodes = &nodes[i..];
+                }
+            }
+
+            ways_added.inc(1);
+        });
     let num_ways_read = ways_added.position();
+    drop(nids_in_ne2_ways);
     info!(
-        "Finshed first read of file. {} ways read in {}, {:.3e} ways/sec",
+        "Finshed reading file and building graph data structure. {} ways read in {}, {:.3e} ways/sec",
         num_ways_read.to_formatted_string(&Locale::en),
         formatting::format_duration(started_reading_ways.elapsed()),
         (num_ways_read as f64) / started_reading_ways.elapsed().as_secs_f64(),
     );
     ways_added.finish_and_clear();
     input_bar.finish_and_clear();
-    let nodeid_wayids = Arc::try_unwrap(nodeid_wayids)
-        .unwrap()
-        .into_inner()
-        .unwrap();
+    let graphs = Arc::try_unwrap(graphs).unwrap().into_inner().unwrap();
+    let inter_store = Arc::try_unwrap(inter_store).unwrap().into_inner().unwrap();
 
-    let group_wayid_nodes = Arc::try_unwrap(group_wayid_nodes)
-        .unwrap()
-        .into_inner()
-        .unwrap();
-
-    if group_wayid_nodes.is_empty() {
-        info!("No ways in the file matched your filters. Nothing to do");
-        return Ok(());
+    let assemble_nids_needed = progress_bars
+        .add(ProgressBar::new_spinner().with_style(
+            ProgressStyle::with_template("{human_pos} nids needed for later").unwrap(),
+        ));
+    let mut nids_we_need: Vec<i64> = Vec::new();
+    for graph in graphs.values() {
+        nids_we_need.extend(graph.vertexes());
+        assemble_nids_needed.inc(nids_we_need.len() as u64);
     }
-
-    debug!("{}", nodeid_wayids.detailed_size());
-
-    //let input_fp = std::fs::File::open(&args.input_filename)?;
-    //let input_bar = progress_bars.add(
-    //    ProgressBar::new(input_fp.metadata()?.len())
-    //        .with_message("Re-reading file to save node locations")
-    //        .with_style(file_reading_style.clone()),
-    //);
-    //let rdr = input_bar.wrap_read(input_fp);
-    //let reader = osmio::stringpbf::PBFNodePositionReader::from_reader(input_fp);
+    nids_we_need.extend(
+        inter_store
+            .all_inter_nids()
+            .inspect(|_| assemble_nids_needed.inc(1)),
+    );
+    let nids_we_need = SortedSliceSet::from_vec(nids_we_need);
+    assemble_nids_needed.finish_and_clear();
 
     debug!("Re-reading file to read all nodes");
     let started_reading_nodes = Instant::now();
     let setting_node_pos = progress_bars.add(
-        ProgressBar::new(nodeid_wayids.len() as u64)
+        ProgressBar::new(nids_we_need.len() as u64)
             .with_message("Nodes read")
             .with_style(style.clone()),
     );
@@ -292,7 +360,7 @@ fn main() -> Result<()> {
     reader
         .into_iter()
         .par_bridge()
-        .filter(|(nid, _pos)| nodeid_wayids.contains_nid(nid))
+        .filter(|(nid, _pos)| nids_we_need.contains(nid))
         .map(|(nid, pos)| (nid, (pos.1.inner(), pos.0.inner()))) // WTF do I have lat & lon
         // mixed up??
         .for_each_with(nodeid_pos.clone(), |nodeid_pos, (nid, pos)| {
@@ -300,6 +368,7 @@ fn main() -> Result<()> {
             nodeid_pos.lock().unwrap().insert_i32(nid, pos);
         });
 
+    drop(nids_we_need);
     let mut nodeid_pos = Arc::try_unwrap(nodeid_pos).unwrap().into_inner().unwrap();
     nodeid_pos.finished_inserting();
     let nodeid_pos = nodeid_pos;
@@ -334,20 +403,18 @@ fn main() -> Result<()> {
     }
     info!(
         "Starting the breath-first search.{}",
-        if group_wayid_nodes.len() > 1 {
-            format!(" There are {} groups", group_wayid_nodes.len())
+        if graphs.len() > 1 {
+            format!(" There are {} groups", graphs.len())
         } else {
             "".to_string()
         }
     );
     let grouping = progress_bars.add(
         ProgressBar::new(
-            group_wayid_nodes
-                .values()
-                .map(|wayid_nodes| {
-                    wayid_nodes.par_iter().map(|(_k, v)| v.len()).sum::<usize>() as u64
-                })
-                .sum(),
+            graphs
+                .par_iter()
+                .map(|(_group_name, graph)| graph.num_vertexes())
+                .sum::<usize>() as u64,
         )
         .with_message("Grouping all ways")
         .with_style(style.clone()),
@@ -357,345 +424,122 @@ fn main() -> Result<()> {
             ProgressStyle::with_template("            {human_pos} groups found").unwrap(),
         ));
 
-    let reorder_segments_bar = progress_bars.add(
-        ProgressBar::new(0)
-            .with_message("Reordering inner segments")
-            .with_style(style.clone()),
-    );
+    //grouping.inc(10);
+    let started_bfs = Instant::now();
 
-    let splitter = progress_bars.add(
-        ProgressBar::new(0)
-            .with_message("Splitting ways into lines")
-            .with_style(style.clone()),
-    );
-
-    let way_groups = group_wayid_nodes
+    let mut way_groups = graphs
         .into_par_iter()
-        .flat_map(|(group, wayid_nodes)| {
-            // Actually do the breath first search
-            // TODO this is single threaded...
-            trace!("Starting breath-first search for group {:?}", group);
-
-            trace!("Starting to collect all the wayids into a set...");
-            let mut unprocessed_wayids: BTreeSet<i64> =
-                wayid_nodes.par_iter().map(|(k, _v)| k).copied().collect();
-            trace!("... finished");
-
-            // Current list of all wids which are in the group
-            let mut this_group_wayids = Vec::new();
-
-            // all our resultant way groups
-            let mut way_groups = Vec::new();
-
-            while let Some(root_wayid) = unprocessed_wayids.pop_first() {
-                grouping.inc(wayid_nodes[&root_wayid].len() as u64);
-                // wayids which are in this little group
-                this_group_wayids.push(root_wayid);
-
-                // struct for this group
-                let mut this_group = WayGroup::new(root_wayid, group.to_owned());
-                trace!(
-                    "root_wayid {:?} (there are {} unprocessed ways left)",
-                    root_wayid,
-                    unprocessed_wayids.len()
-                );
-                while let Some(wid) = this_group_wayids.pop() {
-                    trace!(
-                        "Wayid: {} Currently there are {} ways in this group",
-                        wid,
-                        this_group.way_ids.len()
-                    );
-
-                    this_group.way_ids.push(wid);
-                    // Kinda stupid way to try to get this *somewhat* multithreaded
-                    rayon::join(
-                        || {
-                            this_group.nodeids.push(wayid_nodes[&wid].clone());
-                        },
-                        || {
-                            // find all other ways which are connected to wid, and add them to this_group
-                            for other_wayid in wayid_nodes[&wid]
-                                .iter()
-                                .filter(|nid| nodeid_wayids.nid_is_in_many(nid)) // only look at nodes in >1 ways
-                                .flat_map(|nid| nodeid_wayids.ways(nid))
-                            {
-                                // If this other way hasn't been processed yet, then add to this group.
-                                if unprocessed_wayids.remove(&other_wayid) {
-                                    grouping.inc(wayid_nodes[&other_wayid].len() as u64);
-                                    trace!("adding other way {}", other_wayid);
-                                    this_group_wayids.push(other_wayid);
-                                }
-                            }
-                        },
-                    );
-                }
-
-                reorder_segments_bar.inc_length(this_group.nodeids.len() as u64);
-                total_groups_found.inc(1);
-                way_groups.push(this_group);
-            }
-            debug!(
-                "In total, found {} waygroups for the tag group {:?}",
-                way_groups.len().to_formatted_string(&Locale::en),
-                group
-            );
-
-            way_groups
+        .flat_map_iter(|(group, mut complete_graph)| {
+            complete_graph
+                .into_disconnected_graphs(grouping.clone())
+                .map({
+                    let total_groups_found = total_groups_found.clone();
+                    move |sub_graph| {
+                        total_groups_found.inc(1);
+                        WayGroup::new(sub_graph, group.clone())
+                    }
+                })
         })
         .collect::<Vec<WayGroup>>();
+
+    info!(
+        "Finshed splitting into groups in {}",
+        formatting::format_duration(started_bfs.elapsed()),
+    );
     // ↑ The breath first search is done
     grouping.finish_and_clear();
     total_groups_found.finish_and_clear();
-    drop(nodeid_wayids);
+    way_groups.shrink_to_fit();
 
-    let way_groups: Vec<_> = way_groups
-        .into_par_iter()
-        .filter(|way_group| {
-            if args.only_these_way_groups.is_empty() {
-                true // no filtering in operation
-            } else {
-                args.only_these_way_groups
-                    .par_iter()
-                    .any(|only| *only == way_group.root_wayid)
-            }
-        })
-        .filter(|way_group| match only_these_way_groups_divmod {
-            None => true,
-            Some((a, b)) => way_group.root_wayid % a == b,
-        })
-        .filter(|way_group| {
-            if args.only_these_way_groups_nodeid.is_empty() {
-                true
-            } else {
-                args.only_these_way_groups_nodeid
-                    .par_iter()
-                    .any(|nid1| way_group.nodeids_iter().any(|nid2| nid1 == nid2))
-            }
-        })
-        .collect();
+    // FIXME do the only_these_way_groups etc check
+    assert!(args.only_these_way_groups.is_empty());
+    assert!(only_these_way_groups_divmod.is_none());
 
-    let way_groups: Vec<_> = way_groups
-        .into_par_iter()
-        .update(|way_group| {
-            trace!("Reducing the number of inner segments");
-            way_group.reorder_segments(20, &reorder_segments_bar, true);
-        })
-        .update(|way_group| {
-            trace!("Saving coordinates for all ways");
-            way_group.set_coords(&nodeid_pos);
-        })
-        .update(|way_group| {
-            trace!("Calculating all lengths");
-            way_group.calculate_length();
-        })
-        // apply min length filter
-        // This is before any possible splitting. If an unsplitted way_group has total len ≤ the min
-        // len, then splitting won't make it be included.
-        // This reduces the amount of splitting we have to do.
-        .filter(|way_group| match args.min_length_m {
-            None => true,
-            Some(min_len) => way_group.length_m.unwrap() >= min_len,
-        })
-        .inspect(|way_group| {
-            if args.split_into_single_paths {
-                splitter.inc_length(way_group.num_nodeids() as u64);
-            }
-        })
-        .collect();
-    reorder_segments_bar.finish_and_clear();
-
-    // ↓ Split into paths if needed
-    let way_groups: Vec<_> = way_groups.into_par_iter()
-    .flat_map(|way_group| {
-        let new_way_groups = if !args.split_into_single_paths {
-            vec![way_group]
-        } else {
-
-            trace!("wg:{} splitting the groups into single paths with Dij algorithm... wg.num_nodeids() = {}", way_group.root_wayid, way_group.num_nodeids());
-            let started = Instant::now();
-            let paths = match dij::into_segments(&way_group, &nodeid_pos, args.min_length_m, args.only_longest_n_splitted_paths, args.max_sinuosity, args.split_into_single_paths_by.clone().unwrap_or_default(), &splitter) {
-                Ok(paths) => {
-                    let duration = started.elapsed().as_secs_f64();
-                    log!(
-                        if paths.len() > 20 || duration > 2. { Debug } else { Trace },
-                        "Have generated {} paths from wg:{} ({} nodes) in {:.1} sec. {:.2} nodes/sec",
-                        paths.len(), way_group.root_wayid, way_group.num_nodeids(), duration, (way_group.num_nodeids() as f64)/duration
-                    );
-
-                    paths
-                }
-                Err(e) => {
-                    error!("Problem with wg:{:?}: {}. You probably don't have enough memory. You can rerun just this failing subset by passing --only-these-way-groups {:?} as a CLI arg. This group has {} nodes Error: {:?}", way_group.root_wayid, e, way_group.root_wayid, way_group.root_wayid, e);
-                    // Hack to ensure nothing is run later
-                    vec![]
-                }
-            };
-
-            paths.into_par_iter().map(move |path| {
-                let mut new_wg = way_group.clone();
-                new_wg.root_wayid = *path.iter().min().unwrap();
-                new_wg.nodeids = vec![path];
-                new_wg.coords = None;
-                new_wg.length_m = None;
-                new_wg.way_ids.truncate(0);
-                new_wg.to_owned()
-            })
-            .collect()
-        };
-
-        new_way_groups.into_par_iter()
-
-    })
-    // Add the coords & lengths again if needed
-    .update(|way_group| {
-        way_group.set_coords(&nodeid_pos);
-    })
-    .update(|way_group| {
-        way_group.calculate_length()
-    })
-    // apply min length filter
-    .filter(|way_group|
-        match args.min_length_m {
-            None => true,
-            Some(min_len) => way_group.length_m.unwrap() >= min_len,
-        }
-    )
-    .update(|way_group| {
-        trace!("Preparing extra json properties");
-        way_group.extra_json_props["root_wayid"] = way_group.root_wayid.into();
-        way_group.extra_json_props["root_wayid_120"] = (way_group.root_wayid % 120).into();
-        way_group.extra_json_props["length_m"] = way_group.length_m.into();
-        for (i, group) in way_group.group.iter().enumerate() {
-            way_group.extra_json_props[format!("tag_group_{}", i)] = group.as_ref().cloned().into();
-        }
-        way_group.extra_json_props["tag_groups"] = way_group.group.clone().into();
-        way_group.extra_json_props["length_m_int"] = way_group.length_m.map(|l| l.round() as i64).into();
-        way_group.extra_json_props["length_km"] = way_group.length_m.map(|l| l/1000.).into();
-        way_group.extra_json_props["length_km_int"] = way_group.length_m.map(|l| l/1000.).map(|l| l.round() as i64).into();
-        way_group.extra_json_props["num_ways"] = way_group.way_ids.len().into();
-        way_group.extra_json_props["num_nodes"] = way_group.num_nodeids().into();
-        if args.split_into_single_paths {
-            let line = &way_group.coords.as_ref().unwrap()[0];
-            let dist_ends = haversine_m(line[0].0, line[0].1, line.last().unwrap().0, line.last().unwrap().1);
-            way_group.extra_json_props["dist_ends_m"] = dist_ends.into();
-            way_group.extra_json_props["dist_ends_m_int"] = (dist_ends.round() as i64).into();
-            way_group.extra_json_props["dist_ends_km"] = (dist_ends/1000.).into();
-            way_group.extra_json_props["dist_ends_km_int"] = ((dist_ends/1000.).round() as i64).into();
-            way_group.extra_json_props["sinuosity"] = way_group.length_m.map(|l| l/dist_ends).into();
-        }
-
-    })
-    .collect();
-
-    if let Some(frames_filepath) = args.output_frames {
-        let skipped_way_groups_count = AtomicUsize::new(0);
-        let skipped_way_groups_length_sum = AtomicU64::new(0);
-
-        let started_frames = Instant::now();
+    if !args.only_these_way_groups_nodeid.is_empty() {
+        let old_num_wgs = way_groups.len();
+        way_groups.retain(|wg| {
+            args.only_these_way_groups_nodeid
+                .iter()
+                .any(|nid| wg.graph.contains_vertex(*nid))
+        });
+        way_groups.shrink_to_fit();
         info!(
-            "Calculating, for each way group, all the frames (lines through the middle){}",
-            args.frames_group_min_length_m
-                .map_or("".to_string(), |min| format!(
-                    ", and only including way groups longer than {:.3e}",
-                    min
-                ))
-        );
-        let frames_all_nodes_bar = progress_bars.add(
-            ProgressBar::new(
-                way_groups
-                    .par_iter()
-                    .map(|wg| wg.num_nodeids() as u64)
-                    .sum::<u64>(),
-            )
-            .with_message("Processing nodes for Frames")
-            .with_style(style.clone()),
-        );
-        let frames_bar = progress_bars.add(
-            ProgressBar::new(0)
-                .with_message("Calculating Frames")
-                .with_style(style.clone()),
-        );
-        // This can need a lot of memory, so don't calculate in parallel.
-        let started_frames_calculation = Instant::now();
-        let frames: Vec<_> = way_groups
-            .iter()
-            .flat_map(
-                |wg| -> Box<dyn Iterator<Item = (serde_json::Value, Vec<_>)>> {
-                    if let Some(min) = args.frames_group_min_length_m {
-                        if wg.length_m.unwrap() < min {
-                            skipped_way_groups_count.fetch_add(1, atomic_Ordering::SeqCst);
-                            skipped_way_groups_length_sum.fetch_add(
-                                wg.length_m.unwrap().round() as u64,
-                                atomic_Ordering::SeqCst,
-                            );
-                            frames_all_nodes_bar.inc(wg.num_nodeids() as u64);
-                            return Box::new(std::iter::empty());
-                        }
-                    }
-                    //let started = Instant::now();
-                    let paths = wg.frames(&nodeid_pos, &frames_bar);
-                    frames_all_nodes_bar.inc(wg.num_nodeids() as u64);
-                    if args.save_as_linestrings {
-                        Box::new(
-                            paths
-                                .into_iter()
-                                .map(|path| (wg.extra_json_props.clone(), vec![path])),
-                        )
-                    } else {
-                        Box::new(std::iter::once((wg.extra_json_props.clone(), paths)))
-                    }
-                },
-            )
-            .collect();
-        info!(
-            "Calculated {} frames in {} ({:.3e} frames/sec)",
-            frames.len().to_formatted_string(&Locale::en),
-            formatting::format_duration(started_frames_calculation.elapsed()),
-            (frames.len() as f64) / started_frames_calculation.elapsed().as_secs_f64(),
-        );
-        if args.frames_group_min_length_m.is_some() {
-            info!(
-                "{} way groups (total length: {:.3e} m) were excluded from frame calculation",
-                skipped_way_groups_count
-                    .into_inner()
-                    .to_formatted_string(&Locale::en),
-                skipped_way_groups_length_sum.into_inner(),
-            )
-        }
-        frames_bar.finish_and_clear();
-        frames_all_nodes_bar.finish_and_clear();
-
-        // Then write it
-        let frames_writing_bar = progress_bars.add(
-            ProgressBar::new(frames.len() as u64)
-                .with_message(format!("Writing frames to {}", frames_filepath.display()))
-                .with_style(style.clone()),
-        );
-
-        let f = std::fs::File::create(&frames_filepath).unwrap();
-        let mut f = std::io::BufWriter::new(f);
-        let num_written = fileio::write_geojson_features_directly(
-            frames_writing_bar.wrap_iter(frames.into_iter()),
-            &mut f,
-            &OutputFormat::GeoJSONSeq,
-        )?;
-        info!(
-            "Calculated & wrote {} frames to {:?} in {}",
-            num_written.to_formatted_string(&Locale::en),
-            frames_filepath,
-            formatting::format_duration(started_frames.elapsed())
+            "Removed {} waygroups which don't have a required node, leaving only {} left",
+            old_num_wgs - way_groups.len(),
+            way_groups.len()
         );
     }
 
+    way_groups
+        .par_iter_mut()
+        .for_each(|wg| wg.calculate_length(&nodeid_pos));
+
+    if let Some(min_length_m) = args.min_length_m {
+        let old = way_groups.len();
+        way_groups.retain(|wg| wg.length_m >= min_length_m);
+        info!(
+            "Removed {} way_groups which were smaller than {} m",
+            (old - way_groups.len()).to_formatted_string(&Locale::en),
+            min_length_m
+        );
+    }
+    if let Some(max_length_m) = args.max_length_m {
+        way_groups.retain(|wg| wg.length_m <= max_length_m);
+    }
+    way_groups.shrink_to_fit();
+
+    way_groups.par_iter_mut().for_each(|wg| {
+        let mut json_props = &mut wg.json_props;
+        json_props["root_nodeid"] = wg.root_nodeid.into();
+        json_props["root_nodeid_120"] = (wg.root_nodeid % 120).into();
+        json_props["length_m"] = wg.length_m.into();
+        for (i, group) in wg.group.iter().enumerate() {
+            json_props[format!("tag_group_{}", i)] = group.as_ref().cloned().into();
+        }
+        json_props["tag_groups"] = wg.group.to_vec().into();
+        json_props["length_m_int"] = (wg.length_m.round() as i64).into();
+        json_props["length_km"] = (wg.length_m / 1000.).into();
+        json_props["length_km_int"] = ((wg.length_m / 1000.).round() as i64).into();
+        json_props["num_nodes"] = wg.graph.num_vertexes().into();
+    });
+
+    info!("all JSON properties set");
+
+    if let Some(output_frames) = args.output_frames {
+        do_frames(
+            &output_frames,
+            args.frames_group_min_length_m.clone(),
+            args.save_as_linestrings.clone(),
+            &way_groups,
+            &progress_bars,
+            &style,
+            &nodeid_pos,
+            &inter_store,
+        )?;
+    }
+
+    let split_into_lines = progress_bars.add(
+        ProgressBar::new(
+            way_groups
+                .par_iter()
+                .map(|wg| wg.num_nodes())
+                .sum::<usize>() as u64,
+        )
+        .with_message("Splitting into single lines")
+        .with_style(style.clone()),
+    );
+
+    assert!(!args.split_files_by_group);
     let files_data: HashMap<_, _> = way_groups
         .into_par_iter()
         // Group into files
         .fold(
-            || HashMap::new() as HashMap<String, Vec<WayGroup>>,
+            || HashMap::new() as HashMap<String, Vec<_>>,
             |mut files, way_group| {
                 trace!("Grouping all data into files");
                 files
-                    .entry(way_group.filename(&args.output_filename, args.split_files_by_group))
+                    //.entry(way_group.filename(&args.output_filename, args.split_files_by_group))
+                    .entry(args.output_filename.clone())
                     .or_default()
                     .push(way_group);
                 files
@@ -705,114 +549,28 @@ fn main() -> Result<()> {
         .reduce(HashMap::new, |mut acc, curr| {
             trace!("Merging files down again");
             for (filename, wgs) in curr.into_iter() {
-                #[allow(clippy::map_entry)]
-                if !acc.contains_key(&filename) {
-                    acc.insert(filename, wgs);
-                } else {
-                    acc.get_mut(&filename).unwrap().extend(wgs.into_iter());
-                }
+                acc.entry(filename).or_default().extend(wgs.into_iter())
             }
             acc
         });
+
+    info!(
+        "All data has been split into {} different file(s)",
+        files_data.len()
+    );
+    assert!(!args.incl_dist_to_longer);
 
     files_data
         .into_par_iter()
         .update(|(_filename, way_groups)| {
             debug!("sorting ways by length & truncating");
             // in calc dist to longer, we need this sorted too
-            way_groups.par_sort_by(|a, b| {
-                a.length_m
-                    .unwrap()
-                    .total_cmp(&b.length_m.unwrap())
-                    .reverse()
-            });
+            way_groups.par_sort_unstable_by(|a, b| a.length_m.total_cmp(&b.length_m).reverse());
         })
         .update(|(_filename, way_groups)| {
             if let Some(limit) = args.only_longest_n_per_file {
                 debug!("Truncating files by longest");
                 way_groups.truncate(limit);
-            }
-        })
-        .update(|(_filename, way_groups)| {
-            if args.incl_dist_to_longer {
-                debug!("Calculating the distance to the nearest longer object per way");
-
-                let mut points_distance_idx = KdTree::new(2);
-
-                let prog = progress_bars.add(
-                    ProgressBar::new(way_groups.iter().map(|wg| wg.num_nodeids() as u64).sum())
-                        .with_message("Calc distance to longer: Indexing data")
-                        .with_style(style.clone()),
-                );
-
-                for (wg_id, coords) in way_groups
-                    .iter()
-                    .enumerate()
-                    .flat_map(|(wg_id, wg)| wg.coords_iter_seq().map(move |coords| (wg_id, coords)))
-                {
-                    points_distance_idx.add(coords, wg_id).unwrap();
-                    prog.inc(1);
-                }
-                prog.finish_and_clear();
-
-                let prog = progress_bars.add(
-                    ProgressBar::new(
-                        way_groups
-                            .par_iter()
-                            .map(|wg| wg.num_nodeids() as u64)
-                            .sum::<u64>(),
-                    )
-                    .with_message("Calc distance to longer")
-                    .with_style(style.clone()),
-                );
-                // dist to larger
-                let longers = way_groups
-                    .par_iter()
-                    .enumerate()
-                    .map(|(wg_id, wg)| {
-                        // for each point what's the nearest other point that's in a longer other wayid
-                        let min = wg
-                            .coords_iter_par()
-                            .map(|coord: [f64; 2]| -> Option<(f64, i64)> {
-                                let nearest_longer = points_distance_idx
-                                    .iter_nearest(&coord, &haversine::haversine_m_arr)
-                                    .unwrap()
-                                    .filter(|(_dist, other_wg_id)| **other_wg_id != wg_id)
-                                    .find(|(_dist, other_wg_id)| {
-                                        way_groups[**other_wg_id].length_m
-                                            > way_groups[wg_id].length_m
-                                    });
-                                prog.inc(1);
-                                nearest_longer
-                                    .map(|(dist, wgid)| (dist, way_groups[*wgid].root_wayid))
-                            })
-                            .filter_map(|x| x)
-                            .min_by(|a, b| (a.0).total_cmp(&b.0));
-                        min
-                    })
-                    .collect::<Vec<_>>();
-                prog.finish_and_clear();
-
-                // set the longer distance
-                way_groups
-                    .par_iter_mut()
-                    .zip(longers)
-                    .for_each(|(wg, longer)| {
-                        wg.extra_json_props["dist_to_longer_m"] =
-                            longer.map(|(dist, _)| dist).into();
-                        wg.extra_json_props["nearest_longer_waygroup"] =
-                            longer.map(|(_dist, wgid)| wgid).into();
-                    });
-
-                // remove any that are too short
-                // TODO this can prob. be done faster in the above line, where er
-                if let Some(min_dist_to_longer_m) = args.min_dist_to_longer_m {
-                    way_groups.retain(|wg| {
-                        wg.extra_json_props["dist_to_longer_m"]
-                            .as_f64()
-                            .map_or(true, |d| d >= min_dist_to_longer_m)
-                    })
-                }
             }
         })
         .update(|(_filename, way_groups)| {
@@ -823,7 +581,7 @@ fn main() -> Result<()> {
             way_groups
                 .par_iter()
                 .enumerate()
-                .map(|(i, wg)| (wg.length_m.unwrap(), i, 0))
+                .map(|(i, wg)| (wg.length_m, i, 0))
                 .collect_into_vec(&mut feature_ranks);
             // sort by longest first
             feature_ranks.par_sort_unstable_by(|a, b| a.0.total_cmp(&b.0).reverse());
@@ -843,78 +601,96 @@ fn main() -> Result<()> {
                 .par_iter_mut()
                 .zip(feature_ranks.par_iter())
                 .for_each(|(wg, (_len, _wg_idx, rank))| {
-                    wg.extra_json_props["length_desc_rank"] = (*rank).into();
-                    wg.extra_json_props["length_desc_rank_perc"] =
+                    wg.json_props["length_desc_rank"] = (*rank).into();
+                    wg.json_props["length_desc_rank_perc"] =
                         ((*rank as f64) / way_groups_len_f).into();
-                    wg.extra_json_props["length_asc_rank"] = (way_groups_len - *rank).into();
-                    wg.extra_json_props["length_asc_rank_perc"] =
+                    wg.json_props["length_asc_rank"] = (way_groups_len - *rank).into();
+                    wg.json_props["length_asc_rank_perc"] =
                         ((way_groups_len - *rank) as f64 / way_groups_len_f).into();
                 });
 
-            if args.split_into_single_paths {
-                // dist between ends
-                feature_ranks.truncate(0);
+            //if args.split_into_single_paths {
+            //    // dist between ends
+            //    feature_ranks.truncate(0);
 
-                // (length of way group, idx of this way group in way_groups, rank)
-                way_groups
-                    .par_iter()
-                    .enumerate()
-                    .map(|(i, wg)| (wg.extra_json_props["dist_ends_m"].as_f64().unwrap(), i, 0))
-                    .collect_into_vec(&mut feature_ranks);
-                // sort by longest first
-                feature_ranks.par_sort_unstable_by(|a, b| a.0.total_cmp(&b.0).reverse());
-                // update feature_ranks to store the local rank
-                feature_ranks.par_iter_mut().enumerate().for_each(
-                    |(rank, (_len, _idx, new_rank))| {
-                        *new_rank = rank;
-                    },
-                );
-                // sort back by way_groups idx
-                feature_ranks.par_sort_unstable_by_key(|(_len, wg_idx, _rank)| *wg_idx);
-                // now update the way_groups
-                way_groups
-                    .par_iter_mut()
-                    .zip(feature_ranks.par_iter())
-                    .for_each(|(wg, (_len, _wg_idx, rank))| {
-                        wg.extra_json_props["dist_ends_desc_rank"] = (*rank).into();
-                        wg.extra_json_props["dist_ends_asc_rank"] = (way_groups_len - *rank).into();
-                    });
-            }
+            //    // (length of way group, idx of this way group in way_groups, rank)
+            //    way_groups
+            //        .par_iter()
+            //        .enumerate()
+            //        .map(|(i, wg)| (wg.json_props["dist_ends_m"].as_f64().unwrap(), i, 0))
+            //        .collect_into_vec(&mut feature_ranks);
+            //    // sort by longest first
+            //    feature_ranks.par_sort_unstable_by(|a, b| a.0.total_cmp(&b.0).reverse());
+            //    // update feature_ranks to store the local rank
+            //    feature_ranks.par_iter_mut().enumerate().for_each(
+            //        |(rank, (_len, _idx, new_rank))| {
+            //            *new_rank = rank;
+            //        },
+            //    );
+            //    // sort back by way_groups idx
+            //    feature_ranks.par_sort_unstable_by_key(|(_len, wg_idx, _rank)| *wg_idx);
+            //    // now update the way_groups
+            //    way_groups
+            //        .par_iter_mut()
+            //        .zip(feature_ranks.par_iter())
+            //        .for_each(|(wg, (_len, _wg_idx, rank))| {
+            //            wg.json_props["dist_ends_desc_rank"] = (*rank).into();
+            //            wg.json_props["dist_ends_asc_rank"] = (way_groups_len - *rank).into();
+            //        });
+            //}
         })
-        // ↓ convert to json objs
         .map(|(filename, way_groups)| {
-            debug!("Convert to GeoJSON (ish)");
-            let features = way_groups
-                .into_par_iter()
-                .map(|w| {
-                    let mut properties = w.extra_json_props;
-                    if args.incl_wayids {
-                        properties["all_wayids"] = w
-                            .way_ids
-                            .iter()
-                            .map(|wid| format!("w{}", wid))
-                            .collect::<Vec<String>>()
-                            .into();
-                    }
+            let mut results = Vec::with_capacity(way_groups.len());
+            for wg in way_groups.into_iter() {
+                let WayGroup {
+                    json_props,
+                    graph,
+                    group,
+                    ..
+                } = wg;
+                // Iterator which yields lines of nids for each line
+                let lines_nids_iter = if args.split_into_single_paths {
+                    assert_eq!(
+                        args.split_into_single_paths_by,
+                        dij::SplitPathsMethod::AsCrowFlies
+                    );
+                    Box::new(
+                        graph
+                            .into_lines_as_crow_flies(&nodeid_pos)
+                            .take(args.only_longest_n_splitted_paths.unwrap_or(usize::MAX)),
+                    ) as Box<dyn Iterator<Item = Box<[i64]>>>
+                } else {
+                    Box::new(graph.into_lines_random())
+                };
+                // Turn list of nids into latlngs
+                let coords_iter = lines_nids_iter.map(|nids| {
+                    split_into_lines.inc(nids.len() as u64);
+                    inter_store
+                        .expand_line_undirected(&nids)
+                        .map(|nid| nodeid_pos.get(&nid).unwrap())
+                        .collect::<Vec<_>>()
+                });
 
-                    (properties, w.coords.unwrap())
-                })
-                .flat_map_iter(|(properties, coords)| {
-                    if args.save_as_linestrings {
-                        Box::new(
-                            coords
-                                .into_iter()
-                                .map(move |coord_string| (properties.clone(), vec![coord_string])),
-                        )
-                    } else {
-                        // Need to put the `as Box…` so the rust compiler won't complain
-                        Box::new(std::iter::once((properties, coords)))
-                            as Box<dyn Iterator<Item = (serde_json::Value, Vec<Vec<(f64, f64)>>)>>
-                    }
-                })
-                .collect::<Vec<_>>();
+                if !args.split_into_single_paths && !args.save_as_linestrings {
+                    results.push((json_props, coords_iter.collect::<Vec<_>>()));
+                } else {
+                    // TODO remove this little Vec (goal is to reduce allocations)
+                    results.extend(coords_iter.map(|coords| {
+                        let mut json_props = json_props.clone();
+                        if args.split_into_single_paths {
+                            let dist_ends = haversine_m_fpair(coords[0], *coords.last().unwrap());
+                            json_props["dist_ends_m"] = dist_ends.into();
+                            json_props["dist_ends_m_int"] = (dist_ends.round() as i64).into();
+                            json_props["dist_ends_km"] = (dist_ends / 1000.).into();
+                            json_props["dist_ends_km_int"] =
+                                ((dist_ends / 1000.).round() as i64).into();
+                        }
+                        (json_props, vec![coords])
+                    }));
+                }
+            }
 
-            (filename, features)
+            (filename, results)
         })
         .try_for_each(|(filename, features)| {
             debug!("Writing data to file(s)...");
@@ -976,5 +752,113 @@ fn main() -> Result<()> {
         "Finished all in {}",
         formatting::format_duration(global_start.elapsed())
     );
+    Ok(())
+}
+
+fn do_frames(
+    frames_filepath: &PathBuf,
+    frames_group_min_length_m: Option<f64>,
+    save_as_linestrings: bool,
+    way_groups: &[WayGroup],
+    progress_bars: &MultiProgress,
+    style: &ProgressStyle,
+    nodeid_pos: &impl NodeIdPosition,
+    inter_store: &inter_store::InterStore,
+) -> Result<()> {
+    let skipped_way_groups_count = AtomicUsize::new(0);
+    let skipped_way_groups_length_sum = AtomicU64::new(0);
+
+    let started_frames = Instant::now();
+    info!(
+        "Calculating, for each way group, all the frames (lines through the middle){}",
+        frames_group_min_length_m.map_or("".to_string(), |min| format!(
+            ", and only including way groups longer than {:.3e}",
+            min
+        ))
+    );
+    let frames_all_nodes_bar = progress_bars.add(
+        ProgressBar::new(
+            way_groups
+                .par_iter()
+                .map(|wg| wg.num_nodes() as u64)
+                .sum::<u64>(),
+        )
+        .with_message("Processing nodes for Frames")
+        .with_style(style.clone()),
+    );
+    let frames_bar = progress_bars.add(
+        ProgressBar::new(0)
+            .with_message("Calculating Frames")
+            .with_style(style.clone()),
+    );
+    let started_frames_calculation = Instant::now();
+    let frames: Vec<_> = way_groups
+        .par_iter()
+        .filter(|wg| frames_group_min_length_m.map_or(true, |min| wg.length_m >= min))
+        .flat_map_iter(
+            |wg| -> Box<dyn Iterator<Item = (serde_json::Value, Vec<_>)>> {
+                let paths = wg
+                    .frames(nodeid_pos, &frames_bar)
+                    .map(|line| {
+                        inter_store
+                            .expand_line_undirected(&line)
+                            .map(|nid| nodeid_pos.get(&nid).unwrap())
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>();
+                frames_all_nodes_bar.inc(wg.num_nodes() as u64);
+
+                //frames_all_nodes_bar.inc(wg.num_nodeids() as u64);
+                if save_as_linestrings {
+                    Box::new(
+                        paths
+                            .into_iter()
+                            .map(|path| (wg.json_props.clone(), vec![path])),
+                    )
+                } else {
+                    Box::new(std::iter::once((wg.json_props.clone(), paths)))
+                }
+            },
+        )
+        .collect();
+    info!(
+        "Calculated {} frames in {} ({:.3e} frames/sec)",
+        frames.len().to_formatted_string(&Locale::en),
+        formatting::format_duration(started_frames_calculation.elapsed()),
+        (frames.len() as f64) / started_frames_calculation.elapsed().as_secs_f64(),
+    );
+    if frames_group_min_length_m.is_some() {
+        info!(
+            "{} way groups (total length: {:.3e} m) were excluded from frame calculation",
+            skipped_way_groups_count
+                .into_inner()
+                .to_formatted_string(&Locale::en),
+            skipped_way_groups_length_sum.into_inner(),
+        )
+    }
+    frames_bar.finish_and_clear();
+    frames_all_nodes_bar.finish_and_clear();
+
+    // Then write it
+    let frames_writing_bar = progress_bars.add(
+        ProgressBar::new(frames.len() as u64)
+            .with_message(format!("Writing frames to {}", frames_filepath.display()))
+            .with_style(style.clone()),
+    );
+
+    let f = std::fs::File::create(&frames_filepath).unwrap();
+    let mut f = std::io::BufWriter::new(f);
+    let num_written = fileio::write_geojson_features_directly(
+        frames_writing_bar.wrap_iter(frames.into_iter()),
+        &mut f,
+        &OutputFormat::GeoJSONSeq,
+    )?;
+    info!(
+        "Calculated & wrote {} frames to {:?} in {}",
+        num_written.to_formatted_string(&Locale::en),
+        frames_filepath,
+        formatting::format_duration(started_frames.elapsed())
+    );
+
     Ok(())
 }

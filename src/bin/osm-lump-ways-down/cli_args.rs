@@ -49,9 +49,9 @@ pub struct Args {
     ///      or if it does, it's not one of these values
     ///   • `-f key~regex` way has this key and the value matches this regex.
     ///     Regexes are case sensitive. Add `(?i)` at start of regex to switch to case insensitive
-    ///     (e.g. `-f name~(?i).* street`)
+    ///     (e.g. `-f "name~(?i).* street"`)
     ///     Regexes match the whole value, `-f name~[Ss]treet` will match `Street`, but not `Main
-    ///     Street North` nor `Main Street`. Use `-f name~.*[Ss]treet.*` to match all.
+    ///     Street North` nor `Main Street`. Use `-f "name~.*[Ss]treet.*"` to match all.
     ///   • `-f F1∨F2∨F3…` logical OR of the other tag filters F1, F2, …
     ///   • `-f F1∧F2∧F3…` logical AND of the other tag filters F1, F2, …
     #[arg(
@@ -154,6 +154,10 @@ pub struct Args {
     #[arg(long, value_name = "NUMBER")]
     pub min_upstream_m: Option<f64>,
 
+    /// Where to write the loops file
+    #[arg(long, value_name = "OUTPUT.geojson[s]")]
+    pub loops: Option<PathBuf>,
+
     /// Path to store CSV of statistics
     /// CSV file with 4 columns.
     /// • `timestamp`: unix epoch timestamp of data age (integer)
@@ -167,19 +171,15 @@ pub struct Args {
     ///     • `loops_length_m`: Total length, in metres, of all loops in this region (float)
     /// • `value` The value of the metric.
     #[arg(long, value_name = "FILENAME.csv", verbatim_doc_comment)]
-    pub csv_stats_file: Option<PathBuf>,
+    pub loops_csv_stats_file: Option<PathBuf>,
 
     /// Path to store OpenMetrics/Prometheus metrics
     #[arg(long, value_name = "FILENAME.prom")]
-    pub openmetrics: Option<PathBuf>,
+    pub loops_openmetrics: Option<PathBuf>,
 
     /// Write the ends file
     #[arg(long, value_name = "OUTPUT.geojson[s]")]
     pub ends: Option<PathBuf>,
-
-    /// Where to write the loops file
-    #[arg(long, value_name = "OUTPUT.geojson[s]")]
-    pub loops: Option<PathBuf>,
 
     /// The points in the Ends data will have a boolean if they are a member of a way with this
     /// tag. Syntax is the tag filter.
@@ -190,48 +190,69 @@ pub struct Args {
     /// on that end point as the GeoJSON property `tag:$TAG`. If the upstreams, or grouped
     /// upstreams are calculated, that will be included in the `end_tag:X` property
     ///
-    /// e.g. --ends-tag NAME will add the value of the `name` tag from each OSM way which ends at a
+    /// e.g. `--ends-tag NAME` will add the value of the `name` tag from each OSM way which ends at a
     /// point to that point, and any upstream points. This makes the output in `grouped-ends` more
     /// human readable.
-    #[arg(long, value_name = "TAG")]
+    #[arg(long, value_name = "TAG", verbatim_doc_comment)]
     pub ends_tag: Vec<String>,
+
+    /// Path to store CSV exports of end points
+    /// CSV file with following columns:
+    /// • `timestamp`: unix epoch timestamp of data age (integer)
+    /// • `iso_timestamp`: ISO8601/RFC3339 string of data age same second as timestamp. (string)
+    /// • `upstream_m`: Total upstream to this end, in metres (float)
+    /// • `upstream_m_rank`: What's the rank of that upstream, 1 = the biggest upstream_m.
+    /// (integer)
+    /// • `nid`: OSM Node id
+    /// • `lat`: Latitude of the point
+    /// • `lng`: Longitude
+    /// And then one column for each `--ends-tag` value.
+    #[arg(long, value_name = "FILENAME.csv", verbatim_doc_comment)]
+    pub ends_csv_file: Option<PathBuf>,
+
+    /// Only end points with a `upstream_m` longer than this will be included in ends csv file
+    /// If unset, all end points will be included
+    #[arg(long, requires = "ends_csv_file")]
+    pub ends_csv_min_length_m: Option<f64>,
+
+    /// Only the largest N ends (by `upstream_m`) are included in CSV file
+    #[arg(long, requires = "ends_csv_file")]
+    pub ends_csv_only_largest_n: Option<usize>,
 
     /// Calculate & write a file with each upstream line to this file
     #[arg(long, value_name = "UPSTREAMS_FILENAME")]
     pub upstreams: Option<PathBuf>,
 
+    /// The upstreams file will only include segments which have at least this much of an
+    /// upstream_m value. If unset, all segments will be included.
+    /// This helps reduce the file size
+    #[arg(long, value_name = "NUMBER", requires = "upstreams")]
+    pub upstreams_min_upstream_m: Option<f64>,
+
     /// For every upstream, include details on which end point(s) this eventually flows to.
     #[arg(long, default_value = "false")]
     pub upstream_output_ends_full: bool,
 
-    /// For every upstream, include details on the largest end that this point flows to.
-    /// Less details on other ends than upstream_output_ends_full, but requires less memory to
-    /// process.
-    #[arg(
-        long,
-        default_value = "false",
-      conflicts_with_all=["upstream_output_ends_full", "upstream_assign_end_by_tag"],
-    )]
-    pub upstream_output_biggest_end: bool,
+    /// Include an extra property from_upstream_m_N for every occurance of this argument, with the
+    /// from_upstream_m value rounded to the nearest multiple of N.
+    /// e.g. `--upstream-from-upstream-multiple 100` will cause `from_upstream_m_100` value to be
+    /// the `upstream_m` value, but rounded to the nearest multiple of 100.
+    #[arg(long, requires = "upstreams", verbatim_doc_comment)]
+    pub upstreams_from_upstream_multiple: Vec<f64>,
 
-    /// Assign lines to an end which matches the value of this OSM tag
-    #[arg(long,
-          conflicts_with_all=["upstream_output_biggest_end"],
-    )]
-    pub upstream_assign_end_by_tag: Option<String>,
+    ///
+    #[arg(long, default_value = "false", conflicts_with = "flow_follows_tag")]
+    pub flow_split_equally: bool,
+
+    ///
+    #[arg(long, conflicts_with = "flow_split_equally")]
+    pub flow_follows_tag: Option<String>,
 
     /// Calculate and write ways which are based on which end point each line eventually flows
     /// into, based on the `upstream_assign_end_by_tag` or `upstream_output_biggest_end` (for
     /// biggest end).
     #[arg(long)]
     pub grouped_ends: Option<PathBuf>,
-
-    /// Include an extra property from_upstream_m_N for every occurance of this argument, with the
-    /// from_upstream_m value rounded to the nearest multiple of N.
-    /// e.g. `--upstream-from-upstream-multiple 100` will cause `from_upstream_m_100` value to be
-    /// the `upstream_m` value, but rounded to the nearest multiple of 100.
-    #[arg(long, requires = "upstreams")]
-    pub upstream_from_upstream_multiple: Vec<i64>,
 
     /// For all ends, calc the complete upstreams
     #[arg(long, default_value = "false")]

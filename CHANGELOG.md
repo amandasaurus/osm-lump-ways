@@ -1,6 +1,19 @@
 # Changelog
 
-## Unreleased
+## v2.0.0
+
+* Massive refactor to speed up code. Both `osm-lump-ways` &
+  `osm-lump-ways-down` have been refactored to work much faster.
+* Arguments renamed:
+   * `--csv-stats-file` → `--loops-csv-stats-file`
+   * `--openmetrics` → `--loops-openmetrics`
+   * `--upstream-output-biggest-end` → `--flow-split-equally`
+   * `--upstream-assign-end-by-tag` → `--flow-follows-tag`
+* `root_wayid` in `osm-lump-ways` output replaced with `root_nodeid`.
+* New `osm-lump-ways-down` feature: `--ends-csv`: Create/Update a CSV of end
+  points.
+* When using `--flow-follows-tag TAG`, this will also assign the
+  upstream value for ways based on this tag, rather than splitting equally.
 
 ## v1.7.0 (2024-10-06)
 

@@ -12,6 +12,7 @@ use osmio::prelude::*;
 use osmio::OSMObjBase;
 use rayon::prelude::*;
 
+use itertools::Itertools;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs::File;
 use std::io::BufWriter;
@@ -36,7 +37,9 @@ use haversine::haversine_m;
 use nodeid_position::NodeIdPosition;
 use osm_lump_ways::graph;
 use osm_lump_ways::haversine;
+use osm_lump_ways::inter_store;
 use osm_lump_ways::nodeid_position;
+use osm_lump_ways::sorted_slice_store::SortedSliceMap;
 use osm_lump_ways::tagfilter;
 
 use fileio::{write_csv_features_directly, write_geojson_features_directly};
@@ -44,6 +47,7 @@ use osm_lump_ways::fileio;
 
 use osm_lump_ways::formatting;
 
+mod ends_csv;
 mod loops_csv_stats;
 mod openmetrics;
 
@@ -96,6 +100,7 @@ fn main() -> Result<()> {
             .with_style(file_reading_style.clone()),
     );
     let rdr = input_bar.wrap_read(input_fp);
+    let reader = osmio::stringpbf::PBFReader::new(rdr);
 
     if !args.input_filename.is_file() {
         error!(
@@ -110,17 +115,24 @@ fn main() -> Result<()> {
 
     anyhow::ensure!(
         args.ends.is_some()
+            || args.ends_csv_file.is_some()
             || args.loops.is_some()
             || args.upstreams.is_some()
             || args.grouped_ends.is_some(),
         "Nothing to do. You need to specifiy one of --ends/--loops/--upstreams/etc."
     );
 
-    if args.grouped_ends.is_some()
-        && !(args.upstream_output_biggest_end || args.upstream_assign_end_by_tag.is_some())
+    if (args.grouped_ends.is_some()
+        || args.upstreams.is_some()
+        || args.ends.is_some()
+        || args.ends_csv_file.is_some())
+        && !(args.flow_split_equally || args.flow_follows_tag.is_some())
     {
-        error!("If you have upstreams which are grouped by ends, you must specificy one of --upstream-output-biggest-end or --upstream-assign-end-by-tag TAG");
-        anyhow::bail!("If you have upstreams which are grouped by ends, you must specificy one of --upstream-output-biggest-end or --upstream-assign-end-by-tag TAG");
+        error!("If you want to output upstreams or ends, you must specificy one of --flow-split-equally or --flow-follows-tag TAG");
+        anyhow::bail!("If you want to output upstreams or ends, you must specificy one of --flow-split-equally or --flow-follows-tag TAG");
+    }
+    if args.ends_csv_file.is_some() && args.ends_tag.is_empty() {
+        warn!("The ends CSV file only makes sense with the --ends-tag arguments. Since you have specified no end tags, nothing will be written to the ends CSV file");
     }
 
     info!("Input file: {:?}", &args.input_filename);
@@ -163,10 +175,26 @@ fn main() -> Result<()> {
         ),
     );
 
-    let mut metrics = args.openmetrics.as_ref().map(openmetrics::init);
-    let mut csv_stats = args.csv_stats_file.as_ref().map(loops_csv_stats::init);
+    let mut loops_metrics = args.loops_openmetrics.as_ref().map(openmetrics::init);
+    let mut loops_csv_stats = args
+        .loops_csv_stats_file
+        .as_ref()
+        .map(loops_csv_stats::init);
+    let mut ends_csv = args
+        .ends_csv_file
+        .as_ref()
+        .map(|f| ends_csv::init(f, &args));
 
     let boundaries = CountryBoundaries::from_reader(BOUNDARIES_ODBL_360X180)?;
+
+    // how many vertexes are there per node id? (which do we need to keep)
+    let nids_in_ne2_ways = do_read_nids_in_ne2_ways(
+        reader,
+        &tag_filter,
+        &args.tag_filter_func,
+        &input_bar,
+        &progress_bars,
+    )?;
 
     let g = graph::DirectedGraph2::new();
     let g = Arc::new(Mutex::new(g));
@@ -175,75 +203,26 @@ fn main() -> Result<()> {
     // OSM tag vaules are strings, but we don't need to store the strings. We give each string a
     // unique id (i32) and store that. We don't need to know what the tagvalue for 2 segments is,
     // we only need to know if they are the same or not.
-    // FIXME replace this with a sorted vec, rather than hashmap
     let mut nid_pair_to_endtag_group: HashMap<(i64, i64), i32> = HashMap::new();
-
-    if let Some(ref upstream_assign_end_by_tag) = args.upstream_assign_end_by_tag {
-        // read all the ways to get a list of which nid pairs are in which name tag
-        let rdr = std::fs::File::open(&args.input_filename)?;
-        let mut reader = osmio::stringpbf::PBFReader::new(rdr);
-
-        // Produces a HashMap<tagvalue: String, Vec<(nid1,nid2)>> each unique tagvalue.
-        let tagvalues_to_edges = reader
-            .ways()
-            .par_bridge()
-            .inspect(|_| obj_reader.inc(1))
-            .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, &args.tag_filter_func))
-            .filter(|w| w.has_tag(upstream_assign_end_by_tag))
-            .inspect(|_| ways_added.inc(1))
-            .fold(
-                || HashMap::new() as HashMap<String, HashSet<(i64, i64)>>,
-                |mut seen_tagvalues, w| {
-                    let seen = seen_tagvalues
-                        .entry(w.tag(upstream_assign_end_by_tag).unwrap().to_string())
-                        .or_default();
-                    for pair in w.nodes().windows(2) {
-                        seen.insert((pair[0], pair[1]));
-                    }
-                    seen_tagvalues
-                },
-            )
-            .reduce(HashMap::new, |mut a, b| {
-                let mut pairs_in_this_value;
-                for (tag_value, mut pair_set) in b.into_iter() {
-                    pairs_in_this_value = a.entry(tag_value).or_default();
-                    pairs_in_this_value.extend(pair_set.drain());
-                }
-                a
-            });
-        assert!(tagvalues_to_edges.len() < i32::MAX as usize);
-
-        let total_num_pairs = tagvalues_to_edges
-            .par_iter()
-            .map(|(_tagvalue, pairs)| pairs.len())
-            .sum();
-        nid_pair_to_endtag_group.reserve(total_num_pairs);
-
-        info!(
-            "Have following {} unique '{}' tags in {} node pairs",
-            tagvalues_to_edges.len().to_formatted_string(&Locale::en),
-            upstream_assign_end_by_tag,
-            total_num_pairs.to_formatted_string(&Locale::en),
-        );
-        for (_tagvalue, pairs) in tagvalues_to_edges.into_iter() {
-            let curr_id = nid_pair_to_endtag_group.len();
-            for pair in pairs.into_iter() {
-                nid_pair_to_endtag_group.insert(pair, curr_id as i32);
-            }
-        }
-        info!(
-            "Total size of the '{}' lookup: {} bytes",
-            upstream_assign_end_by_tag,
-            nid_pair_to_endtag_group
-                .get_size()
-                .to_formatted_string(&Locale::en)
-        );
-    }
 
     // first step, get all the cycles
     let latest_timestamp = AtomicI64::new(0);
     let start_reading_ways = Instant::now();
+    let input_fp = std::fs::File::open(&args.input_filename)?;
+    let input_bar = progress_bars.add(
+        ProgressBar::new(input_fp.metadata()?.len())
+            .with_message("Reading input file")
+            .with_style(file_reading_style.clone()),
+    );
+    let rdr = input_bar.wrap_read(input_fp);
     let mut reader = osmio::stringpbf::PBFReader::new(rdr);
+    let inter_store = inter_store::InterStore::new();
+    //let inter_store: HashMap<(i64, i64), Box<[i64]>> = Default::default();
+    let inter_store = Arc::new(Mutex::new(inter_store));
+    let tagvalues_to_edges = Arc::new(Mutex::new(
+        HashMap::new() as HashMap<String, HashSet<(i64, i64)>>
+    ));
+
     reader
         .ways()
         .par_bridge()
@@ -251,15 +230,56 @@ fn main() -> Result<()> {
         .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, &args.tag_filter_func))
         .inspect(|_| ways_added.inc(1))
         // TODO support grouping by tag value
-        .for_each_with(g.clone(), |g, w| {
-            assert!(w.id() > 0, "This file has a way id < 0. negative ids are not supported in this tool Use osmium sort & osmium renumber to convert this file and run again.");
-            // add the nodes from w to this graph
-            let mut g = g.lock().unwrap();
-            nodes_added.inc(w.nodes().len() as u64);
-            g.add_edge_chain(w.nodes());
-            if let Some(t) = w.timestamp().as_ref().map(|t| t.to_epoch_number()) {
-                latest_timestamp.fetch_max(t, atomic_Ordering::SeqCst);
-            }
+        .for_each_with((g.clone(), inter_store.clone(), tagvalues_to_edges.clone()),
+            |(g, inter_store, seen_tagvalues), w| {
+                assert!(w.id() > 0, "This file has a way id < 0. negative ids are not supported in this tool Use osmium sort & osmium renumber to convert this file and run again.");
+                // add the nodes from w to this graph
+                let mut g = g.lock().unwrap();
+                let mut inter_store = inter_store.lock().unwrap();
+                let mut seen_tagvalues = seen_tagvalues.lock().unwrap();
+                nodes_added.inc(w.nodes().len() as u64);
+                let mut nodes = w.nodes();
+
+                // If we're assigning based on tag, get the hashset where it'll be stored
+                let mut tagvalues_to_edges = args.flow_follows_tag
+                    .as_ref()
+                    .and_then(|flow_follows_tag| w.tag(flow_follows_tag))
+                    .map(|way_tag_value| seen_tagvalues.entry(way_tag_value.to_string()).or_default());
+
+                // Don't add all the nodes, just the ones we need
+                while nodes.len() >= 2 {
+                    let i_opt = nodes.iter().skip(1).position(|nid| nids_in_ne2_ways.binary_search(nid).is_ok());
+
+                    let mut i = i_opt.unwrap() + 1;
+                    // can happen when a river splits and then joins again. try to stop reducing
+                    // this little tributary away.
+                    while g.contains_edge(nodes[0], nodes[i]) && i > 1 {
+                        i -= 1;
+                    }
+                    // 2 nodes after another with nothing in between? That can happen with someone
+                    // double maps a river. But assert a differnet problem, which shows our ability
+                    // to contract edges has problems
+                    if i > 1 {
+                        assert!(!g.contains_edge(nodes[0], nodes[i]), "already existing edge from {} to {} (there are {} nodes in the middle) i={}", nodes[0], nodes[i], nodes.len(), i);
+                    }
+
+                    g.add_edge(nodes[0], nodes[i]);
+
+                    if let Some(ref mut tagvalues_to_edges) = tagvalues_to_edges {
+                        tagvalues_to_edges.insert((nodes[0], nodes[i]));
+                    }
+
+                    inter_store.insert_directed((nodes[0], nodes[i]), &nodes[1..i]);
+
+                    // For the next loop iteration
+                    nodes = &nodes[i..];
+                }
+
+
+                //g.add_edge_chain_contractable(w.nodes(), &|nid| nids_in_ne2_ways.binary_search(nid).is_err());
+                if let Some(t) = w.timestamp().as_ref().map(|t| t.to_epoch_number()) {
+                    latest_timestamp.fetch_max(t, atomic_Ordering::SeqCst);
+                }
         });
     let way_reading_duration = start_reading_ways.elapsed();
     info!(
@@ -283,7 +303,13 @@ fn main() -> Result<()> {
     nodes_added.finish_and_clear();
     input_bar.finish_and_clear();
     progress_bars.remove(&input_bar);
-    let g: graph::DirectedGraph2 = Arc::try_unwrap(g).unwrap().into_inner().unwrap();
+
+    let mut g = Arc::try_unwrap(g).unwrap().into_inner().unwrap();
+    let inter_store = Arc::try_unwrap(inter_store).unwrap().into_inner().unwrap();
+    let tagvalues_to_edges = Arc::try_unwrap(tagvalues_to_edges)
+        .unwrap()
+        .into_inner()
+        .unwrap();
 
     info!(
         "All data has been loaded in {}. Started processing...",
@@ -303,53 +329,62 @@ fn main() -> Result<()> {
         num_vertexes.to_formatted_string(&Locale::en)
     );
 
-    // We used to use a graph that only stored out neighbours, which meant we needed to keep track
-    // of which vertexes don't have outgoing nodes, so that we can remember
-    // to save their position.
-    // But not we use something that stores directly both
+    // Convert the HashMap to something we can look up based on an edge. also throw away the
+    // unneeded string value.
+    if let Some(ref flow_follows_tag) = args.flow_follows_tag {
+        assert!(tagvalues_to_edges.len() < i32::MAX as usize);
 
-    info!("Splitting this large graph into many smaller non-connected graphs...");
-    let splitting_graphs_bar = progress_bars.add(
-        ProgressBar::new(g.num_vertexes() as u64)
-            .with_message("Splitting into smaller graphs")
-            .with_style(style.clone()),
-    );
-    // Split into separtely connected graphs.
-    let graphs = g
-        .into_disconnected_graphs()
-        .inspect(|g| splitting_graphs_bar.inc(g.num_vertexes() as u64))
-        .collect::<Vec<_>>();
-    splitting_graphs_bar.finish_and_clear();
-    info!(
-        "Split the graph into {} different disconnected graphs",
-        graphs.len().to_formatted_string(&Locale::en)
-    );
-    info_memory_used!();
+        let total_num_pairs = tagvalues_to_edges
+            .par_iter()
+            .map(|(_tagvalue, pairs)| pairs.len())
+            .sum();
+        nid_pair_to_endtag_group.reserve(total_num_pairs);
+
+        info!(
+            "Have following {} unique '{}' tags in {} node pairs",
+            tagvalues_to_edges.len().to_formatted_string(&Locale::en),
+            flow_follows_tag,
+            total_num_pairs.to_formatted_string(&Locale::en),
+        );
+        for (_tagvalue, pairs) in tagvalues_to_edges.into_iter() {
+            let curr_id = nid_pair_to_endtag_group.len();
+            for pair in pairs.into_iter() {
+                nid_pair_to_endtag_group.insert(pair, curr_id as i32);
+            }
+        }
+        info!(
+            "Total size of the '{}' lookup: {} bytes",
+            flow_follows_tag,
+            nid_pair_to_endtag_group
+                .get_size()
+                .to_formatted_string(&Locale::en)
+        );
+    }
+    // convert to memory effecient sorted vec.
+    let nid_pair_to_endtag_group = SortedSliceMap::from(nid_pair_to_endtag_group.into_iter());
 
     let calc_components_bar = progress_bars.add(
         ProgressBar::new((num_vertexes * 2) as u64)
             .with_message("Looking for cycles")
             .with_style(style.clone()),
     );
-    let graphs_processed = progress_bars.add(
-        ProgressBar::new(graphs.len() as u64)
-            .with_message("Graphs processed")
-            .with_style(style.clone()),
-    );
     info_memory_used!();
 
-    let cycles: Vec<Vec<[i64; 2]>> = graphs
-        .into_par_iter()
-        .update(|g| {
-            let old_len = g.num_vertexes();
-            g.remove_vertexes_with_in_xor_out();
-            calc_components_bar.inc(2 * (old_len - g.num_vertexes()) as u64);
+    let cycles: Vec<Vec<[i64; 2]>> = g.strongly_connected_components(&calc_components_bar);
+    // expand the intermediate values
+    let cycles = cycles
+        .into_iter()
+        .map(|segs| {
+            segs.into_iter()
+                .flat_map(|seg| {
+                    inter_store
+                        .expand_directed(seg[0], seg[1])
+                        .tuple_windows()
+                        .map(|(a, b)| [a, b])
+                })
+                .collect::<Vec<_>>()
         })
-        .flat_map(|g| {
-            graphs_processed.inc(1);
-            g.strongly_connected_components(&calc_components_bar)
-        })
-        .collect();
+        .collect::<Vec<_>>();
 
     info!(
         "Found {} cycles, comprised of {} nodes",
@@ -363,9 +398,10 @@ fn main() -> Result<()> {
     info_memory_used!();
 
     calc_components_bar.finish_and_clear();
-    graphs_processed.finish_and_clear();
 
-    if !cycles.is_empty() {
+    if !cycles.is_empty()
+        && (args.loops.is_some() || loops_csv_stats.is_some() || loops_metrics.is_some())
+    {
         let mut wanted_nodeids: HashSet<i64> =
             HashSet::with_capacity(cycles.par_iter().map(|cycle| cycle.len()).sum());
         for cycle in cycles.iter() {
@@ -421,7 +457,7 @@ fn main() -> Result<()> {
             .collect::<Result<_>>()?;
         info_memory_used!();
 
-        if csv_stats.is_some() || metrics.is_some() {
+        if loops_csv_stats.is_some() || loops_metrics.is_some() {
             let mut per_boundary: BTreeMap<&str, (u64, f64)> = BTreeMap::new();
             for cycle in cycles_output.iter() {
                 let boundaries = cycle.0["areas"].as_array().unwrap();
@@ -434,9 +470,9 @@ fn main() -> Result<()> {
                 }
             }
             for (boundary, (count, len)) in per_boundary.into_iter() {
-                if let Some(ref mut csv_stats) = csv_stats {
+                if let Some(ref mut loops_csv_stats) = loops_csv_stats {
                     loops_csv_stats::write_boundary(
-                        csv_stats,
+                        loops_csv_stats,
                         boundary,
                         latest_timestamp,
                         &latest_timestamp_iso,
@@ -444,16 +480,22 @@ fn main() -> Result<()> {
                         len,
                     )?;
                 }
-                if let Some(ref mut metrics) = metrics {
-                    openmetrics::write_boundary(metrics, boundary, latest_timestamp, count, len)?;
+                if let Some(ref mut loops_metrics) = loops_metrics {
+                    openmetrics::write_boundary(
+                        loops_metrics,
+                        boundary,
+                        latest_timestamp,
+                        count,
+                        len,
+                    )?;
                 }
             }
 
-            if let Some(ref mut csv_stats) = csv_stats {
-                csv_stats.flush()?;
+            if let Some(ref mut loops_csv_stats) = loops_csv_stats {
+                loops_csv_stats.flush()?;
                 info!(
-                    "Statistics have been written to file {}",
-                    args.csv_stats_file.as_ref().unwrap().display()
+                    "Loop statistics have been written to file {}",
+                    args.loops_csv_stats_file.as_ref().unwrap().display()
                 );
             }
         }
@@ -474,7 +516,11 @@ fn main() -> Result<()> {
         }
     }
 
-    if args.ends.is_none() && args.upstreams.is_none() && args.grouped_ends.is_none() {
+    if args.ends.is_none()
+        && args.ends_csv_file.is_none()
+        && args.upstreams.is_none()
+        && args.grouped_ends.is_none()
+    {
         // nothing else to do
         return Ok(());
     }
@@ -498,21 +544,10 @@ fn main() -> Result<()> {
     );
 
     info_memory_used!();
-    let started_reread = Instant::now();
-    info!("Re-reading file to generate upstreams etc");
-    let mut g = graph::DirectedGraph2::new();
-    read_with_node_replacements(
-        &args.input_filename,
-        &tag_filter,
-        &args.tag_filter_func,
-        &|nid| *node_id_replaces.get(&nid).unwrap_or(&nid),
-        &progress_bars,
-        &mut g,
-    )?;
-    info!(
-        "Re-read all nodes with replacements in {}",
-        formatting::format_duration(started_reread.elapsed())
-    );
+    info!("Contracting the graph");
+    for (vertex, replacement) in node_id_replaces.iter() {
+        g.contract_vertex(vertex, replacement);
+    }
 
     // TODO do we need to sort topologically? Why not just calc lengths from upstreams
     let sorting_nodes_bar = progress_bars.add(
@@ -524,7 +559,10 @@ fn main() -> Result<()> {
     info!("Sorting all vertexes topologically...");
     //// TODO this graph (g) can be split into disconnected components
     let orig_num_vertexes = g.num_vertexes();
-    let topologically_sorted_nodes = g.into_vertexes_topologically_sorted(&sorting_nodes_bar);
+    let topologically_sorted_nodes = g
+        .clone()
+        .into_vertexes_topologically_sorted(&sorting_nodes_bar)
+        .into_boxed_slice();
     sorting_nodes_bar.finish_and_clear();
     info!(
         "All {} nodes have been sorted topographically in {}. Size of sorted nodes: {} bytes = {}",
@@ -539,34 +577,25 @@ fn main() -> Result<()> {
     );
 
     assert_eq!(orig_num_vertexes, topologically_sorted_nodes.len());
-    info!("Re-reading the file again to build the graph");
-    let mut g = graph::DirectedGraph2::new();
-    read_with_node_replacements(
-        &args.input_filename,
-        &tag_filter,
-        &args.tag_filter_func,
-        &|nid| *node_id_replaces.get(&nid).unwrap_or(&nid),
-        &progress_bars,
-        &mut g,
-    )?;
-    info!("Re-read nodes",);
 
+    let mut nids_we_need = HashSet::with_capacity(g.num_vertexes());
+    nids_we_need.extend(g.vertexes());
+    nids_we_need.extend(inter_store.all_inter_nids());
+    nids_we_need.shrink_to_fit();
     let setting_node_pos = progress_bars.add(
-        ProgressBar::new(g.num_vertexes() as u64)
+        ProgressBar::new(nids_we_need.len() as u64)
             .with_message("Reading file to save node locations")
             .with_style(style.clone()),
     );
     let mut nodeid_pos = nodeid_position::default();
     read_node_positions(
         &args.input_filename,
-        // Previosuly, the g.contains_vertex would be false for nodes without outgoing, so we
-        // needed nids_we_need. But now we don't
-        // |nid| g.contains_vertex(&nid) || nids_we_need.contains(&nid),
-        |nid| g.contains_vertex(&nid),
+        |nid| nids_we_need.contains(&nid),
         &setting_node_pos,
         &mut nodeid_pos,
     )?;
     setting_node_pos.finish_and_clear();
+    drop(nids_we_need);
     info_memory_used!();
 
     // Sorted list of all nids which are an end point
@@ -603,44 +632,108 @@ fn main() -> Result<()> {
         );
     }
 
-    // This is an iterator that returns the total upstream length for all nodes.
-    // it keeps track of an intermediate value which is the length of items “further downstream”.
-    // It's a function because we want to create it many times.
-    // return value: (
-    //  nid_idx: usize. Index in topologically_sorted_nodes for this node
-    //  nid: i64, OSM Node id
-    //  upstream_length_m: f64, upstream value at this node
-    let upstream_length_iter = || {
-        topologically_sorted_nodes.iter().copied().enumerate().scan(
-            // a cache of node id and the currently best known upstream value
-            // we “push” values onto this from upstream
-            HashMap::new() as HashMap<i64, f64>,
-            |tmp_upstream_length, (nid_idx, nid)| {
-                let curr_upstream = tmp_upstream_length.remove(&nid).unwrap_or(0.);
-
-                // FIXME rather than split the upstream value equally between all out-edges, look
-                // at the name tag (cf nid_pair_to_name_group)
-                let num_outs = g.out_neighbours(nid).count() as f64;
-                let per_downstream = curr_upstream / num_outs;
-                let curr_pos = nodeid_pos.get(&nid).unwrap();
-                for other in g.out_neighbours(nid) {
-                    let other_pos = nodeid_pos.get(&other).unwrap();
-                    let this_edge_len =
-                        haversine::haversine_m(curr_pos.0, curr_pos.1, other_pos.0, other_pos.1);
-                    *tmp_upstream_length.entry(other).or_default() +=
-                        per_downstream + this_edge_len;
-                }
-
-                Some((nid_idx, nid, curr_upstream))
-            },
-        )
-    };
-
-    let calc_upstream_ends_bar = progress_bars.add(
-        ProgressBar::new(end_points.len() as u64)
-            .with_message("Calculating upstream value for end points")
+    // Calculate the upstream for every node and edge.
+    let mut upstream_length: Vec<f64> = vec![0.; topologically_sorted_nodes.len()];
+    // for an edge in the graph, what's the amount flowing down it.
+    let mut upstream_per_edge: Vec<((i64, i64), f64)> =
+        Vec::with_capacity(topologically_sorted_nodes.len());
+    let calc_all_upstreams = progress_bars.add(
+        ProgressBar::new(topologically_sorted_nodes.len() as u64)
+            .with_message("Calculating all upstream values")
             .with_style(style.clone()),
     );
+    // a cache of node id and the currently best known upstream value
+    // we “push” values onto this from upstream HashMap::new() as HashMap<i64, f64>,
+    let mut tmp_upstream_length = HashMap::new() as HashMap<i64, f64>;
+
+    for (nid, upstream_value) in topologically_sorted_nodes
+        .iter()
+        .copied()
+        .zip(upstream_length.iter_mut())
+    {
+        let curr_upstream = tmp_upstream_length.remove(&nid).unwrap_or(0.);
+
+        // FIXME rather than split the upstream value equally between all out-edges, look
+        // at the name tag (cf nid_pair_to_name_group)
+        let num_ins = g.in_neighbours(nid).count();
+        let num_outs = g.out_neighbours(nid).count() as f64;
+        let in_name_group_opt = g
+            .in_neighbours(nid)
+            .next()
+            .and_then(|in_nid| nid_pair_to_endtag_group.get(&(in_nid, nid)));
+        let num_outs_with_same_tag = in_name_group_opt.map_or(0, |in_name_group| {
+            g.out_neighbours(nid)
+                .filter(|out_nid| {
+                    nid_pair_to_endtag_group.get(&(nid, *out_nid)) == Some(in_name_group)
+                })
+                .count()
+        }) as f64;
+        if num_ins == 1
+            && num_outs > 1.
+            && in_name_group_opt.is_some()
+            && num_outs_with_same_tag > 0.
+        {
+            let in_name_group = in_name_group_opt.unwrap();
+            let mut to_differnet_downstreams_total = curr_upstream * 0.01;
+            if to_differnet_downstreams_total > 1. {
+                to_differnet_downstreams_total = 1.;
+            }
+            let per_same_downstream =
+                (curr_upstream - to_differnet_downstreams_total) / num_outs_with_same_tag;
+            let per_differnet_downstreams =
+                to_differnet_downstreams_total / (num_outs - num_outs_with_same_tag);
+            for (other, is_in_same_group) in g.out_neighbours(nid).map(|out_nid| {
+                (
+                    out_nid,
+                    nid_pair_to_endtag_group.get(&(nid, out_nid)) == Some(in_name_group),
+                )
+            }) {
+                let this_edge_len = inter_store
+                    .expand_directed(nid, other)
+                    .map(|nid| nodeid_pos.get(&nid).unwrap())
+                    .tuple_windows::<(_, _)>()
+                    .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
+                    .sum::<f64>();
+
+                let sent_down_this_edge = if is_in_same_group {
+                    per_same_downstream + this_edge_len
+                } else {
+                    per_differnet_downstreams + this_edge_len
+                };
+
+                *tmp_upstream_length.entry(other).or_default() += sent_down_this_edge;
+                upstream_per_edge.push(((nid, other), sent_down_this_edge));
+            }
+        } else {
+            // > 1 in vertex (too complicated!) or no tag on the only in vertex
+            let per_downstream = curr_upstream / num_outs;
+            //let curr_pos = nodeid_pos.get(&nid).unwrap();
+            for other in g.out_neighbours(nid) {
+                //let other_pos = nodeid_pos.get(&other).unwrap();
+                let this_edge_len = inter_store
+                    .expand_directed(nid, other)
+                    .map(|nid| nodeid_pos.get(&nid).unwrap())
+                    .tuple_windows::<(_, _)>()
+                    .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
+                    .sum::<f64>();
+
+                let sent_down_this_edge = per_downstream + this_edge_len;
+                *tmp_upstream_length.entry(other).or_default() += sent_down_this_edge;
+                upstream_per_edge.push(((nid, other), sent_down_this_edge));
+            }
+        }
+
+        *upstream_value = curr_upstream;
+        calc_all_upstreams.inc(1);
+    }
+    calc_all_upstreams.finish_and_clear();
+    let upstream_length = upstream_length.into_boxed_slice();
+    let upstream_per_edge = SortedSliceMap::from_vec(upstream_per_edge);
+    info!(
+        "Have calculated the upstream values for {} different edges",
+        upstream_per_edge.len().to_formatted_string(&Locale::en)
+    );
+
     let calc_all_upstream_bar = progress_bars.add(
         ProgressBar::new(end_points.len() as u64)
             .with_message("Calculating upstream value for all End points")
@@ -649,15 +742,18 @@ fn main() -> Result<()> {
     calc_all_upstream_bar.set_length(topologically_sorted_nodes.len() as u64);
 
     // Calculate all the upstream value for all the end points.
-    for (_nid_idx, nid, upstream_length) in calc_all_upstream_bar.wrap_iter(upstream_length_iter())
-    {
-        if let Ok(idx) = end_points.binary_search(&nid) {
-            end_point_upstreams[idx] = upstream_length;
+    for (nid, upstream_length) in calc_all_upstream_bar.wrap_iter(
+        topologically_sorted_nodes
+            .iter()
+            .zip(upstream_length.iter()),
+    ) {
+        if let Ok(idx) = end_points.binary_search(nid) {
+            end_point_upstreams[idx] = *upstream_length;
             calc_all_upstream_bar.inc(1);
         }
     }
     calc_all_upstream_bar.finish_and_clear();
-    calc_upstream_ends_bar.finish_and_clear();
+    let end_point_upstreams = end_point_upstreams.into_boxed_slice();
     info!(
         "Calculated the upstream value for {} nodes",
         topologically_sorted_nodes
@@ -792,9 +888,8 @@ fn main() -> Result<()> {
     // needed for default values later
     let empty_smallvec_bool = smallvec::smallvec![];
     let empty_smallvec_str = smallvec::smallvec![];
-
-    if let Some(ref ends_filename) = args.ends {
-        let end_points_output = end_points
+    let end_points_w_meta = || {
+        end_points
             .iter()
             .zip(
                 // If no end_point_memberships's then that vec is empty, so the zip doesn't return
@@ -809,10 +904,15 @@ fn main() -> Result<()> {
                     .chain(std::iter::repeat(&empty_smallvec_str)),
             )
             .zip(end_point_upstreams.iter())
-            .filter(|(((_nid, _mbms), _end_tgs), len)| {
+            .map(|(((nid, mbms), end_tags), len)| (nid, mbms, end_tags, len))
+    };
+
+    if let Some(ref ends_filename) = args.ends {
+        let end_points_output = end_points_w_meta()
+            .filter(|(_nid, _mbms, _end_tgs, len)| {
                 args.min_upstream_m.map_or(true, |min| *len >= &min)
             })
-            .map(|(((nid, mbms), end_tags), len)| {
+            .map(|(nid, mbms, end_tags, len)| {
                 (nid, mbms, end_tags, len, nodeid_pos.get(nid).unwrap())
             })
             .map(|(nid, mbms, end_tags, len, pos)| {
@@ -855,6 +955,17 @@ fn main() -> Result<()> {
         "Too many end nodes (>2³²). We optimize by addressing nodes with a i32"
     );
 
+    if let Some(ref mut ends_csv) = ends_csv {
+        ends_csv::write_ends(
+            ends_csv,
+            end_points_w_meta(),
+            &args,
+            &nodeid_pos,
+            latest_timestamp,
+            &latest_timestamp_iso,
+        )?;
+    }
+
     // For every node in topologically_sorted_nodes, store the index (in end_points) of the biggest
     // end point that this node flows into.
     // We store the index as a i32 to save space. We assume we will have <2³² end points
@@ -865,7 +976,7 @@ fn main() -> Result<()> {
     // TODO replace this with nonzerou32
     let mut upstream_assigned_end: Vec<i32> = Vec::new();
 
-    if args.upstream_output_biggest_end {
+    if args.flow_split_equally {
         upstream_assigned_end.resize(topologically_sorted_nodes.len(), -1);
 
         // this is a cache of values as we walk upstream
@@ -895,7 +1006,7 @@ fn main() -> Result<()> {
                     .or_insert(curr_biggest);
             }
         }
-    } else if args.upstream_assign_end_by_tag.is_some() {
+    } else if args.flow_follows_tag.is_some() {
         upstream_assigned_end.resize(topologically_sorted_nodes.len(), -1);
 
         // this is a cache of values as we walk upstream
@@ -971,6 +1082,7 @@ fn main() -> Result<()> {
         }
     }
     assert!(upstream_assigned_end.par_iter().all(|end| *end >= 0));
+    let upstream_assigned_end = upstream_assigned_end.into_boxed_slice();
 
     if let Some(ref grouped_ends) = args.grouped_ends {
         do_group_by_ends(
@@ -985,120 +1097,25 @@ fn main() -> Result<()> {
             &nodeid_pos,
             &end_point_tag_values,
             &args.ends_tag,
+            &inter_store,
         )?;
     }
 
     if let Some(ref upstream_filename) = args.upstreams {
-        // we loop over all nodes in topologically_sorted_nodes (which is annotated in
-        // upstream_length_iter with the upstream value) and flat_map that into each line segment
-        // that goes out of that.
-        let lines = upstream_length_iter()
-            .filter(|(_to_nid_idx, _to_nid, upstream_m)| {
-                args.min_upstream_m.map_or(true, |min| *upstream_m >= min)
-            })
-            .flat_map(|(to_nid_idx, to_nid, upstream_len)| {
-                g.in_neighbours(to_nid)
-                    .map(move |from_nid| (to_nid_idx, from_nid, to_nid, upstream_len))
-            })
-            .map(|(to_nid_idx, from_nid, to_nid, upstream_len)| {
-                // Round the upstream to only output 1 decimal place
-                let mut props = serde_json::json!({
-                    "to_upstream_m": round(&upstream_len, 1),
-                });
-
-                for mult in args.upstream_from_upstream_multiple.iter() {
-                    props[format!("to_upstream_m_{}", mult)] =
-                        round_mult(&upstream_len, *mult).into();
-                }
-
-                if upstream_assigned_end.len() >= to_nid_idx {
-                    let end_idx: usize = upstream_assigned_end[to_nid_idx] as usize;
-                    props["end_upstream_m"] = round(&end_point_upstreams[end_idx], 1).into();
-                    props["end_nid"] = end_points[end_idx].into();
-
-                    if !args.ends_tag.is_empty() {
-                        for (tag_key, tag_value) in args
-                            .ends_tag
-                            .iter()
-                            .zip(end_point_tag_values[end_idx].iter())
-                        {
-                            if let Some(tag_value) = tag_value {
-                                props[format!("end_tag:{}", tag_key)] = tag_value.clone().into();
-                            }
-                        }
-                    }
-                } else if args.upstream_output_ends_full {
-                    todo!();
-                    //let ends = upstream_ends_full.get(&from_nid).unwrap();
-                    //props["num_ends"] = ends.len().into();
-                    //props["ends"] = ends.iter().copied().collect::<Vec<i64>>().into();
-                    //let mut ends_strs = vec![",".to_string()];
-                    //let mut this_len;
-                    //let mut biggest_end = (upstream_length.get(&ends[0]).unwrap(), ends[0]);
-                    //for end in ends {
-                    //    ends_strs.push(end.to_string());
-                    //    ends_strs.push(",".to_string());
-                    //    this_len = upstream_length.get(&ends[0]).unwrap();
-                    //    if this_len > biggest_end.0 {
-                    //        biggest_end = (this_len, *end);
-                    //    }
-                    //}
-                    //props["ends_s"] = ends_strs.join("").into();
-                    //props["biggest_end_upstream_m"] = round(biggest_end.0, 1).into();
-                    //props["biggest_end_nid"] = biggest_end.1.into();
-                }
-
-                (
-                    props,
-                    (
-                        nodeid_pos.get(&from_nid).unwrap(),
-                        nodeid_pos.get(&to_nid).unwrap(),
-                    ),
-                )
-            });
-        info_memory_used!();
-
-        let writing_upstreams_bar = progress_bars.add(
-            ProgressBar::new(g.num_edges() as u64)
-                .with_message("Writing upstreams geojson(s) file")
-                .with_style(style.clone()),
-        );
-
-        let lines = lines.progress_with(writing_upstreams_bar);
-
-        let mut f = std::io::BufWriter::new(std::fs::File::create(upstream_filename)?);
-
-        let num_written;
-        if upstream_filename.extension().unwrap() == "geojsons"
-            || upstream_filename.extension().unwrap() == "geojson"
-        {
-            num_written = write_geojson_features_directly(
-                lines,
-                &mut f,
-                &fileio::format_for_filename(upstream_filename),
-            )?;
-        } else if upstream_filename.extension().unwrap() == "csv" {
-            let mut csv_columns = vec!["from_upstream_m".to_string()];
-            if args.upstream_output_biggest_end {
-                csv_columns.push("biggest_end_nid".to_string());
-            }
-            for mult in args.upstream_from_upstream_multiple.iter() {
-                csv_columns.push(format!("from_upstream_m_{}", mult));
-            }
-            if !args.ends_tag.is_empty() {
-                warn!("Adding the end tag values has not been implemented for CSV files yet.");
-            }
-
-            num_written = write_csv_features_directly(lines, &mut f, &csv_columns)?;
-        } else {
-            anyhow::bail!("Unsupported output format");
-        }
-
-        info!(
-            "Wrote {} features to output file {}",
-            num_written.to_formatted_string(&Locale::en),
-            upstream_filename.display(),
-        );
+        do_write_upstreams(
+            &args,
+            upstream_filename,
+            &progress_bars,
+            &style,
+            &upstream_assigned_end,
+            &topologically_sorted_nodes,
+            &upstream_per_edge,
+            &inter_store,
+            &nodeid_pos,
+            &end_points,
+            &end_point_upstreams,
+            &end_point_tag_values,
+        )?;
     }
 
     info!(
@@ -1109,85 +1126,59 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn read_with_node_replacements(
-    input_filename: &Path,
+fn do_read_nids_in_ne2_ways(
+    mut reader: osmio::pbf::PBFReader<indicatif::ProgressBarIter<File>>,
     tag_filter: &SmallVec<[tagfilter::TagFilter; 3]>,
     tag_filter_func: &Option<tagfilter::TagFilterFunc>,
-    node_id_replaces: &(impl Fn(i64) -> i64 + Sync),
+    input_bar: &ProgressBar,
     progress_bars: &MultiProgress,
-    graph: &mut impl graph::DirectedGraphTrait,
-) -> Result<()> {
-    let file_reading_style =
-                ProgressStyle::with_template(
-        "[{elapsed_precise}] {percent:>3}% done. eta {eta:>4} {bar:10.cyan/blue} {bytes:>7}/{total_bytes:7} {per_sec:>12} {msg}",
-            ).unwrap();
-    let input_fp = std::fs::File::open(input_filename)?;
-    let input_bar = progress_bars.add(
-        ProgressBar::new(input_fp.metadata()?.len())
-            .with_message("Reading input file")
-            .with_style(file_reading_style.clone()),
-    );
-    let rdr = input_bar.wrap_read(input_fp);
-
-    let mut reader = osmio::stringpbf::PBFReader::new(rdr);
-
-    let obj_reader = progress_bars.add(
-        ProgressBar::new_spinner().with_style(
-            ProgressStyle::with_template(
-                "[{elapsed_precise}] {human_pos} OSM ways read {per_sec:>20}",
-            )
-            .unwrap(),
-        ),
-    );
-    let ways_added = progress_bars.add(
-        ProgressBar::new_spinner().with_style(
-            ProgressStyle::with_template(
-                "           {human_pos} ways collected so far for later processing",
-            )
-            .unwrap(),
-        ),
-    );
-    let nodes_added = progress_bars.add(
-        ProgressBar::new_spinner().with_style(
-            ProgressStyle::with_template(
-                "           {human_pos} nodes collected so far for later processing",
-            )
-            .unwrap(),
-        ),
-    );
-
-    let graph = Arc::new(Mutex::new(graph));
-
+) -> Result<Box<[i64]>> {
+    // how many vertexes are there per node id? (which do we need to keep)
+    info!("About to preform first read of file, to calculate which nids we need to keep");
+    let nid2nways = Arc::new(Mutex::new(HashMap::<i64, u8>::new()));
     reader
         .ways()
         .par_bridge()
-        .inspect(|_| obj_reader.inc(1))
-        .filter(|w| tagfilter::obj_pass_filters(w, tag_filter, tag_filter_func))
-        .inspect(|_| ways_added.inc(1))
+        .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, &tag_filter_func))
         // TODO support grouping by tag value
-        .for_each_with(graph.clone(), |graph, w| {
-            let nodes = w.nodes();
-            nodes_added.inc(nodes.len() as u64);
-            if nodes.par_iter().any(|nid| node_id_replaces(*nid) != *nid) {
-                let mut new_nodes = nodes
-                    .iter()
-                    .map(|nid| node_id_replaces(*nid))
-                    .collect::<Vec<i64>>();
-                new_nodes.dedup();
-                let mut graph = graph.lock().unwrap();
-                graph.add_edge_chain(&new_nodes);
-            } else {
-                // None of these are replacements, so add directly
-                // add the nodes from w to this graph
-                let mut graph = graph.lock().unwrap();
-                graph.add_edge_chain(nodes);
-            }
-        });
-    obj_reader.finish_and_clear();
-    ways_added.finish_and_clear();
-    nodes_added.finish_and_clear();
+        .for_each_with(nid2nways.clone(), |nid2nways, w| {
+            assert!(w.id() > 0, "This file has a way id < 0. negative ids are not supported in this tool Use osmium sort & osmium renumber to convert this file and run again.");
 
-    Ok(())
+            let mut nid2nways = nid2nways.lock().unwrap();
+            let nids = w.nodes();
+            let mut val = nid2nways.get(&nids[0]).unwrap_or(&0).saturating_add(1);
+            nid2nways.insert(nids[0], val);
+            val = nid2nways.get(nids.last().unwrap()).unwrap_or(&0).saturating_add(1);
+            nid2nways.insert(*nids.last().unwrap(), val);
+            for n in &nids[1..nids.len()] {
+                val = nid2nways.get(n).unwrap_or(&0).saturating_add(2);
+                nid2nways.insert(*n, val);
+            }
+
+        });
+    input_bar.finish();
+    progress_bars.remove(&input_bar);
+    let nid2nways = Arc::try_unwrap(nid2nways).unwrap().into_inner().unwrap();
+
+    let num_nids = nid2nways.len();
+    let mut nids_in_ne2_ways: Vec<i64> = nid2nways
+        .into_iter()
+        .filter_map(|(nid, nvertexes)| if nvertexes != 2 { Some(nid) } else { None })
+        .collect();
+    nids_in_ne2_ways.sort_unstable();
+    nids_in_ne2_ways.dedup();
+    let nids_in_ne2_ways: Box<[i64]> = nids_in_ne2_ways.into_boxed_slice();
+    info!(
+        "There are {} nodes in total, but only {} ({:.1}%) are pillar nodes",
+        num_nids.to_formatted_string(&Locale::en),
+        nids_in_ne2_ways.len().to_formatted_string(&Locale::en),
+        (nids_in_ne2_ways.len() as f64) * 100. / (num_nids as f64),
+    );
+    // nids_in_ne2_ways is all node ids which have ¬2 number of vertexes. It's about 5% of all
+    // nodes. We contract the graph as we build it, and we know we can always contract any nids not
+    // in this list. This allows us to keep the in-memory size of the graph small
+
+    Ok(nids_in_ne2_ways)
 }
 
 fn read_node_positions(
@@ -1259,8 +1250,8 @@ fn round(f: &f64, places: u8) -> f64 {
 }
 
 /// Round this float to be a whole number multiple of base.
-fn round_mult(f: &f64, base: i64) -> i64 {
-    (f / (base as f64)).round() as i64 * base
+fn round_mult(f: &f64, base: f64) -> i64 {
+    ((f / base).round() * base) as i64
 }
 
 fn _bbox_area(points: impl Iterator<Item = (f64, f64)>) -> Option<f64> {
@@ -1317,6 +1308,7 @@ fn do_group_by_ends(
     nodeid_pos: &impl NodeIdPosition,
     end_point_tag_values: &[SmallVec<[Option<String>; 1]>],
     ends_tags: &[String],
+    inter_store: &inter_store::InterStore,
 ) -> Result<()> {
     let started = Instant::now();
     let nodes_bar = progress_bars.add(
@@ -1388,6 +1380,13 @@ fn do_group_by_ends(
 
             // include this point in every line so far
             for (_line_end, line_points) in lines_to_here.iter_mut() {
+                if let Some(last) = line_points.last() {
+                    if inter_store.contains_directed(nid, last) {
+                        // we're building the line in reverse, so swap nid & last in the lookup.
+                        let mut inters: Vec<_> = inter_store.inters_directed(nid, last).collect();
+                        line_points.extend(inters.drain(..).rev());
+                    }
+                }
                 line_points.push(*nid);
             }
 
@@ -1444,7 +1443,7 @@ fn do_group_by_ends(
 
         let points = path
             .into_iter()
-            .map(|nid| nodeid_pos.get(&nid).unwrap())
+            .map(|nid| nodeid_pos.get(&nid).expect("Cannot find position for node"))
             .collect::<Vec<_>>();
         let mut props = serde_json::json!({
             "end_nid": end_points[end_idx as usize],
@@ -1486,6 +1485,137 @@ fn do_group_by_ends(
         output_filename.to_str().unwrap(),
         formatting::format_duration(grouping_duration),
         (topologically_sorted_nodes.len() as f64) / grouping_duration.as_secs_f64(),
+    );
+
+    Ok(())
+}
+
+fn do_write_upstreams(
+    args: &crate::cli_args::Args,
+    upstream_filename: &Path,
+    progress_bars: &MultiProgress,
+    style: &ProgressStyle,
+    upstream_assigned_end: &[i32],
+    topologically_sorted_nodes: &[i64],
+    upstream_per_edge: &SortedSliceMap<(i64, i64), f64>,
+    inter_store: &inter_store::InterStore,
+    nodeid_pos: &impl NodeIdPosition,
+    end_points: &[i64],
+    end_point_upstreams: &[f64],
+    end_point_tag_values: &[SmallVec<[Option<String>; 1]>],
+) -> Result<()> {
+    assert!(!upstream_assigned_end.is_empty(), "When doing upstreams, we should have assigned each point to an end. Why was this not done?");
+    assert_eq!(
+        topologically_sorted_nodes.len(),
+        upstream_assigned_end.len()
+    );
+    let upstream_assigned_end_map: SortedSliceMap<i64, i32> = SortedSliceMap::from(
+        topologically_sorted_nodes
+            .iter()
+            .copied()
+            .zip(upstream_assigned_end.iter().copied()),
+    );
+
+    let writing_upstreams_bar = progress_bars.add(
+        ProgressBar::new(upstream_per_edge.len() as u64)
+            .with_message("Writing upstreams file")
+            .with_style(style.clone()),
+    );
+
+    // we loop over all nodes in topologically_sorted_nodes (which is annotated in
+    // upstream_length_iter with the upstream value) and flat_map that into each line segment
+    // that goes out of that.
+    let lines = upstream_per_edge
+        .iter()
+        .progress_with(writing_upstreams_bar)
+        .map(|((from_nid, to_nid), initial_upstream_len)| {
+            let end_idx: usize = *upstream_assigned_end_map.get(to_nid).unwrap() as usize;
+            (from_nid, to_nid, initial_upstream_len, end_idx)
+        })
+        .flat_map(|(from_nid, to_nid, initial_upstream_len, end_idx)| {
+            // Expand all the intermediate nodes between these 2, and increase the current
+            // total upsteam, and output all that for the next iteration
+            inter_store
+                .expand_directed(*from_nid, *to_nid)
+                .map(|nid| (nid, nodeid_pos.get(&nid).unwrap()))
+                .tuple_windows::<(_, _)>()
+                .scan(
+                    *initial_upstream_len,
+                    move |curr_upstream_len, ((nid1, p1), (nid2, p2))| {
+                        let this_len = haversine::haversine_m_fpair(p1, p2);
+                        let from_upstream_len = *curr_upstream_len;
+                        *curr_upstream_len += this_len;
+                        Some((
+                            nid1,
+                            nid2,
+                            p1,
+                            p2,
+                            from_upstream_len,
+                            *curr_upstream_len,
+                            end_idx,
+                        ))
+                    },
+                )
+        })
+        .filter(
+            |(_from_nid, _to_nid, _p1, _p2, from_upstream_len, to_upstream_len, _end_idx)| {
+                args.upstreams_min_upstream_m.map_or(true, |min| {
+                    *from_upstream_len >= min || *to_upstream_len >= min
+                })
+            },
+        )
+        .map(
+            |(_from_nid, _to_nid, p1, p2, from_upstream_len, to_upstream_len, end_idx)| {
+                // Round the upstream to only output 1 decimal place
+                let mut props = serde_json::json!({});
+                props["from_upstream_m"] = round(&from_upstream_len, 1).into();
+                props["to_upstream_m"] = round(&to_upstream_len, 1).into();
+
+                for mult in args.upstreams_from_upstream_multiple.iter() {
+                    props[format!("from_upstream_m_{}", mult)] =
+                        round_mult(&from_upstream_len, *mult).into();
+                }
+                props["end_upstream_m"] = round(&end_point_upstreams[end_idx], 1).into();
+                props["end_nid"] = end_points[end_idx].into();
+
+                if !args.ends_tag.is_empty() {
+                    for (tag_key, tag_value) in args
+                        .ends_tag
+                        .iter()
+                        .zip(end_point_tag_values[end_idx].iter())
+                    {
+                        if let Some(tag_value) = tag_value {
+                            props[format!("end_tag:{}", tag_key)] = tag_value.clone().into();
+                        }
+                    }
+                }
+
+                (props, (p1, p2))
+            },
+        );
+    info_memory_used!();
+
+    let mut f = std::io::BufWriter::new(std::fs::File::create(upstream_filename)?);
+
+    let num_written;
+    if upstream_filename.extension().unwrap() == "geojsons"
+        || upstream_filename.extension().unwrap() == "geojson"
+    {
+        num_written = write_geojson_features_directly(
+            lines,
+            &mut f,
+            &fileio::format_for_filename(upstream_filename),
+        )?;
+    } else if upstream_filename.extension().unwrap() == "csv" {
+        num_written = write_csv_features_directly(lines, &mut f)?;
+    } else {
+        anyhow::bail!("Unsupported output format");
+    }
+
+    info!(
+        "Wrote {} features to output file {}",
+        num_written.to_formatted_string(&Locale::en),
+        upstream_filename.display(),
     );
 
     Ok(())

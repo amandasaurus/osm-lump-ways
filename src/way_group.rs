@@ -1,3 +1,4 @@
+#![allow(warnings)]
 #![allow(dead_code, unused_imports)]
 use super::*;
 use geo::algorithm::convex_hull::qhull::quick_hull;
@@ -6,93 +7,44 @@ use geo::{
     geometry::{Coord, MultiPoint, Point},
     CoordsIter,
 };
+use graph::Graph2;
 use graph::UndirectedAdjGraph;
+use haversine::haversine_m_fpair;
+use inter_store::InterStore;
 use ordered_float::OrderedFloat;
+use sorted_slice_store::SortedSliceSet;
 use std::collections::HashSet;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct WayGroup {
-    pub root_wayid: i64,
-    pub way_ids: Vec<i64>,
-    pub nodeids: Vec<Vec<i64>>,
-    pub length_m: Option<f64>,
-    pub coords: Option<Vec<Vec<(f64, f64)>>>,
-    pub extra_json_props: serde_json::Value,
-    pub group: Vec<Option<String>>,
+    pub graph: Graph2,
+    pub length_m: f64,
+    pub json_props: serde_json::Value,
+    pub group: Box<[Option<String>]>,
+    pub root_nodeid: i64,
 }
 
 impl WayGroup {
-    pub fn new(root_wayid: impl Into<i64>, group: Vec<Option<String>>) -> Self {
+    pub fn new(graph: Graph2, group: Box<[Option<String>]>) -> Self {
+        let root_nodeid = *graph.first_vertex().unwrap();
         WayGroup {
+            graph,
+            root_nodeid,
             group,
-            root_wayid: root_wayid.into(),
-            extra_json_props: serde_json::from_str("{}").unwrap(),
             ..Default::default()
         }
     }
 
-    pub fn calculate_length(&mut self) {
-        if self.length_m.is_some() {
-            return;
-        }
-        self.length_m = Some(
-            self.coords
-                .as_ref()
-                .unwrap()
-                .par_iter()
-                .map(|coord_string| {
-                    coord_string
-                        .par_windows(2)
-                        .map(|pair| haversine_m(pair[0].1, pair[0].0, pair[1].1, pair[1].0))
-                        .sum::<f64>()
-                })
-                .sum(),
-        )
+    pub fn calculate_length(&mut self, nodeid_pos: &impl NodeIdPosition) {
+        self.length_m = self
+            .graph
+            .edges_par_iter()
+            .map(|(a, b)| haversine_m_fpair(nodeid_pos.get(a).unwrap(), nodeid_pos.get(b).unwrap()))
+            .sum::<f64>();
     }
 
-    pub fn set_coords(&mut self, nodeid_pos: &impl NodeIdPosition) {
-        if self.coords.is_some() {
-            return;
-        }
-        self.coords = Some(
-            self.nodeids
-                .par_iter()
-                .map(|nids| {
-                    let mut poses = vec![(-200., -200.); nids.len()];
-                    nodeid_pos.get_many_unwrap(nids, poses.as_mut_slice());
-                    poses
-                })
-                .collect::<Vec<_>>(),
-        );
-    }
-
-    pub fn num_nodeids(&self) -> usize {
-        self.nodeids.par_iter().map(|nids| nids.len()).sum()
-    }
-
-    pub fn nodeids_iter(&self) -> impl rayon::prelude::ParallelIterator<Item = &i64> + '_ {
-        self.nodeids.par_iter().flat_map(|nids| nids.par_iter())
-    }
-
-    pub fn nodeids_iter_seq(&self) -> impl Iterator<Item = &i64> + '_ {
-        self.nodeids.iter().flat_map(|nids| nids.iter())
-    }
-
-    pub fn coords_iter_par(&self) -> impl rayon::prelude::ParallelIterator<Item = [f64; 2]> + '_ {
-        self.coords
-            .as_ref()
-            .expect("You called WayGroup::coords_iter_par before you have set the coords for this waygroup")
-            .par_iter()
-            .flat_map(|coord_string| coord_string.par_iter().map(|c| [c.0, c.1]))
-    }
-
-    pub fn coords_iter_seq(&self) -> impl Iterator<Item = [f64; 2]> + '_ {
-        //pub coords: Option<Vec<Vec<(f64, f64)>>>,
-        self.coords
-            .as_ref()
-            .expect("You called WayGroup::coords_iter_seq before you have set the coords for this waygroup")
-            .iter()
-            .flat_map(|coord_string| coord_string.iter().map(|c| [c.0, c.1]))
+    pub fn num_nodes(&self) -> usize {
+        self.graph.num_vertexes()
     }
 
     pub fn filename(&self, output_filename: &str, split_files_by_group: bool) -> String {
@@ -115,261 +67,123 @@ impl WayGroup {
     }
     #[allow(unused)]
     pub fn recalculate_root_id(&mut self) {
-        self.root_wayid = *self
-            .nodeids
-            .par_iter()
-            .flat_map(|ns| ns.par_iter())
-            .min()
-            .unwrap_or(&0);
-    }
-
-    /// Try to reduce the number of inner segments, by merging segments which are end to end
-    /// connected
-    pub fn reorder_segments(
-        &mut self,
-        max_rounds: impl Into<Option<usize>>,
-        reorder_segments_bar: &ProgressBar,
-        can_reverse_ways: bool,
-    ) {
-        let max_rounds = max_rounds.into();
-        let old_num_nodeids = self.nodeids.len();
-        if old_num_nodeids == 1 {
-            // nothing to do
-            reorder_segments_bar.inc(self.nodeids.len() as u64);
-            return;
-        }
-        trace!(
-            "wg:{} Before reorder_segments there are {old_num_nodeids} segments",
-            self.root_wayid,
-        );
-
-        let mut graph_modified;
-        let mut round = 0;
-        let (mut seg_i, mut seg_j);
-        let mut num_nodes;
-        let (mut left, mut right);
-        let (mut i, mut j);
-
-        let mut nid_num_neighbours: HashMap<i64, Vec<usize>> =
-            HashMap::with_capacity(2 * self.nodeids.len());
-
-        // Main loop to remove segments
-        loop {
-            if self.nodeids.len() == 1 {
-                break;
-            }
-            // shortest segments first. this seems to have the largest reduction in segments
-            self.nodeids.par_sort_by_key(|e| e.len());
-            graph_modified = false;
-            num_nodes = self.nodeids.len();
-            if old_num_nodeids > 1_000 {
-                trace!(
-                    "wg:{} reorder_segments. round {round}. There are {num_nodes} nodeids",
-                    self.root_wayid
-                );
-            }
-            if max_rounds.map_or(false, |max| round >= max) {
-                trace!(
-                    "wg:{} reorder_segments. round {round}. Reached max rounds, breaking out",
-                    self.root_wayid
-                );
-                break;
-            }
-            round += 1;
-
-            nid_num_neighbours.clear();
-            for (i, segment) in self.nodeids.iter().enumerate() {
-                if segment.is_empty() {
-                    continue;
-                }
-                nid_num_neighbours
-                    .entry(*segment.first().unwrap())
-                    .or_default()
-                    .push(i);
-                nid_num_neighbours
-                    .entry(*segment.last().unwrap())
-                    .or_default()
-                    .push(i);
-            }
-            nid_num_neighbours.shrink_to_fit();
-
-            for edges in nid_num_neighbours
-                .drain()
-                .map(|(_k, v)| v)
-                .filter(|e| e.len() >= 2)
-            {
-                i = edges[0];
-                j = edges[1];
-                if i == j {
-                    continue;
-                }
-                if i > j {
-                    std::mem::swap(&mut i, &mut j);
-                }
-                (left, right) = self.nodeids.split_at_mut(i + 1);
-                seg_i = left.last_mut().unwrap();
-                seg_j = right.get_mut(j - i - 1).unwrap();
-                if seg_i.is_empty() || seg_j.is_empty() {
-                    continue;
-                }
-
-                if seg_i.last() == seg_j.first() {
-                    graph_modified = true;
-                    reorder_segments_bar.inc(1);
-                    seg_i.extend(seg_j.drain(..).skip(1));
-                } else if can_reverse_ways && seg_i.last() == seg_j.last() {
-                    graph_modified = true;
-                    reorder_segments_bar.inc(1);
-                    seg_i.extend(seg_j.drain(..).rev().skip(1));
-                } else if seg_i.first() == seg_j.first() {
-                    graph_modified = true;
-                    reorder_segments_bar.inc(1);
-                    seg_i.reverse();
-                    seg_i.extend(seg_j.drain(..).skip(1));
-                } else if can_reverse_ways && seg_i.first() == seg_j.last() {
-                    graph_modified = true;
-                    reorder_segments_bar.inc(1);
-                    seg_i.reverse();
-                    seg_i.extend(seg_j.drain(..).rev().skip(1));
-                }
-            }
-
-            if !graph_modified {
-                break;
-            }
-        }
-        drop(nid_num_neighbours);
-        // Shrink our total
-        self.nodeids.retain(|segments| !segments.is_empty());
-
-        self.nodeids.shrink_to_fit();
-        // these segments are “done”
-        reorder_segments_bar.inc(self.nodeids.len() as u64);
-
-        // coords no longer valid
-        self.coords = None;
-        // in theory this shouldn't change, but just in case
-        self.length_m = None;
-
-        log!(
-            if old_num_nodeids > 20_000 || old_num_nodeids - self.nodeids.len() > 20_000 {
-                Debug
-            } else {
-                Trace
-            },
-            "wg:{} After reorder_segments there are {}K segments, removed {}K, in {round} round(s)",
-            self.root_wayid,
-            self.nodeids.len() / 1_000,
-            old_num_nodeids.abs_diff(self.nodeids.len()) / 1_000,
-        );
+        self.root_nodeid = *self.graph.first_vertex().unwrap_or(&0);
     }
 
     /// Calculate the frames for this way group
     pub fn frames(
         &self,
         nodeid_pos: &impl NodeIdPosition,
-        furthest_path_bar: &ProgressBar,
-    ) -> Vec<Vec<(f64, f64)>> {
-        let mut all_nodes_pos: Vec<Coord<f64>> = self
-            .coords_iter_par()
-            .map(|c| Coord { x: c[0], y: c[1] })
-            .collect();
+        frames_bar: &ProgressBar,
+    ) -> impl Iterator<Item = Box<[i64]>> {
+        // First calculate the
+        let mut all_nodes_pos = self
+            .graph
+            .vertexes_par_iter()
+            .map(|nid| nodeid_pos.get(nid).unwrap())
+            .collect::<Vec<_>>();
+        all_nodes_pos.par_sort_unstable_by_key(|(x, y)| (OrderedFloat(*x), OrderedFloat(*y)));
         all_nodes_pos.dedup();
-        let chull = quick_hull(&mut all_nodes_pos).into_inner();
-        //info!("Calculated convex hull from {} points in total to {} in c. hull (∆ {})", all_nodes_pos.len(), chull.len(), all_nodes_pos.len()-chull.len());
-        drop(all_nodes_pos);
-        let mut chull: Vec<(f64, f64)> = chull.into_iter().map(|c| (c.x, c.y)).collect();
-        chull.sort_by_key(|(x, y)| (OrderedFloat(*x), OrderedFloat(*y)));
-        chull.dedup();
-        furthest_path_bar.inc_length((chull.len() * (chull.len() + 1) / 2) as u64);
+        let mut all_nodes_pos = all_nodes_pos
+            .into_iter()
+            .map(|c| Coord { x: c.0, y: c.1 })
+            .collect::<Vec<_>>();
 
+        let chull = quick_hull(&mut all_nodes_pos).into_inner();
+
+        drop(all_nodes_pos);
+        let mut chull: Vec<(OrderedFloat<f64>, OrderedFloat<f64>)> = chull
+            .into_iter()
+            .map(|c| (c.x.into(), c.y.into()))
+            .collect();
+        chull.par_sort_by_key(|(x, y)| (OrderedFloat(*x), OrderedFloat(*y)));
+        chull.dedup();
+        let n = chull.len() as u64;
+        frames_bar.inc_length((n * (n - 1) / 2) * self.graph.num_vertexes() as u64);
+        let chull = SortedSliceSet::from_vec(chull);
+        //furthest_path_bar.inc_length((chull.len() * (chull.len() + 1) / 2) as u64);
+
+        // We need the nodeids of these positions.
+        // This is very effecient, we're basically doing a nodeid_pos lookup *again*.
         let mut convex_hull_nodes: Vec<_> = self
-            .nodeids_iter()
-            .filter_map(|n| {
-                let p = nodeid_pos.get(n).unwrap();
+            .graph
+            .vertexes_par_iter()
+            .filter_map(|nid| {
+                let p = nodeid_pos.get(nid).unwrap();
+                let p = (p.0.into(), p.1.into());
                 if chull.contains(&p) {
-                    Some((*n, p))
+                    Some((*nid, p))
                 } else {
                     None
                 }
             })
             .collect();
-        //assert_eq!(convex_hull_nodes.len(), chull.len());
-        convex_hull_nodes.sort_by_key(|(n, _)| *n);
+        assert_eq!(convex_hull_nodes.len(), chull.len());
+        drop(chull);
+        convex_hull_nodes.par_sort_by_key(|(n, _)| *n);
 
-        let mut edges = UndirectedAdjGraph::new();
-        for node_seq in self.nodeids.iter() {
-            for win in node_seq.windows(2) {
-                edges.set(
-                    &win[0],
-                    &win[1],
-                    haversine::haversine_m_fpair(
-                        nodeid_pos.get(&win[0]).unwrap(),
-                        nodeid_pos.get(&win[1]).unwrap(),
-                    ),
-                );
-            }
-        }
+        // Frames have a lot of overlap with each other.
+        let mut frames_graph = Arc::new(Mutex::new(Graph2::new()));
 
-        // Contract edges, but never remove the vertexes that we later want to route on
-
-        //let old_num_edges = edges.num_edges();
-        edges.contract_edges_some(|v| !convex_hull_nodes.iter().any(|(n, _)| v == n));
-        edges.remove_spikes(|v| !convex_hull_nodes.iter().any(|(n, _)| v == n));
-        // after spike removal, there might be a few new removable vertexes, so run this again to
-        // be sure.
-        edges.contract_edges_some(|v| !convex_hull_nodes.iter().any(|(n, _)| v == n));
-        //dbg!(old_num_edges - edges.num_edges());
-
-        // path_results is a graph that has a vertex if there is a shortest path that goes this
-        // way.
-        // This is binary. there is or isn't a connection between the 2 nodes. If we stored the
-        // total number (or length) of paths through each vertex, then we can get closer to
-        // Betweenness Centrality. That's a potential task for later.
-        // This saves much less space than storing the full paths for each connection.
-        let path_results = Arc::new(Mutex::new(UndirectedAdjGraph::new()));
         convex_hull_nodes
             .par_iter()
             .enumerate()
-            .for_each(|(i, source)| {
-                let these_results = dij::paths_one_to_many(
+            .flat_map(|(i, source)| {
+                // returns an iterator for each of the other nodes
+                dij::paths_one_to_many(
                     *source,
                     &convex_hull_nodes[(i + 1)..],
                     nodeid_pos,
-                    &edges,
-                );
-                these_results.for_each_with(path_results.clone(), |path_results, (_ends, path)| {
-                    furthest_path_bar.inc(1);
-                    let mut path_results = path_results.lock().unwrap();
-                    for win in path.windows(2) {
-                        path_results.set(&win[0], &win[1], 0u8);
-                    }
-                });
-            });
-        let mut path_graph = Arc::into_inner(path_results).unwrap().into_inner().unwrap();
+                    &self.graph,
+                )
+            })
+            .inspect(|_| frames_bar.inc(self.graph.num_vertexes() as u64))
+            .for_each_with(
+                frames_graph.clone(),
+                |frames_graph, ((from_nid, to_nid), path)| {
+                    frames_graph.lock().unwrap().add_edge_chain(&path);
+                },
+            );
 
-        // We have lots of little segments, nid1-nid2. We turn these into sensible lines, by
-        // contracting that graph and then saving all the linestrings that come out of it.
-        path_graph.contract_edges();
+        let mut frames_graph = Arc::try_unwrap(frames_graph).unwrap().into_inner().unwrap();
 
-        // turn each of the vertexes (in the contracted graph) into a series of lines.
-        let results = path_graph
-            .get_all_contracted_edges()
-            .map(|(_dummy_weight, nids)| {
-                let nids = nids.collect::<Vec<_>>();
-                nids.par_iter()
-                    .map(|nid| nodeid_pos.get(nid).unwrap())
+        frames_graph.into_lines_random()
+    }
+
+    pub fn coords<'a>(
+        &'a self,
+        nodeid_pos: &'a impl NodeIdPosition,
+    ) -> impl Iterator<Item = Vec<(f64, f64)>> + 'a {
+        // very simple, just each edge
+        self.graph
+            .edges_iter()
+            .map(|(a, b)| vec![nodeid_pos.get(a).unwrap(), nodeid_pos.get(b).unwrap()])
+    }
+
+    pub fn into_props_coords_random(
+        self,
+        nodeid_pos: &impl NodeIdPosition,
+        inter_store: &InterStore,
+    ) -> (serde_json::Value, Vec<Vec<(f64, f64)>>) {
+        let Self {
+            json_props, graph, ..
+        } = self;
+        let coords = graph
+            .into_lines_random()
+            .map(|line| {
+                inter_store
+                    .expand_line_undirected(&line)
+                    .map(|nid| nodeid_pos.get(&nid).unwrap())
                     .collect::<Vec<_>>()
             })
             .collect();
-
-        results
+        (json_props, coords)
     }
 }
 
 impl PartialEq for WayGroup {
     fn eq(&self, other: &Self) -> bool {
-        self.root_wayid == other.root_wayid
+        self.root_nodeid == other.root_nodeid
     }
 }
 impl Eq for WayGroup {}
@@ -381,10 +195,7 @@ impl PartialOrd for WayGroup {
 }
 impl Ord for WayGroup {
     fn cmp(&self, other: &Self) -> Ordering {
-        match (self.length_m, other.length_m) {
-            (Some(a), Some(b)) => a.total_cmp(&b).reverse(),
-            _ => self.root_wayid.cmp(&other.root_wayid),
-        }
+        self.length_m.total_cmp(&other.length_m).reverse()
     }
 }
 

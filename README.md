@@ -74,7 +74,10 @@ mode, a line `include FILENAME;` will include the contents of another file
 there. `FILENAME` is a path relative to the original filename. It will be
 expanded recursively.
 
-Comments start with `#` and continue to the end of the line.
+Comments start with `#` and continue to the end of the line. Since the `;` is
+special, it cannot be directly used in tag filtering. Use `\u{3B}` instead.
+e.g. `waterway=put_in\u{3B}egress→F;` is a rule to exclude any tag with key
+`waterway` and value `put_in;egress`.
 
 # Output
 
@@ -97,7 +100,9 @@ path in the graph, and this can take days to calculate on large networks.
 
 # Input
 
-The input must be an [OSM PBF](https://wiki.openstreetmap.org/wiki/PBF_Format) file. Use [osmium to convert between OSM file formats](https://osmcode.org/osmium-tool/manual.html#osm-file-formats-and-converting-between-them).
+The input must be an [OSM PBF](https://wiki.openstreetmap.org/wiki/PBF_Format)
+file. Use [osmium to convert between OSM file
+formats](https://osmcode.org/osmium-tool/manual.html#osm-file-formats-and-converting-between-them).
 
 The input
 [object ids](https://wiki.openstreetmap.org/wiki/Elements#:~:text=Description-,id,-integer%20%2864-bit)
@@ -111,9 +116,19 @@ so, to create an acceptable file.
 	osmium sort negative-id-file.osm.pbf -o sorted.osm.obf
 	osmium renumber sorted.osm.pbf -o new-input.osm.pbf
 
+# Installation
+
+	cargo install osm-lump-ways
+
+This will install the 2 programmes: `osm-lump-ways` & `osm-lump-ways-down`.
+`osm-lump-ways` ignores the direction of the OSM ways, and produces single
+output files. It can be used for waterways or watersheds, but also for roads or
+similar. `osm-lump-ways-down` uses the direction of the OSM data to produce
+many similar files.
+
 # `osm-lump-ways`
 
-# Usage
+## Usage
 
 Generate river drainage basins
 
@@ -127,15 +142,12 @@ To find long streets and assemble them into connected (Multi)LineStrings:
 
 	osm-lump-ways -i path/to/region-latest.osm.pbf -o long-streets.geojson -f highway -g name
 
-# Installation
 
-	cargo install osm-lump-ways
-
-# Full Options
+## Full Options
 
 Run with `--help` to see all options.
 
-# Frames
+## Frames
 
 Here, a “frame” of a grouping is a shortest path through 2 points in the
 grouped together ways. This can be useful for waterways to find where a big
@@ -152,10 +164,32 @@ GeoJSONSeq output format only.
 * [Die Bahnhofstrassen in jeder Schweizer Sprachregion (german language only)](https://habi.gna.ch/2023/11/14/die-bahnhofstrassen-in-jeder-schweizer-sprachregion/)
 * Your project here!
 
-## `osm-lump-ways-down`
+# `osm-lump-ways-down`
 
 It reads & groups an OSM PBF file, like `osm-lump-ways`, but it uses the
-direction of the OSM way, to produce many different output files.
+direction of the OSM way, to produce many different output files. The main use
+for this is waterway flow, so that terminology will often be used, but it could
+be used for anything else which uses direction.
+
+One concept that occurs a lot is the “sum of all the ways that flow into this
+point”, i.e. the “upstream” at a point.
+
+## Allocating flow downstream of a bifurcation
+
+When there is X m of upstream ways flowing into a node (via 1+ incoming ways),
+and 2+ ways leading out of a point, there are 2 methods to allocate the
+upstream total to the nodes “downstream” of this node. 
+
+`--flow-split-equally`: The value of X is split equally between all nodes
+“downstram”. `--flow-follows-tag TAG`: If there is 1 incoming segment with a
+tag `TAG`, and 1+ outgoing segment(s) with the same `TAG` value, then the X is
+split equally between them, and 1 m of upstream is shared between all other
+outgoing segments.
+
+Splitting the flow equally sounds logical, however it can often happen that a
+large river has a (mis)tagged waterway that leads away, and results in half
+getting diverted. If the flow follow the `name` tag, then most of the upstream
+stays with the main stream.
 
 ## Output files
 
@@ -164,7 +198,8 @@ It can output different files, depending on the options:
 ### `--loops FILENAME`
 
 Cycles in the network. Each is a [strongly connected
-component](https://en.wikipedia.org/wiki/Strongly_connected_component), and `MultiLineString`.
+component](https://en.wikipedia.org/wiki/Strongly_connected_component), and
+`MultiLineString`.
 
 #### Feature Properties
 
@@ -187,7 +222,7 @@ component](https://en.wikipedia.org/wiki/Strongly_connected_component), and `Mul
 
 ### Loops stats CSV
 
-With `--csv-stats-file FILENAME.csv`, a CSV file with statistics of the loops,
+With `--loops-csv-stats-file FILENAME.csv`, a CSV file with statistics of the loops,
 along with a breakdown per region is created. If the file is already there, the
 data is appended.
 
@@ -225,16 +260,27 @@ Points where waterways end.
 
 #### Ends membership of tagged ways
 
+##### `--ends-membership TAGFILTER`
+
 With the `--ends-membership TAGFILTER` arg every end will have a boolean
 property called `is_in:TAGFILTER` which is only true if this end node is a
 member of a way with this tag filter. This argument can be applied many times.
 An addditional property `is_in_count` is an integer of how many of these
 properties are true.
 
-
 e.g. `--ends-membership natural=coastline` will cause each end point to have a
 JSON property `is_in:natural=coastline` which is `true` iff this node is also a
 member of a way with the `natural=coastline` tag, false otherwise.
+
+##### `--ends-tag TAG`
+
+Every end point will have a JSON property `tag:X` which is the tag
+
+e.g. `--ends-tag name` will cause every end point to have a `tag:name` JSON
+property, with the `name` tag from the way which flows into this end point.
+
+Unlike `--ends-membership` this only uses the OSM ways which are included by
+the tag filters
 
 ### `ends-full-upstreams`
 
@@ -244,11 +290,23 @@ end somewhere.
 
 `--ends-upstreams-min-upstream-m 1e6 --ends-upstreams-max-nodes 1000` is a good tradeoff for calculation speed & file size, which still shows the relevant upstreams
 
+### Ends stats CSV
+
+With `--ends-csv-file FILENAME.csv`, the end points are also written to a CSV
+file. If the file is already there, new data is appended. Values from
+`--ends-tag` (in order) are included in the CSV. Changing the arguments (or
+order) will make a possibly invalid CSV file.
+
+Only end points with an `upstream_m` greater than `--ends-csv-min-length-m X`
+will be included, and only the largest N from `--ends-csv-only-largest-n N`
+
+See the doc comment
+[`src/bin/osm-lump-ways-down/cli_args.rs`](./blob/main/src/bin/osm-lump-ways-down/cli_args.rs), or run `osm-lump-ways-down --help` for the format.
+
 ## Loop removal
 
 After the loops are detected, all the edges (way segments) in the loops are
 contracted together, producing a new graph which is loop-free.
-
 
 # TODOs
 

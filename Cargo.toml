@@ -1,6 +1,6 @@
 [package]
 name = "osm-lump-ways"
-version = "1.8.0-dev"
+version = "2.0.0"
 edition = "2021"
 authors = ["Amanda McCann <amanda@technomancy.org>"]
 license = "MIT OR Apache-2.0"
@@ -19,6 +19,7 @@ geo = "0.28.0"
 get-size = { version = "0.1.4", features = ["derive"] }
 indicatif = "0.17.8"
 indicatif-log-bridge = "0.2.3"
+itertools = "0.13.0"
 kdtree = "0.7.0"
 log = "0.4.22"
 memory-stats = "1.2.0"
@@ -37,5 +38,12 @@ vartyint = "0.3.0"
 [profile.dev]
 opt-level = 3
 
-[profile.release]
-debug=true
+[profile.profiling]
+inherits = "release"
+debug = true
+lto = false
+
+[profile.opt]
+inherits = "release"
+lto = "fat"
+panic = "abort"

@@ -202,31 +202,42 @@ fn write_linestring_coords(
 pub fn write_csv_features_directly<G>(
     features: impl Iterator<Item = (serde_json::Value, G)>,
     f: &mut impl Write,
-    columns: &[String],
 ) -> Result<usize>
 where
     G: Geometry,
 {
+    let mut headers: Vec<String> = Vec::with_capacity(10);
+
     let mut num_written = 0;
 
     let mut wtr = csv::Writer::from_writer(f);
 
-    for col in columns {
-        wtr.write_field(col)?;
-    }
-    wtr.write_field("geom")?;
-    wtr.write_record(None::<&[u8]>)?;
-
     let mut buf = Vec::new();
     for (props, geom) in features {
-        for col in columns {
+        // Write the headers on the first run
+        if headers.is_empty() {
+            // NB no sorting here, the results look OK...
+            headers = props
+                .as_object()
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect::<Vec<_>>();
+            for col in headers.iter() {
+                wtr.write_field(col)?;
+            }
+            wtr.write_field("geom")?;
+            wtr.write_record(None::<&[u8]>)?;
+        }
+
+        for col in headers.iter() {
             wtr.write_field(props[&col].to_string())?;
         }
         buf.clear();
         geom.write_wkt(&mut buf);
         wtr.write_field(&buf)?;
-
         wtr.write_record(None::<&[u8]>)?;
+
         num_written += 1;
     }
 

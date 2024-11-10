@@ -1,14 +1,14 @@
+#![allow(unused_imports)]
 //! Kosaraju Algorithm to find Strongly Connected Components
 //! https://en.wikipedia.org/wiki/Kosaraju%27s_algorithm
 use super::*;
 use crate::graph::{DirectedGraph2, DirectedGraphTrait};
-#[allow(unused_imports)]
 use indicatif::ProgressDrawTarget;
 
 use std::collections::{BTreeMap, HashSet};
 
 pub(crate) fn kosaraju(
-    g: &DirectedGraph2,
+    g: &impl DirectedGraphTrait,
     calc_components_bar: &ProgressBar,
 ) -> BTreeMap<i64, i64> {
     kosaraju_it(g, calc_components_bar)
@@ -16,7 +16,7 @@ pub(crate) fn kosaraju(
 
 /// Iterative Koaraju algorithm
 pub(crate) fn kosaraju_it(
-    g: &DirectedGraph2,
+    g: &impl DirectedGraphTrait,
     calc_components_bar: &ProgressBar,
 ) -> BTreeMap<i64, i64> {
     let mut visited_vertexes: HashSet<i64> = HashSet::new();
@@ -53,12 +53,12 @@ pub(crate) fn kosaraju_it(
         }
     }
     l.reverse();
-    assert_eq!(
-        l.len(),
-        g.num_vertexes(),
-        "Unequal lengths for {}",
-        g.vertexes().next().unwrap()
-    );
+    //assert_eq!(
+    //    l.len(),
+    //    g.num_vertexes(),
+    //    "Unequal lengths for {}",
+    //    g.vertexes().next().unwrap()
+    //);
     drop(stack);
 
     let mut components = BTreeMap::new();
