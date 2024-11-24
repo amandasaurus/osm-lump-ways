@@ -195,7 +195,7 @@ stays with the main stream.
 
 It can output different files, depending on the options:
 
-### `--loops FILENAME`
+### Loops (Cycles) (`--loops FILENAME`)
 
 Cycles in the network. Each is a [strongly connected
 component](https://en.wikipedia.org/wiki/Strongly_connected_component), and
@@ -220,7 +220,7 @@ component](https://en.wikipedia.org/wiki/Strongly_connected_component), and
 * `root_node_id`: Integer. Node id of the lowest numbered node in this cycle.
 * `num_nodes`: Integer. Number of nodes in this cycle. incl. duplicates.
 
-### Loops stats CSV
+### Loops stats CSV (`--loops-csv-stats-file FILENAME.csv`)
 
 With `--loops-csv-stats-file FILENAME.csv`, a CSV file with statistics of the loops,
 along with a breakdown per region is created. If the file is already there, the
@@ -230,7 +230,7 @@ See the doc comment
 [`src/bin/osm-lump-ways-down/cli_args.rs`](./blob/main/src/bin/osm-lump-ways-down/cli_args.rs#L158-L171),
 or run `osm-lump-ways-down --help` for the format.
 
-### `--upstreams FILENAME`
+### Way network, with per segment upstream value (`--upstreams FILENAME`)
 
 Each way segment (a 2 point `LineString`) with the upstream data.
 With `--upstream-output-ends-full`, each segement get information about all the end
@@ -245,7 +245,7 @@ With `--upstream-assign-end-by-tag TAG`, it will attempt to follow the same OSM
 tag upstream from an end point. When used with the `name` tag, this usually
 produces maps that are more like what people expect.
 
-### `--grouped\_ends FILENAME`
+### Way network, grouped by end point (`--grouped\_ends FILENAME`)
 
 Ways grouped by downhill and the end point they flow into. The upstream value
 of each segment isn't included, and it attemptes to generate long LineStrings,
@@ -254,7 +254,7 @@ grouped by the end point that it flows into.
 See the `--upstream-outpout-biggest-end` & `--upstream-assign-end-by-tag TAG`
 arguments.
 
-### `--ends FILENAME`
+### End points (`--ends FILENAME`)
 
 Points where waterways end.
 
@@ -288,9 +288,11 @@ Only with `--ends-upstreams` argument. File of MultiLineStrings showing, for
 each end, where the upstreams are. Useful to find why there's a big upstream
 end somewhere.
 
-`--ends-upstreams-min-upstream-m 1e6 --ends-upstreams-max-nodes 1000` is a good tradeoff for calculation speed & file size, which still shows the relevant upstreams
+`--ends-upstreams-min-upstream-m 1e6 --ends-upstreams-max-nodes 1000` is a good
+tradeoff for calculation speed & file size, which still shows the relevant
+upstreams
 
-### Ends stats CSV
+### Ends stats CSV (`--ends-csv-file FILENAME.csv`)
 
 With `--ends-csv-file FILENAME.csv`, the end points are also written to a CSV
 file. If the file is already there, new data is appended. Values from
@@ -298,10 +300,26 @@ file. If the file is already there, new data is appended. Values from
 order) will make a possibly invalid CSV file.
 
 Only end points with an `upstream_m` greater than `--ends-csv-min-length-m X`
-will be included, and only the largest N from `--ends-csv-only-largest-n N`
+will be included (without this argument, there is no length filtering), and
+only the largest N from `--ends-csv-only-largest-n N` (without this argument
+there is no limit).
 
-See the doc comment
-[`src/bin/osm-lump-ways-down/cli_args.rs`](./blob/main/src/bin/osm-lump-ways-down/cli_args.rs), or run `osm-lump-ways-down --help` for the format.
+#### File format
+
+CSV file with following columns:
+
+* `timestamp`: unix epoch timestamp of data age (integer)
+* `iso_timestamp`: ISO8601/RFC3339 string of data age same second as timestamp. (string)
+* `upstream_m`: Total upstream to this end, in metres (float)
+* `upstream_m_rank`: What's the rank of that upstream, 1 = the biggest upstream\_m.
+(integer) in this iteration.
+* `nid`: OSM Node id (integer)
+* `lat`: Latitude of the point (float)
+* `lng`: Longitude (float)
+
+And then one column for each `--ends-tag` value, with that tag name as column
+name. e.g. `--ends-tag name` causes the ends geojson file to have GeoJSON
+property called `tag:name`, however in this CSV file, the column is `name`. 
 
 ## Loop removal
 
