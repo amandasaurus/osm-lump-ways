@@ -440,11 +440,13 @@ fn main() -> Result<()> {
                     "root_nid": cycle.iter().flat_map(|seg| seg.iter()).min().unwrap(),
                     "num_nodes": cycle.len(),
                     "length_m": round(&node_group_to_length_m(cycle.as_slice(), &nodeid_pos), 1),
-                    "nodes": all_nodes.into_iter()
+                });
+                if !(!args.loops_incl_nids & args.loops_no_incl_nids) {
+                    props["nodes"] = all_nodes.into_iter()
                                 .map(|nid| format!("n{}", nid))
                                 .collect::<Vec<_>>()
-                                .join(","),
-                });
+                                .join(",").into();
+                }
 
                 for (i, boundary) in these_boundaries.iter().enumerate() {
                     props[format!("area_{}", i)] = boundary.to_string().into();

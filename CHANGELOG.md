@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+* New argument `--loops[-no]-incl-nids` to turn on/off whether the `nodes`
+  argument is included in the loops file
+
 ## v2.0.0
 
 * Massive refactor to speed up code. Both `osm-lump-ways` &
