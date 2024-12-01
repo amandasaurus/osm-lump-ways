@@ -586,6 +586,7 @@ fn main() -> Result<()> {
     nids_we_need.extend(g.vertexes());
     nids_we_need.extend(inter_store.all_inter_nids());
     nids_we_need.shrink_to_fit();
+
     let setting_node_pos = progress_bars.add(
         ProgressBar::new(nids_we_need.len() as u64)
             .with_message("Reading file to save node locations")

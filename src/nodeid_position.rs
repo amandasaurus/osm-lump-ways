@@ -60,7 +60,7 @@ pub trait NodeIdPosition: std::fmt::Debug + std::marker::Send + std::marker::Syn
 /// A default good value
 pub fn default() -> impl NodeIdPosition {
     //NodeIdPositionMap::new()
-    NodeIdPositionBucket::with_bucket(4)
+    NodeIdPositionBucket::with_bucket(3)
 }
 
 /// A simple map
