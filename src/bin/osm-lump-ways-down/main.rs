@@ -1382,18 +1382,18 @@ fn do_group_by_ends(
     #[allow(clippy::type_complexity)]
     let mut results_to_pop: SmallVec<[(i32, f64, f64, Vec<i64>); 3]> = smallvec::smallvec![];
 
-    // Iterator that yields (end_node_id, from_upstream_m, to_upstream_m, and a path of nids which end in this nid)
-    // It walks along all the nodes in rev. topological order, and optionally outputs a path when
-    // it has completed one.
+    // Iterator that yields (end_node_id, from_upstream_m, to_upstream_m, and a path of nids which
+    // end in this nid) It walks along all the nodes in rev. topological order, and optionally
+    // outputs a path when it has completed one.
     let upstreams_grouped_by_end = std::iter::from_fn(|| {
         // This code definitly does too many allocations (incl. for Vec's) and could be optimised
 
-        // We keep walking along the nid_end_iter, and
+        // We keep walking along the nid_end_iter, and only stop (& return something) when we have
+        // a complete line to return.
         loop {
             if let Some(mut result) = results_to_pop.pop() {
                 // we have something to return. An iteration of the nid_end_iter might finish 1+
                 // lines, so pop them off.
-                std::mem::swap(&mut result.1, &mut result.2);
                 result.3.reverse();
                 return Some(result);
             }
@@ -1440,8 +1440,8 @@ fn do_group_by_ends(
                         lines_to_here.remove(i);
                     results_to_pop.push((
                         other_end_idx,
-                        this_nid_upstream_m,
                         to_upstream_m,
+                        this_nid_upstream_m,
                         other_points,
                     ));
                 } else {
@@ -1462,8 +1462,8 @@ fn do_group_by_ends(
                         lines_to_here.swap_remove(i);
                     results_to_pop.push((
                         other_end_idx,
-                        this_nid_upstream_m,
                         to_upstream_m,
+                        this_nid_upstream_m,
                         other_points,
                     ));
                 }
@@ -1500,7 +1500,7 @@ fn do_group_by_ends(
             for other_line_to_here in lines_to_here.drain(..) {
                 assert_eq!(other_line_to_here.0, this_end_idx);
                 let (end_idx, _prev_nid, to_upstream_m, points) = other_line_to_here;
-                results_to_pop.push((end_idx, this_nid_upstream_m, to_upstream_m, points));
+                results_to_pop.push((end_idx, to_upstream_m, this_nid_upstream_m, points));
             }
 
             assert!(lines_to_here.is_empty());
@@ -1512,8 +1512,8 @@ fn do_group_by_ends(
                 // no upstreams, so finish it.
                 results_to_pop.push((
                     this_end_idx,
-                    line_to_here.2,
                     this_nid_upstream_m,
+                    line_to_here.2,
                     line_to_here.3,
                 ));
                 continue;
