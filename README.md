@@ -282,12 +282,6 @@ property, with the `name` tag from the way which flows into this end point.
 Unlike `--ends-membership` this only uses the OSM ways which are included by
 the tag filters
 
-### `ends-full-upstreams`
-
-Only with `--ends-upstreams` argument. File of MultiLineStrings showing, for
-each end, where the upstreams are. Useful to find why there's a big upstream
-end somewhere.
-
 `--ends-upstreams-min-upstream-m 1e6 --ends-upstreams-max-nodes 1000` is a good
 tradeoff for calculation speed & file size, which still shows the relevant
 upstreams

@@ -635,10 +635,16 @@ fn main() -> Result<()> {
     }
 
     // Calculate the upstream for every node and edge.
-    let mut upstream_length: Vec<f64> = vec![0.; topologically_sorted_nodes.len()];
-    // for an edge in the graph, what's the amount flowing down it.
+
+    // Upstream m value for each node in topologically_sorted_nodes
+    let upstream_length: Vec<f64> = vec![0.; topologically_sorted_nodes.len()];
+    let mut upstream_length = upstream_length.into_boxed_slice();
+
+    // for an edge in the graph, what's the amount flowing down it. Keys are the from & to nid.
+    // Value is upstream_m just at the start of the from nid.
     let mut upstream_per_edge: Vec<((i64, i64), f64)> =
         Vec::with_capacity(topologically_sorted_nodes.len());
+
     let calc_all_upstreams = progress_bars.add(
         ProgressBar::new(topologically_sorted_nodes.len() as u64)
             .with_message("Calculating all upstream values")
@@ -729,7 +735,6 @@ fn main() -> Result<()> {
         calc_all_upstreams.inc(1);
     }
     calc_all_upstreams.finish_and_clear();
-    let upstream_length = upstream_length.into_boxed_slice();
     let upstream_per_edge = SortedSliceMap::from_vec(upstream_per_edge);
     info!(
         "Have calculated the upstream values for {} different edges",
@@ -1493,7 +1498,7 @@ fn do_group_by_ends(
 }
 
 fn do_write_upstreams(
-    args: &crate::cli_args::Args,
+    args: &cli_args::Args,
     upstream_filename: &Path,
     progress_bars: &MultiProgress,
     style: &ProgressStyle,
