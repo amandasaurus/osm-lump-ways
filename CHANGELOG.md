@@ -14,6 +14,7 @@
 	This is a rough way to prevent long lines.
   * new: `--grouped-ends-max-distance-m NUMBER`, as above, but straight line
 	distance between start & end points.
+* How segments are assigned to ends has been simplified, which fixes some bugs.
   
 
 ## v2.0.0

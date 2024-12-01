@@ -980,114 +980,36 @@ fn main() -> Result<()> {
     // We store the index as a i32 to save space. We assume we will have <2³² end points
     // -1 = no known end point (yet).
     // (biggest end point = end point with the largest upstream value)
-    // NB: This is a top level variable (for scoping reasons), but remains empty if we're not doing
-    // anything
     // TODO replace this with nonzerou32
     let mut upstream_assigned_end: Vec<i32> = Vec::new();
 
-    if args.flow_split_equally {
-        upstream_assigned_end.resize(topologically_sorted_nodes.len(), -1);
+    upstream_assigned_end.resize(topologically_sorted_nodes.len(), -1);
 
-        // this is a cache of values as we walk upstream
-        let mut tmp_biggest_end: HashMap<i64, i32> = HashMap::new();
+    // this is a cache of values as we walk upstream
+    let mut tmp_biggest_end: HashMap<i64, i32> = HashMap::new();
 
-        // Doing topologically_sorted_nodes in reverse, means we are “walking upstream”. We will
-        for (nid_idx, &nid) in topologically_sorted_nodes.iter().enumerate().rev() {
-            // if this node is an end point then save that
-            // otherwise, use the value from the cache
-            let this_end_idx = end_points.binary_search(&nid).ok().map(|i| i as i32);
-            let curr_biggest = tmp_biggest_end.remove(&nid).or(this_end_idx).unwrap();
-            upstream_assigned_end[nid_idx] = curr_biggest;
+    // Doing topologically_sorted_nodes in reverse, means we are “walking upstream”. We will
+    for (nid_idx, &nid) in topologically_sorted_nodes.iter().enumerate().rev() {
+        // if this node is an end point then save that
+        // otherwise, use the value from the cache
+        let this_end_idx = end_points.binary_search(&nid).ok().map(|i| i as i32);
+        let curr_biggest = tmp_biggest_end.remove(&nid).or(this_end_idx).unwrap();
+        upstream_assigned_end[nid_idx] = curr_biggest;
 
-            for upper in g.in_neighbours(nid) {
-                tmp_biggest_end
-                    .entry(upper)
-                    .and_modify(|prev_biggest_end_idx| {
-                        // for all nodes which are one step upstream of this node, check the
-                        // previously calcualted best and update if needed.
-                        if end_point_upstreams[*prev_biggest_end_idx as usize]
-                            < end_point_upstreams[curr_biggest as usize]
-                        {
-                            *prev_biggest_end_idx = curr_biggest;
-                        }
-                    })
-                    // or just store this end point.
-                    .or_insert(curr_biggest);
-            }
-        }
-    } else if args.flow_follows_tag.is_some() {
-        upstream_assigned_end.resize(topologically_sorted_nodes.len(), -1);
-
-        // this is a cache of values as we walk upstream
-        // key: i64 = the node id
-        // value: (bool, i32), i32 is the endidx for the best guess. bool=true → this assignment is
-        // based on the tag value, bool=false → assignment is based on largest end (used when
-        // there's no tag)
-        let mut tmp_biggest_end: HashMap<i64, (bool, i32)> = HashMap::new();
-
-        // Doing topologically_sorted_nodes in reverse, means we are “walking upstream”. This
-        // ensures we visit an end point before we visit any node upstream of it.
-        for (nid_idx, &nid) in topologically_sorted_nodes.iter().enumerate().rev() {
-            // if this node is an end point then save that
-            // otherwise, use the value from the cache
-            let this_end_idx = end_points.binary_search(&nid).ok().map(|i| i as i32);
-            let curr_biggest = tmp_biggest_end
-                .remove(&nid)
-                .map(|(_, i)| i)
-                .or(this_end_idx)
-                .unwrap();
-            upstream_assigned_end[nid_idx] = curr_biggest;
-
-            let downstream_nid_opt = g.out_neighbours(nid).next();
-            if g.out_neighbours(nid).count() == 1
-                && nid_pair_to_endtag_group.contains_key(&(nid, downstream_nid_opt.unwrap()))
-            {
-                let name_id = nid_pair_to_endtag_group
-                    .get(&(nid, downstream_nid_opt.unwrap()))
-                    .unwrap();
-                // This node (nid) has 1 outgoing vertex, which has name name_id
-                for upper in g.in_neighbours(nid) {
-                    if nid_pair_to_endtag_group.get(&(upper, nid)) == Some(name_id) {
-                        // The vertex from upper to nid, also has the same name.
-                        // assign upper to this end, regardless of which is bigger
-                        tmp_biggest_end.insert(upper, (true, curr_biggest));
-                    } else {
-                        // assign only if this is bigger
-                        tmp_biggest_end
-                            .entry(upper)
-                            .and_modify(|(prev_is_name_based, prev_biggest_end_idx)| {
-                                // Only set the value if the previous value wasn't based on names
-                                if !*prev_is_name_based {
-                                    // for all nodes which are one step upstream of this node, check the
-                                    // previously calcualted best and update if needed.
-                                    if end_point_upstreams[*prev_biggest_end_idx as usize]
-                                        < end_point_upstreams[curr_biggest as usize]
-                                    {
-                                        *prev_biggest_end_idx = curr_biggest;
-                                    }
-                                }
-                            })
-                            // or just store this end point.
-                            .or_insert((false, curr_biggest));
+        for upper in g.in_neighbours(nid) {
+            tmp_biggest_end
+                .entry(upper)
+                .and_modify(|prev_biggest_end_idx| {
+                    // for all nodes which are one step upstream of this node, check the
+                    // previously calcualted best and update if needed.
+                    if end_point_upstreams[*prev_biggest_end_idx as usize]
+                        < end_point_upstreams[curr_biggest as usize]
+                    {
+                        *prev_biggest_end_idx = curr_biggest;
                     }
-                }
-            } else {
-                for upper in g.in_neighbours(nid) {
-                    tmp_biggest_end
-                        .entry(upper)
-                        .and_modify(|(_prev_is_name_based, prev_biggest_end_idx)| {
-                            // for all nodes which are one step upstream of this node, check the
-                            // previously calcualted best and update if needed.
-                            if end_point_upstreams[*prev_biggest_end_idx as usize]
-                                < end_point_upstreams[curr_biggest as usize]
-                            {
-                                *prev_biggest_end_idx = curr_biggest;
-                            }
-                        })
-                        // or just store this end point.
-                        .or_insert((false, curr_biggest));
-                }
-            }
+                })
+                // or just store this end point.
+                .or_insert(curr_biggest);
         }
     }
     assert!(upstream_assigned_end.par_iter().all(|end| *end >= 0));
