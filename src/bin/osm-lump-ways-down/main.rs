@@ -1102,6 +1102,7 @@ fn main() -> Result<()> {
             &end_points,
             &topologically_sorted_nodes,
             &end_point_upstreams,
+            &upstream_length,
             &upstream_assigned_end,
             &nodeid_pos,
             &end_point_tag_values,
@@ -1313,6 +1314,7 @@ fn do_group_by_ends(
     end_points: &[i64],
     topologically_sorted_nodes: &[i64],
     end_point_upstreams: &[f64],
+    upstream_length: &[f64],
     upstream_assigned_end: &[i32],
     nodeid_pos: &impl NodeIdPosition,
     end_point_tag_values: &[SmallVec<[Option<String>; 1]>],
@@ -1346,28 +1348,46 @@ fn do_group_by_ends(
 
     // Lines we are drawing
     // key: i64: the last point in the line
-    // value: Vec of all lines (which is the end idx for that line, and then the points (node ids)) which are ending here
+    // value: Vec of all lines (which is the end idx for that line, and then the points (node ids))
+    //        which are ending here
     #[allow(clippy::type_complexity)]
-    let mut in_progress_lines: HashMap<i64, SmallVec<[(i32, Vec<i64>); 2]>> = HashMap::new();
+    let mut in_progress_lines: HashMap<i64, SmallVec<[(i32, f64, Vec<i64>); 2]>> = HashMap::new();
     // walks upstream
     let mut nid_end_iter = topologically_sorted_nodes
         .iter()
         .rev()
-        .zip(upstream_assigned_end.iter().rev());
+        .zip(upstream_assigned_end.iter().rev())
+        .zip(upstream_length.iter().rev())
+        .map(|((nid, assigned_end_idx), upstream_m)| (nid, assigned_end_idx, upstream_m));
 
+    // just a little buffer we might need later
     let mut possible_ins: SmallVec<[i64; 5]> = smallvec::smallvec![];
-    let mut results_to_pop: SmallVec<[(i32, Vec<i64>); 3]> = smallvec::smallvec![];
 
-    // Iterator that yields (end_node_id, and a path of nids which end in this nid)
+    // Buffer of pending
+    // .0 i32 nid of the final end point
+    // .1 f64 to_upstream_m for this segment
+    // .2 f64 from_upstream_m for this segment
+    // .3 Vec<i64> nids that make up the path (stored in reverse order, because it's itermediate
+    //             and the paths are build by walking upstream).
+    #[allow(clippy::type_complexity)]
+    let mut results_to_pop: SmallVec<[(i32, f64, f64, Vec<i64>); 3]> = smallvec::smallvec![];
+
+    // Iterator that yields (end_node_id, from_upstream_m, to_upstream_m, and a path of nids which end in this nid)
+    // It walks along all the nodes in rev. topological order, and optionally outputs a path when
+    // it has completed one.
     let upstreams_grouped_by_end = std::iter::from_fn(|| {
-        // ↓ This code definitly does too many allocations (incl. for Vec's) and could be optimised
+        // This code definitly does too many allocations (incl. for Vec's) and could be optimised
+
+        // We keep walking along the nid_end_iter, and
         loop {
             if let Some(mut result) = results_to_pop.pop() {
-                // we have something to return.
-                result.1.reverse();
+                // we have something to return. An iteration of the nid_end_iter might finish 1+
+                // lines, so pop them off.
+                std::mem::swap(&mut result.1, &mut result.2);
+                result.3.reverse();
                 return Some(result);
             }
-            let (nid, this_end_idx) = match nid_end_iter.next() {
+            let (nid, this_end_idx, &this_nid_upstream_m) = match nid_end_iter.next() {
                 None => {
                     // finished all the nodes
                     return None;
@@ -1384,11 +1404,11 @@ fn do_group_by_ends(
 
                 // Give us something to work with later. This is the start of the lines that start
                 // here.
-                lines_to_here.push((*this_end_idx, vec![]));
+                lines_to_here.push((*this_end_idx, this_nid_upstream_m, vec![]));
             }
 
             // include this point in every line so far
-            for (_line_end, line_points) in lines_to_here.iter_mut() {
+            for (_line_end, _to_upstream_m, line_points) in lines_to_here.iter_mut() {
                 if let Some(last) = line_points.last() {
                     if inter_store.contains_directed(nid, last) {
                         // we're building the line in reverse, so swap nid & last in the lookup.
@@ -1399,25 +1419,33 @@ fn do_group_by_ends(
                 line_points.push(*nid);
             }
 
-            // All the lines that come to here, but are from another group, we end them here.
+            // All the lines that come to here, but are from another end point, we end them here.
             //
             // SmallVec::drain_filter is documentated, but doesn't exist?
             let mut i = 0;
             while i < lines_to_here.len() {
                 if lines_to_here[i].0 != *this_end_idx {
                     // this line ends here and is for another end, so remove it.
-                    let (other_end_idx, other_points) = lines_to_here.remove(i);
-                    results_to_pop.push((other_end_idx, other_points));
+                    let (other_end_idx, to_upstream_m, other_points) = lines_to_here.remove(i);
+                    results_to_pop.push((
+                        other_end_idx,
+                        this_nid_upstream_m,
+                        to_upstream_m,
+                        other_points,
+                    ));
                 } else {
                     i += 1;
                 }
             }
 
             // Now all the lines that end here are in the end group, but we need to have only one
+            // This happens when 2 lines (which flow eventually to the same end point) come
+            // together at this point (while walking upstream). i.e. here is a bifurcation, with
+            // nid having >1 outgoing segments.
             while lines_to_here.len() > 1 {
                 assert_eq!(lines_to_here.last().unwrap().0, *this_end_idx);
-                let (end_idx, points) = lines_to_here.pop().unwrap();
-                results_to_pop.push((end_idx, points));
+                let (end_idx, to_upstream_m, points) = lines_to_here.pop().unwrap();
+                results_to_pop.push((end_idx, this_nid_upstream_m, to_upstream_m, points));
             }
 
             // this is the only line we continue with
@@ -1431,12 +1459,17 @@ fn do_group_by_ends(
                 in_progress_lines
                     .entry(*later_upstream_nodes)
                     .or_default()
-                    .push((*this_end_idx, vec![*nid]));
+                    .push((*this_end_idx, this_nid_upstream_m, vec![*nid]));
             }
 
             if possible_ins.is_empty() {
                 // no upstreams, so finish it.
-                results_to_pop.push((*this_end_idx, line_to_here.1));
+                results_to_pop.push((
+                    *this_end_idx,
+                    line_to_here.1,
+                    this_nid_upstream_m,
+                    line_to_here.2,
+                ));
                 continue;
             } else {
                 // We have >0 upstreams, we've already done something with the 2nd+, so the first
@@ -1446,7 +1479,7 @@ fn do_group_by_ends(
             }
         }
     })
-    .map(|(end_idx, path)| {
+    .map(|(end_idx, from_upstream_m, to_upstream_m, path)| {
         segments_spinner.inc(1);
         nodes_bar.inc(path.len().saturating_sub(1) as u64);
 
@@ -1457,6 +1490,8 @@ fn do_group_by_ends(
         let mut props = serde_json::json!({
             "end_nid": end_points[end_idx as usize],
             "end_upstream_m": round(&end_point_upstreams[end_idx as usize], 1),
+            "from_upstream_m": round(&from_upstream_m, 1),
+            "to_upstream_m": round(&to_upstream_m, 1),
         });
         if !ends_tags.is_empty() {
             for (tag_key, tag_value) in ends_tags
