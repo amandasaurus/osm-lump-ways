@@ -4,7 +4,15 @@
 
 * New argument `--loops[-no]-incl-nids` to turn on/off whether the `nodes`
   argument is included in the loops file
-* osm-lump-ways-down: The grouped ends are refactored to produce nicer lines
+* osm-lump-ways-down: grouped ends:
+  * refactored to produce nicer lines
+  * includes `to_upstream_m` & `from_upstream_m` for the upsteam values at the
+	start (`from_…`) & end (`to_…`) and `avg_upstream_m` the artimetic average
+	of the two.
+  * New feature `--grouped-ends-max-upstream-delta NUMBER` will split a grouped
+	end line if the difference between `from_…` & `to_…` is more than `NUMBER`.
+	This is a rough way to prevent long lines.
+  
 
 ## v2.0.0
 

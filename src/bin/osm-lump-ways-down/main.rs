@@ -1375,12 +1375,10 @@ fn do_group_by_ends(
 
     // Buffer of pending
     // .0 i32 nid of the final end point
-    // .1 f64 to_upstream_m for this segment
-    // .2 f64 from_upstream_m for this segment
-    // .3 Vec<i64> nids that make up the path (stored in reverse order, because it's itermediate
+    // .1 Vec<i64> nids that make up the path (stored in reverse order, because it's itermediate
     //             and the paths are build by walking upstream).
     #[allow(clippy::type_complexity)]
-    let mut results_to_pop: SmallVec<[(i32, f64, f64, Vec<i64>); 3]> = smallvec::smallvec![];
+    let mut results_to_pop: SmallVec<[(i32, Vec<i64>); 3]> = smallvec::smallvec![];
 
     // Iterator that yields (end_node_id, from_upstream_m, to_upstream_m, and a path of nids which
     // end in this nid) It walks along all the nodes in rev. topological order, and optionally
@@ -1394,7 +1392,7 @@ fn do_group_by_ends(
             if let Some(mut result) = results_to_pop.pop() {
                 // we have something to return. An iteration of the nid_end_iter might finish 1+
                 // lines, so pop them off.
-                result.3.reverse();
+                result.1.reverse();
                 return Some(result);
             }
             let (&nid, &this_end_idx, &this_nid_upstream_m) = match nid_end_iter.next() {
@@ -1419,13 +1417,6 @@ fn do_group_by_ends(
 
             // include this point in every line so far
             for (_line_end, _last_nid, _to_upstream_m, line_points) in lines_to_here.iter_mut() {
-                if let Some(last) = line_points.last() {
-                    if inter_store.contains_directed(&nid, last) {
-                        // we're building the line in reverse, so swap nid & last in the lookup.
-                        let mut inters: Vec<_> = inter_store.inters_directed(&nid, last).collect();
-                        line_points.extend(inters.drain(..).rev());
-                    }
-                }
                 line_points.push(nid);
             }
 
@@ -1438,38 +1429,37 @@ fn do_group_by_ends(
                     // this line ends here and is for another end, so remove it.
                     let (other_end_idx, _prev_nid, to_upstream_m, other_points) =
                         lines_to_here.remove(i);
-                    results_to_pop.push((
-                        other_end_idx,
-                        to_upstream_m,
-                        this_nid_upstream_m,
-                        other_points,
-                    ));
+                    results_to_pop.push((other_end_idx, other_points));
                 } else {
                     i += 1;
                 }
             }
 
             if let Some(max_upstream_delta) = grouped_ends_max_upstream_delta {
-                // if there's an incoming point
                 while let Some(i) =
                     lines_to_here
                         .iter()
-                        .position(|(_end_idx, _prev_nid, prev_upstream, _path)| {
-                            prev_upstream - this_nid_upstream_m > max_upstream_delta
+                        .position(|(_end_idx, _prev_nid, _prev_upstream, path)| {
+                            if path.len() >= 3 {
+                                // NB: path is stored in reverse order
+                                upstream_per_edge.get(&(path[1], path[0])).unwrap()
+                                    - upstream_per_edge
+                                        .get(&(path[path.len() - 1], path[path.len() - 2]))
+                                        .unwrap()
+                                    > max_upstream_delta
+                            } else {
+                                false
+                            }
                         })
                 {
                     let (other_end_idx, _prev_nid, to_upstream_m, other_points) =
                         lines_to_here.swap_remove(i);
-                    results_to_pop.push((
-                        other_end_idx,
-                        to_upstream_m,
-                        this_nid_upstream_m,
-                        other_points,
-                    ));
-                }
-                if lines_to_here.is_empty() {
-                    // we might have split them all
-                    lines_to_here.push((this_end_idx, nid, this_nid_upstream_m, vec![nid]));
+                    results_to_pop.push((other_end_idx, other_points));
+
+                    if lines_to_here.is_empty() {
+                        // we've ended this line, so start a new one
+                        lines_to_here.push((other_end_idx, nid, this_nid_upstream_m, vec![nid]));
+                    }
                 }
             }
 
@@ -1500,7 +1490,7 @@ fn do_group_by_ends(
             for other_line_to_here in lines_to_here.drain(..) {
                 assert_eq!(other_line_to_here.0, this_end_idx);
                 let (end_idx, _prev_nid, to_upstream_m, points) = other_line_to_here;
-                results_to_pop.push((end_idx, to_upstream_m, this_nid_upstream_m, points));
+                results_to_pop.push((end_idx, points));
             }
 
             assert!(lines_to_here.is_empty());
@@ -1510,12 +1500,7 @@ fn do_group_by_ends(
 
             if possible_ins.is_empty() {
                 // no upstreams, so finish it.
-                results_to_pop.push((
-                    this_end_idx,
-                    this_nid_upstream_m,
-                    line_to_here.2,
-                    line_to_here.3,
-                ));
+                results_to_pop.push((this_end_idx, line_to_here.3));
                 continue;
             } else if possible_ins.len() == 1 {
                 line_to_here.1 = nid;
@@ -1551,12 +1536,25 @@ fn do_group_by_ends(
             }
         }
     })
-    .map(|(end_idx, from_upstream_m, to_upstream_m, path)| {
+    .filter(|(_end_idx, path)| path.len() >= 2) // can happen when splitting due to max delta
+    .map(|(end_idx, path)| {
         segments_spinner.inc(1);
         nodes_bar.inc(path.len().saturating_sub(1) as u64);
 
-        let points = path
-            .into_iter()
+        let from_upstream_m = *upstream_per_edge.get(&(path[0], path[1])).unwrap();
+        let to_upstream_m_init = upstream_per_edge
+            .get(&(path[path.len() - 2], path[path.len() - 1]))
+            .unwrap();
+        let to_upstream_m = to_upstream_m_init
+            + inter_store
+                .expand_directed(path[path.len() - 2], path[path.len() - 1])
+                .map(|nid| nodeid_pos.get(&nid).unwrap())
+                .tuple_windows::<(_, _)>()
+                .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
+                .sum::<f64>();
+
+        let points = inter_store
+            .expand_line_directed(&path)
             .map(|nid| nodeid_pos.get(&nid).expect("Cannot find position for node"))
             .collect::<Vec<_>>();
         let mut props = serde_json::json!({
@@ -1564,6 +1562,7 @@ fn do_group_by_ends(
             "end_upstream_m": round(&end_point_upstreams[end_idx as usize], 1),
             "from_upstream_m": round(&from_upstream_m, 1),
             "to_upstream_m": round(&to_upstream_m, 1),
+            "avg_upstream_m": round(&((to_upstream_m+from_upstream_m)/2.), 1),
         });
         if !ends_tags.is_empty() {
             for (tag_key, tag_value) in ends_tags
