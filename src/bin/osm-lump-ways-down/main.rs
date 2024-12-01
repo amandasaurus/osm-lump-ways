@@ -1499,6 +1499,7 @@ fn do_group_by_ends(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn do_write_upstreams(
     args: &cli_args::Args,
     upstream_filename: &Path,

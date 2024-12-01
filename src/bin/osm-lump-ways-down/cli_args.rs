@@ -250,11 +250,13 @@ pub struct Args {
     #[arg(long, requires = "upstreams", verbatim_doc_comment)]
     pub upstreams_from_upstream_multiple: Vec<f64>,
 
-    ///
+    /// When a node has >1 child nodes, allocate the upstream value of that node equally amoung all
+    /// these nodes.
     #[arg(long, default_value = "false", conflicts_with = "flow_follows_tag")]
     pub flow_split_equally: bool,
 
-    ///
+    /// When a node has >1 child nodes, allocate (nearly) all the upstream value to the nodes which
+    /// are in ways with the same `TAG` value as the (single) upstream segment for this node.
     #[arg(long, conflicts_with = "flow_split_equally")]
     pub flow_follows_tag: Option<String>,
 
