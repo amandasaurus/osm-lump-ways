@@ -1110,6 +1110,7 @@ fn main() -> Result<()> {
             &args.ends_tag,
             &inter_store,
             args.grouped_ends_max_upstream_delta,
+            args.grouped_ends_max_distance_m,
         )?;
     }
 
@@ -1324,6 +1325,7 @@ fn do_group_by_ends(
     ends_tags: &[String],
     inter_store: &inter_store::InterStore,
     grouped_ends_max_upstream_delta: Option<f64>,
+    grouped_ends_max_distance_m: Option<f64>,
 ) -> Result<()> {
     let started = Instant::now();
     let nodes_bar = progress_bars.add(
@@ -1432,6 +1434,29 @@ fn do_group_by_ends(
                     results_to_pop.push((other_end_idx, other_points));
                 } else {
                     i += 1;
+                }
+            }
+
+            if let Some(max_distance_m) = grouped_ends_max_distance_m {
+                while let Some(i) =
+                    lines_to_here
+                        .iter()
+                        .position(|(_end_idx, _prev_nid, _prev_upstream, path)| {
+                            if path.len() >= 2 {
+                                haversine::haversine_m_fpair(nodeid_pos.get(&path[0]).unwrap(), nodeid_pos.get(path.last().unwrap()).unwrap()) > max_distance_m
+                            } else {
+                                false
+                            }
+                        })
+                {
+                    let (other_end_idx, _prev_nid, to_upstream_m, other_points) =
+                        lines_to_here.swap_remove(i);
+                    results_to_pop.push((other_end_idx, other_points));
+
+                    if lines_to_here.is_empty() {
+                        // we've ended this line, so start a new one
+                        lines_to_here.push((other_end_idx, nid, this_nid_upstream_m, vec![nid]));
+                    }
                 }
             }
 
