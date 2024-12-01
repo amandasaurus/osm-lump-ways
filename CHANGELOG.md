@@ -4,6 +4,7 @@
 
 * New argument `--loops[-no]-incl-nids` to turn on/off whether the `nodes`
   argument is included in the loops file
+* osm-lump-ways-down: The grouped ends are refactored to produce nicer lines
 
 ## v2.0.0
 
