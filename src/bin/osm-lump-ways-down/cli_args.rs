@@ -161,11 +161,11 @@ pub struct Args {
     /// Whether to include a string list of all the consituant nids for each loop. For very long
     /// loops, this can make a large GeoJSON file, which some tools (e.g. `ogr2ogr`) refuse to deal
     /// with.
-    #[arg(long, requires="loops", conflicts_with="loops_no_incl_nids")]
+    #[arg(long, requires = "loops", conflicts_with = "loops_no_incl_nids")]
     pub loops_incl_nids: bool,
 
     /// Don't include the `nids` property in the loops file
-    #[arg(long, requires="loops", conflicts_with="loops_incl_nids")]
+    #[arg(long, requires = "loops", conflicts_with = "loops_incl_nids")]
     pub loops_no_incl_nids: bool,
 
     /// Path to store CSV of statistics

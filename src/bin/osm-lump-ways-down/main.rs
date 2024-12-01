@@ -442,10 +442,12 @@ fn main() -> Result<()> {
                     "length_m": round(&node_group_to_length_m(cycle.as_slice(), &nodeid_pos), 1),
                 });
                 if !(!args.loops_incl_nids & args.loops_no_incl_nids) {
-                    props["nodes"] = all_nodes.into_iter()
-                                .map(|nid| format!("n{}", nid))
-                                .collect::<Vec<_>>()
-                                .join(",").into();
+                    props["nodes"] = all_nodes
+                        .into_iter()
+                        .map(|nid| format!("n{}", nid))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                        .into();
                 }
 
                 for (i, boundary) in these_boundaries.iter().enumerate() {
