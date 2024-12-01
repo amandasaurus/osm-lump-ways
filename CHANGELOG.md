@@ -12,6 +12,8 @@
   * New feature `--grouped-ends-max-upstream-delta NUMBER` will split a grouped
 	end line if the difference between `from_…` & `to_…` is more than `NUMBER`.
 	This is a rough way to prevent long lines.
+  * new: `--grouped-ends-max-distance-m NUMBER`, as above, but straight line
+	distance between start & end points.
   
 
 ## v2.0.0
