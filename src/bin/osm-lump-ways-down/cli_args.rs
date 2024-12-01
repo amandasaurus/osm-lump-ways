@@ -266,6 +266,9 @@ pub struct Args {
     #[arg(long)]
     pub grouped_ends: Option<PathBuf>,
 
+    #[arg(long)]
+    pub grouped_ends_max_upstream_delta: Option<f64>,
+
     /// For all ends, calc the complete upstreams
     #[arg(long, default_value = "false")]
     pub ends_upstreams: bool,

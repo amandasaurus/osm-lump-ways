@@ -1109,6 +1109,7 @@ fn main() -> Result<()> {
             &end_point_tag_values,
             &args.ends_tag,
             &inter_store,
+            args.grouped_ends_max_upstream_delta,
         )?;
     }
 
@@ -1322,6 +1323,7 @@ fn do_group_by_ends(
     end_point_tag_values: &[SmallVec<[Option<String>; 1]>],
     ends_tags: &[String],
     inter_store: &inter_store::InterStore,
+    grouped_ends_max_upstream_delta: Option<f64>,
 ) -> Result<()> {
     let started = Instant::now();
     let nodes_bar = progress_bars.add(
@@ -1444,6 +1446,30 @@ fn do_group_by_ends(
                     ));
                 } else {
                     i += 1;
+                }
+            }
+
+            if let Some(max_upstream_delta) = grouped_ends_max_upstream_delta {
+                // if there's an incoming point
+                while let Some(i) =
+                    lines_to_here
+                        .iter()
+                        .position(|(_end_idx, _prev_nid, prev_upstream, _path)| {
+                            prev_upstream - this_nid_upstream_m > max_upstream_delta
+                        })
+                {
+                    let (other_end_idx, _prev_nid, to_upstream_m, other_points) =
+                        lines_to_here.swap_remove(i);
+                    results_to_pop.push((
+                        other_end_idx,
+                        this_nid_upstream_m,
+                        to_upstream_m,
+                        other_points,
+                    ));
+                }
+                if lines_to_here.is_empty() {
+                    // we might have split them all
+                    lines_to_here.push((this_end_idx, nid, this_nid_upstream_m, vec![nid]));
                 }
             }
 
