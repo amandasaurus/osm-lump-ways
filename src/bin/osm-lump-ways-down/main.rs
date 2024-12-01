@@ -1357,8 +1357,7 @@ fn do_group_by_ends(
     //          the nid of the previous node on the graph
     //        the points (node ids) expanded by iterstore which are ending here.
     #[allow(clippy::type_complexity)]
-    let mut in_progress_lines: HashMap<i64, SmallVec<[(i32, i64, Vec<i64>); 2]>> =
-        HashMap::new();
+    let mut in_progress_lines: HashMap<i64, SmallVec<[(i32, i64, Vec<i64>); 2]>> = HashMap::new();
     // walks upstream
     let mut nid_end_iter = topologically_sorted_nodes
         .iter()
@@ -1422,8 +1421,7 @@ fn do_group_by_ends(
             while i < lines_to_here.len() {
                 if lines_to_here[i].0 != this_end_idx {
                     // this line ends here and is for another end, so remove it.
-                    let (other_end_idx, _prev_nid, other_points) =
-                        lines_to_here.remove(i);
+                    let (other_end_idx, _prev_nid, other_points) = lines_to_here.remove(i);
                     results_to_pop.push((other_end_idx, other_points));
                 } else {
                     i += 1;
@@ -1431,22 +1429,20 @@ fn do_group_by_ends(
             }
 
             if let Some(max_distance_m) = grouped_ends_max_distance_m {
-                while let Some(i) =
-                    lines_to_here
-                        .iter()
-                        .position(|(_end_idx, _prev_nid, path)| {
-                            if path.len() >= 2 {
-                                haversine::haversine_m_fpair(
-                                    nodeid_pos.get(&path[0]).unwrap(),
-                                    nodeid_pos.get(path.last().unwrap()).unwrap(),
-                                ) > max_distance_m
-                            } else {
-                                false
-                            }
-                        })
+                while let Some(i) = lines_to_here
+                    .iter()
+                    .position(|(_end_idx, _prev_nid, path)| {
+                        if path.len() >= 2 {
+                            haversine::haversine_m_fpair(
+                                nodeid_pos.get(&path[0]).unwrap(),
+                                nodeid_pos.get(path.last().unwrap()).unwrap(),
+                            ) > max_distance_m
+                        } else {
+                            false
+                        }
+                    })
                 {
-                    let (other_end_idx, _prev_nid, other_points) =
-                        lines_to_here.swap_remove(i);
+                    let (other_end_idx, _prev_nid, other_points) = lines_to_here.swap_remove(i);
                     results_to_pop.push((other_end_idx, other_points));
 
                     if lines_to_here.is_empty() {
@@ -1457,24 +1453,22 @@ fn do_group_by_ends(
             }
 
             if let Some(max_upstream_delta) = grouped_ends_max_upstream_delta {
-                while let Some(i) =
-                    lines_to_here
-                        .iter()
-                        .position(|(_end_idx, _prev_nid, path)| {
-                            if path.len() >= 3 {
-                                // NB: path is stored in reverse order
-                                upstream_per_edge.get(&(path[1], path[0])).unwrap()
-                                    - upstream_per_edge
-                                        .get(&(path[path.len() - 1], path[path.len() - 2]))
-                                        .unwrap()
-                                    > max_upstream_delta
-                            } else {
-                                false
-                            }
-                        })
+                while let Some(i) = lines_to_here
+                    .iter()
+                    .position(|(_end_idx, _prev_nid, path)| {
+                        if path.len() >= 3 {
+                            // NB: path is stored in reverse order
+                            upstream_per_edge.get(&(path[1], path[0])).unwrap()
+                                - upstream_per_edge
+                                    .get(&(path[path.len() - 1], path[path.len() - 2]))
+                                    .unwrap()
+                                > max_upstream_delta
+                        } else {
+                            false
+                        }
+                    })
                 {
-                    let (other_end_idx, _prev_nid, other_points) =
-                        lines_to_here.swap_remove(i);
+                    let (other_end_idx, _prev_nid, other_points) = lines_to_here.swap_remove(i);
                     results_to_pop.push((other_end_idx, other_points));
 
                     if lines_to_here.is_empty() {
