@@ -1148,7 +1148,7 @@ fn do_read_nids_in_ne2_ways(
     reader
         .ways()
         .par_bridge()
-        .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, &tag_filter_func))
+        .filter(|w| tagfilter::obj_pass_filters(w, tag_filter, tag_filter_func))
         // TODO support grouping by tag value
         .for_each_with(nid2nways.clone(), |nid2nways, w| {
             assert!(w.id() > 0, "This file has a way id < 0. negative ids are not supported in this tool Use osmium sort & osmium renumber to convert this file and run again.");
@@ -1166,7 +1166,7 @@ fn do_read_nids_in_ne2_ways(
 
         });
     input_bar.finish();
-    progress_bars.remove(&input_bar);
+    progress_bars.remove(input_bar);
     let nid2nways = Arc::try_unwrap(nid2nways).unwrap().into_inner().unwrap();
 
     let num_nids = nid2nways.len();
