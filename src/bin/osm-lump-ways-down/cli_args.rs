@@ -266,10 +266,10 @@ pub struct Args {
     #[arg(long)]
     pub grouped_ends: Option<PathBuf>,
 
-    #[arg(long, requires="grouped_ends")]
+    #[arg(long, requires = "grouped_ends")]
     pub grouped_ends_max_upstream_delta: Option<f64>,
 
-    #[arg(long, requires="grouped_ends")]
+    #[arg(long, requires = "grouped_ends")]
     pub grouped_ends_max_distance_m: Option<f64>,
 
     /// For all ends, calc the complete upstreams

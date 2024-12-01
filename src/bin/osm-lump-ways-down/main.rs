@@ -1443,7 +1443,10 @@ fn do_group_by_ends(
                         .iter()
                         .position(|(_end_idx, _prev_nid, _prev_upstream, path)| {
                             if path.len() >= 2 {
-                                haversine::haversine_m_fpair(nodeid_pos.get(&path[0]).unwrap(), nodeid_pos.get(path.last().unwrap()).unwrap()) > max_distance_m
+                                haversine::haversine_m_fpair(
+                                    nodeid_pos.get(&path[0]).unwrap(),
+                                    nodeid_pos.get(path.last().unwrap()).unwrap(),
+                                ) > max_distance_m
                             } else {
                                 false
                             }
