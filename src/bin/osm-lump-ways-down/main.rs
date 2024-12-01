@@ -1104,6 +1104,7 @@ fn main() -> Result<()> {
             &end_point_upstreams,
             &upstream_length,
             &upstream_assigned_end,
+            &upstream_per_edge,
             &nodeid_pos,
             &end_point_tag_values,
             &args.ends_tag,
@@ -1316,6 +1317,7 @@ fn do_group_by_ends(
     end_point_upstreams: &[f64],
     upstream_length: &[f64],
     upstream_assigned_end: &[i32],
+    upstream_per_edge: &SortedSliceMap<(i64, i64), f64>,
     nodeid_pos: &impl NodeIdPosition,
     end_point_tag_values: &[SmallVec<[Option<String>; 1]>],
     ends_tags: &[String],
@@ -1348,10 +1350,16 @@ fn do_group_by_ends(
 
     // Lines we are drawing
     // key: i64: the last point in the line
-    // value: Vec of all lines (which is the end idx for that line, and then the points (node ids))
-    //        which are ending here
+    // value: Vec of:
+    //          end_idx group
+    //          the nid of the previous node on the graph
+    //          Upstream is the upstream of the first point in the path (which is the last point in the real path).
+    //
+    //        the points (node ids) expanded by iterstore
+    //        which are ending here.
     #[allow(clippy::type_complexity)]
-    let mut in_progress_lines: HashMap<i64, SmallVec<[(i32, f64, Vec<i64>); 2]>> = HashMap::new();
+    let mut in_progress_lines: HashMap<i64, SmallVec<[(i32, i64, f64, Vec<i64>); 2]>> =
+        HashMap::new();
     // walks upstream
     let mut nid_end_iter = topologically_sorted_nodes
         .iter()
@@ -1387,7 +1395,7 @@ fn do_group_by_ends(
                 result.3.reverse();
                 return Some(result);
             }
-            let (nid, this_end_idx, &this_nid_upstream_m) = match nid_end_iter.next() {
+            let (&nid, &this_end_idx, &this_nid_upstream_m) = match nid_end_iter.next() {
                 None => {
                     // finished all the nodes
                     return None;
@@ -1396,27 +1404,27 @@ fn do_group_by_ends(
             };
 
             // which in progress lines are there for this node
-            let mut lines_to_here = in_progress_lines.remove(nid).unwrap_or_default();
-            if *nid == end_points[*this_end_idx as usize] {
+            let mut lines_to_here = in_progress_lines.remove(&nid).unwrap_or_default();
+            if nid == end_points[this_end_idx as usize] {
                 // this node is an end node (and it is it's own end node)
 
                 assert!(lines_to_here.is_empty()); // sanity check
 
                 // Give us something to work with later. This is the start of the lines that start
                 // here.
-                lines_to_here.push((*this_end_idx, this_nid_upstream_m, vec![]));
+                lines_to_here.push((this_end_idx, nid, this_nid_upstream_m, vec![]));
             }
 
             // include this point in every line so far
-            for (_line_end, _to_upstream_m, line_points) in lines_to_here.iter_mut() {
+            for (_line_end, _last_nid, _to_upstream_m, line_points) in lines_to_here.iter_mut() {
                 if let Some(last) = line_points.last() {
-                    if inter_store.contains_directed(nid, last) {
+                    if inter_store.contains_directed(&nid, last) {
                         // we're building the line in reverse, so swap nid & last in the lookup.
-                        let mut inters: Vec<_> = inter_store.inters_directed(nid, last).collect();
+                        let mut inters: Vec<_> = inter_store.inters_directed(&nid, last).collect();
                         line_points.extend(inters.drain(..).rev());
                     }
                 }
-                line_points.push(*nid);
+                line_points.push(nid);
             }
 
             // All the lines that come to here, but are from another end point, we end them here.
@@ -1424,9 +1432,10 @@ fn do_group_by_ends(
             // SmallVec::drain_filter is documentated, but doesn't exist?
             let mut i = 0;
             while i < lines_to_here.len() {
-                if lines_to_here[i].0 != *this_end_idx {
+                if lines_to_here[i].0 != this_end_idx {
                     // this line ends here and is for another end, so remove it.
-                    let (other_end_idx, to_upstream_m, other_points) = lines_to_here.remove(i);
+                    let (other_end_idx, _prev_nid, to_upstream_m, other_points) =
+                        lines_to_here.remove(i);
                     results_to_pop.push((
                         other_end_idx,
                         this_nid_upstream_m,
@@ -1438,44 +1447,81 @@ fn do_group_by_ends(
                 }
             }
 
+            // if we have >1 lines_to_here, how do we decide which to continue onwards for this,
+            // and which to end here? This is the index of the one to continue.
+            let mut line_to_continue_idx = 0;
+
+            // we choose the incoming edge with the largest flow
+            if lines_to_here.len() > 1 {
+                line_to_continue_idx = lines_to_here
+                    .iter()
+                    .map(|(_end_idx, prev_nid, _upstream, _path)| prev_nid)
+                    .map(|&prev_nid| upstream_per_edge.get(&(nid, prev_nid)).unwrap())
+                    .enumerate()
+                    .max_by_key(|(_idx, total_upstream)| OrderedFloat(**total_upstream))
+                    .unwrap()
+                    .0;
+            }
+
             // Now all the lines that end here are in the end group, but we need to have only one
             // This happens when 2 lines (which flow eventually to the same end point) come
             // together at this point (while walking upstream). i.e. here is a bifurcation, with
             // nid having >1 outgoing segments.
-            while lines_to_here.len() > 1 {
-                assert_eq!(lines_to_here.last().unwrap().0, *this_end_idx);
-                let (end_idx, to_upstream_m, points) = lines_to_here.pop().unwrap();
+
+            assert!(line_to_continue_idx < lines_to_here.len());
+            let mut line_to_here = lines_to_here.swap_remove(line_to_continue_idx);
+
+            for other_line_to_here in lines_to_here.drain(..) {
+                assert_eq!(other_line_to_here.0, this_end_idx);
+                let (end_idx, _prev_nid, to_upstream_m, points) = other_line_to_here;
                 results_to_pop.push((end_idx, this_nid_upstream_m, to_upstream_m, points));
             }
 
-            // this is the only line we continue with
-            let line_to_here = lines_to_here.pop().unwrap();
             assert!(lines_to_here.is_empty());
 
             possible_ins.clear();
-            possible_ins.extend(g.in_neighbours(*nid));
-            // for the 2nd+ ups, create new paths that start on this node
-            for later_upstream_nodes in possible_ins.iter().skip(1) {
-                in_progress_lines
-                    .entry(*later_upstream_nodes)
-                    .or_default()
-                    .push((*this_end_idx, this_nid_upstream_m, vec![*nid]));
-            }
+            possible_ins.extend(g.in_neighbours(nid));
 
             if possible_ins.is_empty() {
                 // no upstreams, so finish it.
                 results_to_pop.push((
-                    *this_end_idx,
-                    line_to_here.1,
-                    this_nid_upstream_m,
+                    this_end_idx,
                     line_to_here.2,
+                    this_nid_upstream_m,
+                    line_to_here.3,
                 ));
                 continue;
+            } else if possible_ins.len() == 1 {
+                line_to_here.1 = nid;
+                in_progress_lines
+                    .entry(possible_ins[0])
+                    .or_default()
+                    .push(line_to_here);
             } else {
-                // We have >0 upstreams, we've already done something with the 2nd+, so the first
+                let line_to_continue_idx = possible_ins
+                    .iter()
+                    .map(|&next_nid| upstream_per_edge.get(&(next_nid, nid)).unwrap())
+                    .enumerate()
+                    .max_by_key(|(_idx, total_upstream)| OrderedFloat(**total_upstream))
+                    .unwrap()
+                    .0;
+                let possible_in = possible_ins.swap_remove(line_to_continue_idx);
+
+                // for others, create new paths that start on this node
+                for later_upstream_nodes in possible_ins.drain(..) {
+                    in_progress_lines
+                        .entry(later_upstream_nodes)
+                        .or_default()
+                        .push((this_end_idx, nid, this_nid_upstream_m, vec![nid]));
+                }
+
+                // We have >0 upstreams, we've already done something with the others, so the first
                 // upstream is part of the only line here.
-                let nxt = possible_ins[0];
-                in_progress_lines.entry(nxt).or_default().push(line_to_here);
+                line_to_here.1 = nid;
+                in_progress_lines
+                    .entry(possible_in)
+                    .or_default()
+                    .push(line_to_here);
             }
         }
     })
