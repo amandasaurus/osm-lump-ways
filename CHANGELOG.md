@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v2.1.0 (2024-12-03)
 
 * New argument `--loops[-no]-incl-nids` to turn on/off whether the `nodes`
   argument is included in the loops file
