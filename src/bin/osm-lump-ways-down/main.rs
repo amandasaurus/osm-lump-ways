@@ -665,7 +665,7 @@ fn main() -> Result<()> {
         let curr_upstream = tmp_upstream_length.remove(&nid).unwrap_or(0.);
 
         // FIXME rather than split the upstream value equally between all out-edges, look
-        // at the name tag (cf nid_pair_to_name_group)
+        // at the name tag (cf nid_pair_to_endtag_group)
         let num_ins = g.in_neighbours(nid).count();
         let num_outs = g.out_neighbours(nid).count() as f64;
         let in_name_group_opt = g
