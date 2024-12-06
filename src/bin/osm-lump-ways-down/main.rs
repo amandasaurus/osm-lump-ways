@@ -690,7 +690,6 @@ fn main() -> Result<()> {
             // nothing to do
         } else if outs.len() > 1 {
             // For all the incoming edges, calculate how much goes in from each group
-            // TODO do simplier form for ins.len() == 1
             let inflow_per_group: SmallVec<[(Option<i32>, f64); 2]> = g
                 .in_neighbours(nid)
                 .map(|in_nid| (nid_pair_to_endtag_group.get(&(in_nid, nid)), (in_nid, nid)))
@@ -712,6 +711,7 @@ fn main() -> Result<()> {
                     map
                 });
 
+            #[allow(clippy::type_complexity)]
             let outs: SmallVec<[(Option<i32>, (i64, i64)); 2]> = outs
                 .iter()
                 .map(|&nid2| {
