@@ -747,10 +747,8 @@ fn main() -> Result<()> {
             // Any inflow groups without an outflow group are allocated equally to all the outflow
             // groups
             for (in_group, inflow) in inflow_per_group.iter() {
-                if outflow_per_group
-                    .iter()
-                    .find(|(out_group, _)| out_group == in_group)
-                    .is_none()
+                if !outflow_per_group
+                    .iter().any(|(out_group, _)| out_group == in_group)
                 {
                     for (_out_group, outflow) in outflow_per_group.iter_mut() {
                         *outflow += inflow / (outs.len() as f64);
