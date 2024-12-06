@@ -652,7 +652,6 @@ fn main() -> Result<()> {
             .iter()
             .flat_map(|&nid1| g.out_neighbours(nid1).map(move |nid2| ((nid1, nid2), -1.))),
     );
-    dbg!(upstream_per_edge.len());
     let mut upstream_per_edge = SortedSliceMap::from_vec(upstream_per_edge);
 
     let calc_all_upstreams = progress_bars.add(
