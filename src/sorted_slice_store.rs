@@ -41,6 +41,15 @@ where
             .ok()
             .map(|i| &self.data[i].1)
     }
+
+    pub fn get_mut(&mut self, k: &K) -> Option<&mut V> {
+        self.data
+            .binary_search_by_key(&k, |(k2, _v)| k2)
+            .ok()
+            .and_then(|i| self.data.get_mut(i))
+            .map(|(_k, v)| v)
+    }
+
 }
 
 pub struct SortedSliceSet<T> {

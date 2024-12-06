@@ -647,6 +647,9 @@ fn main() -> Result<()> {
     // Value is upstream_m just at the start of the from nid.
     let mut upstream_per_edge: Vec<((i64, i64), f64)> =
         Vec::with_capacity(topologically_sorted_nodes.len());
+    upstream_per_edge.extend(topologically_sorted_nodes.iter().flat_map(|&nid1| g.out_neighbours(nid1).map(move |nid2| ((nid1, nid2), -1.))));
+    dbg!(upstream_per_edge.len());
+    let mut upstream_per_edge = SortedSliceMap::from_vec(upstream_per_edge);
 
     let calc_all_upstreams = progress_bars.add(
         ProgressBar::new(topologically_sorted_nodes.len() as u64)
@@ -713,7 +716,7 @@ fn main() -> Result<()> {
                 };
 
                 *tmp_upstream_length.entry(other).or_default() += sent_down_this_edge;
-                upstream_per_edge.push(((nid, other), sent_down_this_edge));
+                *upstream_per_edge.get_mut(&(nid, other)).unwrap() = sent_down_this_edge;
             }
         } else {
             // > 1 in vertex (too complicated!) or no tag on the only in vertex
@@ -730,7 +733,7 @@ fn main() -> Result<()> {
 
                 let sent_down_this_edge = per_downstream + this_edge_len;
                 *tmp_upstream_length.entry(other).or_default() += sent_down_this_edge;
-                upstream_per_edge.push(((nid, other), sent_down_this_edge));
+                *upstream_per_edge.get_mut(&(nid, other)).unwrap() = sent_down_this_edge;
             }
         }
 
@@ -738,7 +741,7 @@ fn main() -> Result<()> {
         calc_all_upstreams.inc(1);
     }
     calc_all_upstreams.finish_and_clear();
-    let upstream_per_edge = SortedSliceMap::from_vec(upstream_per_edge);
+    let upstream_per_edge = upstream_per_edge;
     info!(
         "Have calculated the upstream values for {} different edges",
         upstream_per_edge.len().to_formatted_string(&Locale::en)
