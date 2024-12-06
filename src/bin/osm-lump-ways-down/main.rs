@@ -747,7 +747,8 @@ fn main() -> Result<()> {
             // groups
             for (in_group, inflow) in inflow_per_group.iter() {
                 if !outflow_per_group
-                    .iter().any(|(out_group, _)| out_group == in_group)
+                    .iter()
+                    .any(|(out_group, _)| out_group == in_group)
                 {
                     for (_out_group, outflow) in outflow_per_group.iter_mut() {
                         *outflow += inflow / (outs.len() as f64);
