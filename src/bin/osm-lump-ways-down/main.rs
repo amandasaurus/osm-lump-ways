@@ -647,7 +647,11 @@ fn main() -> Result<()> {
     // Value is upstream_m just at the start of the from nid.
     let mut upstream_per_edge: Vec<((i64, i64), f64)> =
         Vec::with_capacity(topologically_sorted_nodes.len());
-    upstream_per_edge.extend(topologically_sorted_nodes.iter().flat_map(|&nid1| g.out_neighbours(nid1).map(move |nid2| ((nid1, nid2), -1.))));
+    upstream_per_edge.extend(
+        topologically_sorted_nodes
+            .iter()
+            .flat_map(|&nid1| g.out_neighbours(nid1).map(move |nid2| ((nid1, nid2), -1.))),
+    );
     dbg!(upstream_per_edge.len());
     let mut upstream_per_edge = SortedSliceMap::from_vec(upstream_per_edge);
 
@@ -665,79 +669,113 @@ fn main() -> Result<()> {
         .copied()
         .zip(upstream_length.iter_mut())
     {
+        let debug = { nid == 8936587888 };
         let curr_upstream = tmp_upstream_length.remove(&nid).unwrap_or(0.);
+        *upstream_value = curr_upstream;
 
-        // FIXME rather than split the upstream value equally between all out-edges, look
-        // at the name tag (cf nid_pair_to_endtag_group)
-        let num_ins = g.in_neighbours(nid).count();
-        let num_outs = g.out_neighbours(nid).count() as f64;
-        let in_name_group_opt = g
-            .in_neighbours(nid)
-            .next()
-            .and_then(|in_nid| nid_pair_to_endtag_group.get(&(in_nid, nid)));
-        let num_outs_with_same_tag = in_name_group_opt.map_or(0, |in_name_group| {
-            g.out_neighbours(nid)
-                .filter(|out_nid| {
-                    nid_pair_to_endtag_group.get(&(nid, *out_nid)) == Some(in_name_group)
+        if debug {
+            dbg!(nid);
+        }
+        if debug {
+            dbg!(curr_upstream);
+        }
+
+        let outs = g.out_neighbours(nid).collect::<SmallVec<[_; 2]>>();
+        //if debug { dbg!(num_ins, &outs); }
+
+        if outs.len() == 1 {
+            // simple case, only 1 out → send it all down there
+            let other = outs[0];
+            let outgoing_edge_len = inter_store
+                .expand_directed(nid, other)
+                .map(|nid| nodeid_pos.get(&nid).unwrap())
+                .tuple_windows::<(_, _)>()
+                .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
+                .sum::<f64>();
+
+            *tmp_upstream_length.entry(other).or_default() += curr_upstream + outgoing_edge_len;
+            *upstream_per_edge.get_mut(&(nid, other)).unwrap() = curr_upstream;
+            //if other == 1309953474 {
+            //    dbg!(nid); dbg!(other); dbg!(outgoing_edge_len); dbg!(curr_upstream); dbg!(upstream_per_edge.get(&(nid, other)));
+            //}
+        } else if outs.len() == 0 {
+            // nothing to do
+        } else if outs.len() > 1 {
+            // For all the incoming edges, calculate how much goes in from each group
+            //dbg!(nid); dbg!(curr_upstream);
+            // TODO do simplier form for ins.len() == 1
+            let in_tag_group_flow = g
+                .in_neighbours(nid)
+                .map(|in_nid| (nid_pair_to_endtag_group.get(&(in_nid, nid)), (in_nid, nid)))
+                .map(|(group, (prev_nid, this_nid))| {
+                    //dbg!(prev_nid);
+                    let edge_len = inter_store
+                        .expand_directed(prev_nid, this_nid)
+                        .map(|nid| nodeid_pos.get(&nid).unwrap())
+                        .tuple_windows::<(_, _)>()
+                        .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
+                        .sum::<f64>();
+                    let edge_pre_upstream = *upstream_per_edge.get(&(prev_nid, this_nid)).unwrap();
+                    (group, (prev_nid, this_nid), edge_len + edge_pre_upstream)
                 })
-                .count()
-        }) as f64;
-        if num_ins == 1
-            && num_outs > 1.
-            && in_name_group_opt.is_some()
-            && num_outs_with_same_tag > 0.
-        {
-            let in_name_group = in_name_group_opt.unwrap();
-            let mut to_differnet_downstreams_total = curr_upstream * 0.01;
-            if to_differnet_downstreams_total > 1. {
-                to_differnet_downstreams_total = 1.;
+                .collect::<SmallVec<[_; 2]>>();
+            let outs = outs
+                .iter()
+                .map(|&nid2| (nid_pair_to_endtag_group.get(&(nid, nid2)), (nid, nid2)))
+                .collect::<SmallVec<[_; 2]>>();
+            let mut groups_inflow_numouts: SmallVec<[_; 2]> = SmallVec::new();
+            for (group, _nids, len) in in_tag_group_flow.iter() {
+                match groups_inflow_numouts
+                    .iter()
+                    .position(|(g, _, _)| g == group)
+                {
+                    None => groups_inflow_numouts.push((*group, *len, 0)),
+                    Some(i) => groups_inflow_numouts[i].1 += *len,
+                }
             }
-            let per_same_downstream =
-                (curr_upstream - to_differnet_downstreams_total) / num_outs_with_same_tag;
-            let per_differnet_downstreams =
-                to_differnet_downstreams_total / (num_outs - num_outs_with_same_tag);
-            for (other, is_in_same_group) in g.out_neighbours(nid).map(|out_nid| {
-                (
-                    out_nid,
-                    nid_pair_to_endtag_group.get(&(nid, out_nid)) == Some(in_name_group),
-                )
-            }) {
-                let this_edge_len = inter_store
-                    .expand_directed(nid, other)
-                    .map(|nid| nodeid_pos.get(&nid).unwrap())
-                    .tuple_windows::<(_, _)>()
-                    .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
-                    .sum::<f64>();
+            for (group, _nids) in outs.iter() {
+                match groups_inflow_numouts
+                    .iter()
+                    .position(|(g, _, _)| g == group)
+                {
+                    None => groups_inflow_numouts.push((*group, 0., 1)),
+                    Some(i) => groups_inflow_numouts[i].2 += 1,
+                }
+            }
+            //dbg!(&groups_inflow_numouts); dbg!(&in_tag_group_flow, &outs, &upstream_value);
+            if *upstream_value
+                != in_tag_group_flow
+                    .iter()
+                    .map(|(_group, _nids, len)| len)
+                    .sum::<f64>()
+            {
+                debug!("upstream ≠ incomign");
+            }
 
-                let sent_down_this_edge = if is_in_same_group {
-                    per_same_downstream + this_edge_len
+            for (out_group, (this_nid, other)) in outs.into_iter() {
+                let &(_group, total_out, div) = groups_inflow_numouts
+                    .iter()
+                    .find(|(g, _, _)| *g == out_group)
+                    .unwrap();
+                let this_edge;
+                if total_out == 0. {
+                    // nothing extra allocated to this edge
+                    this_edge = 0.;
                 } else {
-                    per_differnet_downstreams + this_edge_len
-                };
-
-                *tmp_upstream_length.entry(other).or_default() += sent_down_this_edge;
-                *upstream_per_edge.get_mut(&(nid, other)).unwrap() = sent_down_this_edge;
-            }
-        } else {
-            // > 1 in vertex (too complicated!) or no tag on the only in vertex
-            let per_downstream = curr_upstream / num_outs;
-            //let curr_pos = nodeid_pos.get(&nid).unwrap();
-            for other in g.out_neighbours(nid) {
-                //let other_pos = nodeid_pos.get(&other).unwrap();
-                let this_edge_len = inter_store
-                    .expand_directed(nid, other)
-                    .map(|nid| nodeid_pos.get(&nid).unwrap())
-                    .tuple_windows::<(_, _)>()
-                    .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
-                    .sum::<f64>();
-
-                let sent_down_this_edge = per_downstream + this_edge_len;
-                *tmp_upstream_length.entry(other).or_default() += sent_down_this_edge;
-                *upstream_per_edge.get_mut(&(nid, other)).unwrap() = sent_down_this_edge;
+                    assert!(
+                        total_out > 0.,
+                        "{:?}",
+                        (out_group, (this_nid, other), &groups_inflow_numouts)
+                    );
+                    assert!(div > 0);
+                    assert!(this_nid == nid);
+                    this_edge = total_out / (div as f64);
+                }
+                *tmp_upstream_length.entry(other).or_default() += this_edge;
+                *upstream_per_edge.get_mut(&(nid, other)).unwrap() = this_edge;
             }
         }
 
-        *upstream_value = curr_upstream;
         calc_all_upstreams.inc(1);
     }
     calc_all_upstreams.finish_and_clear();

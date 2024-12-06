@@ -49,7 +49,6 @@ where
             .and_then(|i| self.data.get_mut(i))
             .map(|(_k, v)| v)
     }
-
 }
 
 pub struct SortedSliceSet<T> {
