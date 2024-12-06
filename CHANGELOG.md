@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+* `upstream` data (from `olw-d`) includes `flow_tag_group`, an integer for the
+  group that was used to allocate upstream data. (Useful for debugging).
+
 ## v2.1.0 (2024-12-03)
 
 * New argument `--loops[-no]-incl-nids` to turn on/off whether the `nodes`

@@ -1050,6 +1050,7 @@ fn main() -> Result<()> {
             &end_points,
             &end_point_upstreams,
             &end_point_tag_values,
+            &nid_pair_to_endtag_group,
         )?;
     }
 
@@ -1557,6 +1558,7 @@ fn do_write_upstreams(
     end_points: &[i64],
     end_point_upstreams: &[f64],
     end_point_tag_values: &[SmallVec<[Option<String>; 1]>],
+    nid_pair_to_endtag_group: &SortedSliceMap<(i64, i64), i32>,
 ) -> Result<()> {
     assert!(!upstream_assigned_end.is_empty(), "When doing upstreams, we should have assigned each point to an end. Why was this not done?");
     assert_eq!(
@@ -1584,46 +1586,75 @@ fn do_write_upstreams(
         .progress_with(writing_upstreams_bar)
         .map(|((from_nid, to_nid), initial_upstream_len)| {
             let end_idx: usize = *upstream_assigned_end_map.get(to_nid).unwrap() as usize;
-            (from_nid, to_nid, initial_upstream_len, end_idx)
+            let flow_tag_group = nid_pair_to_endtag_group.get(&(*from_nid, *to_nid)).copied();
+            (
+                from_nid,
+                to_nid,
+                initial_upstream_len,
+                end_idx,
+                flow_tag_group,
+            )
         })
-        .flat_map(|(from_nid, to_nid, initial_upstream_len, end_idx)| {
-            // Expand all the intermediate nodes between these 2, and increase the current
-            // total upsteam, and output all that for the next iteration
-            inter_store
-                .expand_directed(*from_nid, *to_nid)
-                .map(|nid| (nid, nodeid_pos.get(&nid).unwrap()))
-                .tuple_windows::<(_, _)>()
-                .scan(
-                    *initial_upstream_len,
-                    move |curr_upstream_len, ((nid1, p1), (nid2, p2))| {
-                        let this_len = haversine::haversine_m_fpair(p1, p2);
-                        let from_upstream_len = *curr_upstream_len;
-                        *curr_upstream_len += this_len;
-                        Some((
-                            nid1,
-                            nid2,
-                            p1,
-                            p2,
-                            from_upstream_len,
-                            *curr_upstream_len,
-                            end_idx,
-                        ))
-                    },
-                )
-        })
+        .flat_map(
+            |(from_nid, to_nid, initial_upstream_len, end_idx, flow_tag_group)| {
+                // Expand all the intermediate nodes between these 2, and increase the current
+                // total upsteam, and output all that for the next iteration
+                inter_store
+                    .expand_directed(*from_nid, *to_nid)
+                    .map(|nid| (nid, nodeid_pos.get(&nid).unwrap()))
+                    .tuple_windows::<(_, _)>()
+                    .scan(
+                        *initial_upstream_len,
+                        move |curr_upstream_len, ((nid1, p1), (nid2, p2))| {
+                            let this_len = haversine::haversine_m_fpair(p1, p2);
+                            let from_upstream_len = *curr_upstream_len;
+                            *curr_upstream_len += this_len;
+                            Some((
+                                nid1,
+                                nid2,
+                                p1,
+                                p2,
+                                from_upstream_len,
+                                *curr_upstream_len,
+                                end_idx,
+                                flow_tag_group,
+                            ))
+                        },
+                    )
+            },
+        )
         .filter(
-            |(_from_nid, _to_nid, _p1, _p2, from_upstream_len, to_upstream_len, _end_idx)| {
+            |(
+                _from_nid,
+                _to_nid,
+                _p1,
+                _p2,
+                from_upstream_len,
+                to_upstream_len,
+                _end_idx,
+                _flow_tag_group,
+            )| {
                 args.upstreams_min_upstream_m.map_or(true, |min| {
                     *from_upstream_len >= min || *to_upstream_len >= min
                 })
             },
         )
         .map(
-            |(_from_nid, _to_nid, p1, p2, from_upstream_len, to_upstream_len, end_idx)| {
+            |(
+                _from_nid,
+                _to_nid,
+                p1,
+                p2,
+                from_upstream_len,
+                to_upstream_len,
+                end_idx,
+                flow_tag_group,
+            )| {
                 // Round the upstream to only output 1 decimal place
                 let mut props = serde_json::json!({});
                 props["from_upstream_m"] = round(&from_upstream_len, 1).into();
                 props["to_upstream_m"] = round(&to_upstream_len, 1).into();
+                props["flow_tag_group"] = flow_tag_group.into();
 
                 for mult in args.upstreams_from_upstream_multiple.iter() {
                     props[format!("from_upstream_m_{}", mult)] =
