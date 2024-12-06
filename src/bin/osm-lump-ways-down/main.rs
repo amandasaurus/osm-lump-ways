@@ -669,19 +669,10 @@ fn main() -> Result<()> {
         .copied()
         .zip(upstream_length.iter_mut())
     {
-        let debug = { nid == 8936587888 };
         let curr_upstream = tmp_upstream_length.remove(&nid).unwrap_or(0.);
         *upstream_value = curr_upstream;
 
-        if debug {
-            dbg!(nid);
-        }
-        if debug {
-            dbg!(curr_upstream);
-        }
-
         let outs = g.out_neighbours(nid).collect::<SmallVec<[_; 2]>>();
-        //if debug { dbg!(num_ins, &outs); }
 
         if outs.len() == 1 {
             // simple case, only 1 out → send it all down there
@@ -695,20 +686,15 @@ fn main() -> Result<()> {
 
             *tmp_upstream_length.entry(other).or_default() += curr_upstream + outgoing_edge_len;
             *upstream_per_edge.get_mut(&(nid, other)).unwrap() = curr_upstream;
-            //if other == 1309953474 {
-            //    dbg!(nid); dbg!(other); dbg!(outgoing_edge_len); dbg!(curr_upstream); dbg!(upstream_per_edge.get(&(nid, other)));
-            //}
-        } else if outs.len() == 0 {
+        } else if outs.is_empty() {
             // nothing to do
         } else if outs.len() > 1 {
             // For all the incoming edges, calculate how much goes in from each group
-            //dbg!(nid); dbg!(curr_upstream);
             // TODO do simplier form for ins.len() == 1
-            let in_tag_group_flow = g
+            let inflow_per_group: SmallVec<[(Option<i32>, f64); 2]> = g
                 .in_neighbours(nid)
                 .map(|in_nid| (nid_pair_to_endtag_group.get(&(in_nid, nid)), (in_nid, nid)))
                 .map(|(group, (prev_nid, this_nid))| {
-                    //dbg!(prev_nid);
                     let edge_len = inter_store
                         .expand_directed(prev_nid, this_nid)
                         .map(|nid| nodeid_pos.get(&nid).unwrap())
@@ -716,63 +702,80 @@ fn main() -> Result<()> {
                         .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
                         .sum::<f64>();
                     let edge_pre_upstream = *upstream_per_edge.get(&(prev_nid, this_nid)).unwrap();
-                    (group, (prev_nid, this_nid), edge_len + edge_pre_upstream)
+                    (group.copied(), edge_len + edge_pre_upstream)
                 })
-                .collect::<SmallVec<[_; 2]>>();
-            let outs = outs
+                .fold(SmallVec::new(), |mut map, (grp, inflow)| {
+                    match map.iter_mut().find(|(g, _)| *g == grp) {
+                        None => map.push((grp, inflow)),
+                        Some((_group, prev_inflow)) => *prev_inflow += inflow,
+                    }
+                    map
+                });
+
+            let outs: SmallVec<[(Option<i32>, (i64, i64)); 2]> = outs
                 .iter()
-                .map(|&nid2| (nid_pair_to_endtag_group.get(&(nid, nid2)), (nid, nid2)))
-                .collect::<SmallVec<[_; 2]>>();
-            let mut groups_inflow_numouts: SmallVec<[_; 2]> = SmallVec::new();
-            for (group, _nids, len) in in_tag_group_flow.iter() {
-                match groups_inflow_numouts
+                .map(|&nid2| {
+                    (
+                        nid_pair_to_endtag_group.get(&(nid, nid2)).copied(),
+                        (nid, nid2),
+                    )
+                })
+                .collect();
+
+            let num_outs_per_group: SmallVec<[(Option<i32>, usize); 2]> = outs
+                .iter()
+                .map(|(group, _nids)| group)
+                .fold(SmallVec::new(), |mut map, grp| {
+                    match map.iter().position(|(g, _)| g == grp) {
+                        None => map.push((*grp, 1)),
+                        Some(i) => map[i].1 += 1,
+                    }
+                    map
+                });
+
+            // now update num_outs_per_group with the total
+            // Allocate inflow that goes to the same group
+            let mut outflow_per_group: SmallVec<[(Option<i32>, f64); 2]> = SmallVec::new();
+            for (group, num_outs) in num_outs_per_group.iter() {
+                let inflow = inflow_per_group
                     .iter()
-                    .position(|(g, _, _)| g == group)
+                    .position(|(grp, _inflow)| grp == group)
+                    .map_or(0., |i| inflow_per_group[i].1);
+                outflow_per_group.push((*group, inflow / (*num_outs as f64)));
+            }
+
+            // Any inflow groups without an outflow group are allocated equally to all the outflow
+            // groups
+            for (in_group, inflow) in inflow_per_group.iter() {
+                if outflow_per_group
+                    .iter()
+                    .find(|(out_group, _)| out_group == in_group)
+                    .is_none()
                 {
-                    None => groups_inflow_numouts.push((*group, *len, 0)),
-                    Some(i) => groups_inflow_numouts[i].1 += *len,
+                    for (_out_group, outflow) in outflow_per_group.iter_mut() {
+                        *outflow += inflow / (outs.len() as f64);
+                    }
                 }
             }
-            for (group, _nids) in outs.iter() {
-                match groups_inflow_numouts
-                    .iter()
-                    .position(|(g, _, _)| g == group)
-                {
-                    None => groups_inflow_numouts.push((*group, 0., 1)),
-                    Some(i) => groups_inflow_numouts[i].2 += 1,
-                }
-            }
-            //dbg!(&groups_inflow_numouts); dbg!(&in_tag_group_flow, &outs, &upstream_value);
+
             if *upstream_value
-                != in_tag_group_flow
+                != inflow_per_group
                     .iter()
-                    .map(|(_group, _nids, len)| len)
+                    .map(|(_group, len)| len)
                     .sum::<f64>()
             {
+                // TODO fix this
                 debug!("upstream ≠ incomign");
             }
 
-            for (out_group, (this_nid, other)) in outs.into_iter() {
-                let &(_group, total_out, div) = groups_inflow_numouts
+            for (out_group, (_this_nid, other)) in outs.into_iter() {
+                let outflow = outflow_per_group
                     .iter()
-                    .find(|(g, _, _)| *g == out_group)
-                    .unwrap();
-                let this_edge;
-                if total_out == 0. {
-                    // nothing extra allocated to this edge
-                    this_edge = 0.;
-                } else {
-                    assert!(
-                        total_out > 0.,
-                        "{:?}",
-                        (out_group, (this_nid, other), &groups_inflow_numouts)
-                    );
-                    assert!(div > 0);
-                    assert!(this_nid == nid);
-                    this_edge = total_out / (div as f64);
-                }
-                *tmp_upstream_length.entry(other).or_default() += this_edge;
-                *upstream_per_edge.get_mut(&(nid, other)).unwrap() = this_edge;
+                    .find(|(g, _)| *g == out_group)
+                    .unwrap()
+                    .1;
+                *tmp_upstream_length.entry(other).or_default() += outflow;
+                *upstream_per_edge.get_mut(&(nid, other)).unwrap() = outflow;
             }
         }
 
