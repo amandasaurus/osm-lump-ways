@@ -2,9 +2,9 @@
 
 ## Unreleased
 
+* Fixes to more complicated tagging flow allocations
 * `upstream` data (from `olw-d`) includes `flow_tag_group`, an integer for the
   group that was used to allocate upstream data. (Useful for debugging).
-* Fixes to more complicated tagging flow allocations
 
 ## v2.1.0 (2024-12-03)
 
