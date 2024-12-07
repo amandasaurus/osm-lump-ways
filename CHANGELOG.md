@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v2.2.0 (2024-12-07)
 
 * Fixes to more complicated tagging flow allocations
 * `upstream` data (from `olw-d`) includes `flow_tag_group`, an integer for the
