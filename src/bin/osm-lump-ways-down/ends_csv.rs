@@ -40,9 +40,6 @@ pub(crate) fn init(
             warn!("Differnet headers. Expected {:?} got {:?}. Are you using a different set (or order) of --ends-tag ? Continuing anyway, and writing the columns we expect.", headers, first_row);
         }
     }
-    if args.ends_tag.is_empty() {
-        warn!("The ends CSV file only makes sense with the --ends-tag arguments. Since you have specified no end tags, nothing will be written to the ends CSV file");
-    }
     csv::Writer::from_writer(std::io::BufWriter::new(
         std::fs::File::options()
             .append(true)
@@ -65,15 +62,13 @@ pub(crate) fn write_ends<'a>(
     latest_timestamp: i64,
     latest_timestamp_iso: &str,
 ) -> Result<()> {
-    if args.ends_tag.is_empty() {
-        return Ok(());
-    }
     let mut end_points_w_meta = end_points_w_meta
         .map(|(nid, _mbms, end_tags, len)| (nid, end_tags, len))
-        .filter(|(_nid, end_tags, _len)| end_tags.iter().any(|t| t.is_some()))
-        .filter(|(_nid, _end_tags, len)| {
-            args.ends_csv_min_length_m.map_or(true, |min| **len >= min)
+        .filter(|(_nid, end_tags, _len)| {
+            !args.ends_csv_only_tagged || end_tags.iter().any(|t| t.is_some())
         })
+        .filter(|(_nid, _end_tags, &len)| args.ends_csv_min_length_m.map_or(true, |min| len >= min))
+        .filter(|(_nid, _end_tags, &len)| len > 1.)
         .collect::<Vec<_>>();
     end_points_w_meta.sort_by_key(|(_nid, _end_tags, len)| -OrderedFloat(**len));
 

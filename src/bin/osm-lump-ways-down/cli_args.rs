@@ -216,7 +216,7 @@ pub struct Args {
     /// • `nid`: OSM Node id
     /// • `lat`: Latitude of the point
     /// • `lng`: Longitude
-    /// And then one column for each `--ends-tag` value.
+    /// And then one column for each `--ends-tag` value (if any set)
     #[arg(long, value_name = "FILENAME.csv", verbatim_doc_comment)]
     pub ends_csv_file: Option<PathBuf>,
 
@@ -228,6 +228,10 @@ pub struct Args {
     /// Only the largest N ends (by `upstream_m`) are included in CSV file
     #[arg(long, requires = "ends_csv_file")]
     pub ends_csv_only_largest_n: Option<usize>,
+
+    /// When calculating ens CSV file, only include end points which have an tag.
+    #[arg(long, requires_all = ["ends_csv_file", "ends_tag"], default_value="false")]
+    pub ends_csv_only_tagged: bool,
 
     /// Calculate & write a file with each upstream line to this file
     #[arg(long, value_name = "UPSTREAMS_FILENAME")]

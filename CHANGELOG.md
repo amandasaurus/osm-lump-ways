@@ -3,6 +3,7 @@
 ## Unreleased
 
 * Fix bug allowing only generation of loop CSV
+* Ends CSV no longer is limited to ends with a name, tbis is optional.
 
 ## v2.2.0 (2024-12-07)
 
