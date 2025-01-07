@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* Fix bug allowing only generation of loop CSV
+
 ## v2.2.0 (2024-12-07)
 
 * Fixes to more complicated tagging flow allocations

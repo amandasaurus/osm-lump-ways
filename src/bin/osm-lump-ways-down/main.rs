@@ -116,7 +116,7 @@ fn main() -> Result<()> {
     anyhow::ensure!(
         args.ends.is_some()
             || args.ends_csv_file.is_some()
-            || args.loops.is_some()
+            || args.loops.is_some() || args.loops_csv_stats_file.is_some()
             || args.upstreams.is_some()
             || args.grouped_ends.is_some(),
         "Nothing to do. You need to specifiy one of --ends/--loops/--upstreams/etc."
