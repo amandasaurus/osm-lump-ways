@@ -256,6 +256,11 @@ fn main() -> Result<()> {
         formatting::format_duration(started_reading_for_pillar_nodes.elapsed()),
     );
 
+    if num_nids == 0 {
+        warn!("No ways in the file matched your filters. Nothing to do.");
+        return Ok(());
+    }
+
     let input_fp = std::fs::File::open(&args.input_filename)?;
     let input_bar = progress_bars.add(
         ProgressBar::new(input_fp.metadata()?.len())
@@ -326,6 +331,7 @@ fn main() -> Result<()> {
         formatting::format_duration(started_reading_ways.elapsed()),
         (num_ways_read as f64) / started_reading_ways.elapsed().as_secs_f64(),
     );
+
     ways_added.finish_and_clear();
     input_bar.finish_and_clear();
     let graphs = Arc::try_unwrap(graphs).unwrap().into_inner().unwrap();
