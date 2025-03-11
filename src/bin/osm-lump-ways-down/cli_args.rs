@@ -287,4 +287,9 @@ pub struct Args {
     /// Upstream from each end goes only up this many nodes.
     #[arg(long)]
     pub ends_upstreams_max_nodes: Option<i64>,
+
+    /// Creates a GeoJSON(Seq) file which has one Feature per grouped, connected waterway (based on
+    /// --flow-follows-tag value).
+    #[arg(long)]
+    pub grouped_waterways: Option<PathBuf>,
 }

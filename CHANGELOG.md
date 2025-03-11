@@ -1,7 +1,9 @@
 # Changelog
 
-## Unreleased
+## v3.0.0-rc1 (2025-03-11)
 
+* Big new feature: --grouped-waterways which returns a hierachial table of all
+  named waterways
 * Fix bug allowing only generation of loop CSV
 * Ends CSV no longer is limited to ends with a name, tbis is optional.
 

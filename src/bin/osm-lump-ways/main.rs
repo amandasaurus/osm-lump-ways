@@ -241,7 +241,7 @@ fn main() -> Result<()> {
     let nid2nways = Arc::try_unwrap(nid2nways).unwrap().into_inner().unwrap();
     let num_nids = nid2nways.len();
     let mut nids_in_ne2_ways: SortedSliceSet<i64> =
-        SortedSliceSet::from(nid2nways.into_iter().filter_map(|(nid, nvertexes)| {
+        SortedSliceSet::from_iter(nid2nways.into_iter().filter_map(|(nid, nvertexes)| {
             if nvertexes != 2 {
                 Some(nid)
             } else {

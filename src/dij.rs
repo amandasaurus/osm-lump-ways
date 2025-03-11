@@ -1,11 +1,9 @@
 #![allow(clippy::type_complexity, dead_code)]
 use super::*;
-use anyhow::Result;
 use graph::{Graph2, UndirectedAdjGraph};
 use haversine::haversine_m_fpair;
 use ordered_float::OrderedFloat;
 use std::collections::BinaryHeap;
-use way_group::WayGroup;
 
 #[derive(Clone, Debug, Default, clap::ValueEnum, PartialEq)]
 pub enum SplitPathsMethod {
@@ -402,7 +400,7 @@ pub(crate) fn paths_one_to_many<'a>(
     nodeid_pos: &'a impl NodeIdPosition,
     edges: &'a Graph2,
 ) -> impl ParallelIterator<Item = ((i64, i64), Vec<i64>)> + 'a {
-    let (start_idx, start_pos) = start;
+    let (start_idx, _start_pos) = start;
     assert!(edges.contains_vertex(start_idx));
     assert!(targets
         .par_iter()

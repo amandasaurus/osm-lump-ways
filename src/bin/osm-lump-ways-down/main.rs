@@ -1,3 +1,4 @@
+#![allow(unused_variables)]
 use anyhow::Result;
 use clap::Parser;
 use get_size::GetSize;
@@ -13,7 +14,8 @@ use osmio::OSMObjBase;
 use rayon::prelude::*;
 
 use itertools::Itertools;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::cmp::min;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
@@ -39,13 +41,16 @@ use osm_lump_ways::graph;
 use osm_lump_ways::haversine;
 use osm_lump_ways::inter_store;
 use osm_lump_ways::nodeid_position;
-use osm_lump_ways::sorted_slice_store::SortedSliceMap;
+use osm_lump_ways::sorted_slice_store::{SortedSliceMap, SortedSliceSet};
 use osm_lump_ways::tagfilter;
 
 use fileio::{write_csv_features_directly, write_geojson_features_directly};
 use osm_lump_ways::fileio;
 
 use osm_lump_ways::formatting;
+use smallvec::smallvec;
+
+use serde_json::json;
 
 mod ends_csv;
 mod loops_csv_stats;
@@ -66,6 +71,13 @@ macro_rules! info_memory_used {
 //        );
 //    };
 //}
+
+macro_rules! sort_dedup {
+    ($item:expr) => {
+        $item.par_sort_unstable();
+        $item.dedup();
+    };
+}
 
 fn main() -> Result<()> {
     let args = cli_args::Args::parse();
@@ -119,7 +131,8 @@ fn main() -> Result<()> {
             || args.loops.is_some()
             || args.loops_csv_stats_file.is_some()
             || args.upstreams.is_some()
-            || args.grouped_ends.is_some(),
+            || args.grouped_ends.is_some()
+            || args.grouped_waterways.is_some(),
         "Nothing to do. You need to specifiy one of --ends/--loops/--upstreams/etc."
     );
 
@@ -202,9 +215,9 @@ fn main() -> Result<()> {
 
     // Stores the tagvalue group for each segment.
     // OSM tag vaules are strings, but we don't need to store the strings. We give each string a
-    // unique id (i32) and store that. We don't need to know what the tagvalue for 2 segments is,
+    // unique id (u32) and store that. We don't need to know what the tagvalue for 2 segments is,
     // we only need to know if they are the same or not.
-    let mut nid_pair_to_endtag_group: HashMap<(i64, i64), i32> = HashMap::new();
+    let mut nid_pair_to_tagid: HashMap<(i64, i64), u32> = HashMap::new();
 
     // first step, get all the cycles
     let latest_timestamp = AtomicI64::new(0);
@@ -231,15 +244,14 @@ fn main() -> Result<()> {
         .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, &args.tag_filter_func))
         .inspect(|_| ways_added.inc(1))
         // TODO support grouping by tag value
-        .for_each_with((g.clone(), inter_store.clone(), tagvalues_to_edges.clone()),
-            |(g, inter_store, seen_tagvalues), w| {
+        .for_each_with((g.clone(), inter_store.clone(), tagvalues_to_edges.clone(), Vec::<i64>::new()),
+            |(g, inter_store, seen_tagvalues, nodes_buf), w| {
                 assert!(w.id() > 0, "This file has a way id < 0. negative ids are not supported in this tool Use osmium sort & osmium renumber to convert this file and run again.");
                 // add the nodes from w to this graph
                 let mut g = g.lock().unwrap();
                 let mut inter_store = inter_store.lock().unwrap();
                 let mut seen_tagvalues = seen_tagvalues.lock().unwrap();
                 nodes_added.inc(w.nodes().len() as u64);
-                let mut nodes = w.nodes();
 
                 // If we're assigning based on tag, get the hashset where it'll be stored
                 let mut tagvalues_to_edges = args.flow_follows_tag
@@ -247,14 +259,25 @@ fn main() -> Result<()> {
                     .and_then(|flow_follows_tag| w.tag(flow_follows_tag))
                     .map(|way_tag_value| seen_tagvalues.entry(way_tag_value.to_string()).or_default());
 
+                // Possibly remove duplicate nodes in a way. IME this happens once in the planet.
+                let mut nodes = if w.nodes().windows(2).any(|w| w[0] == w[1]) {
+                    warn!("Way {} has repeating nodes. at: {:?} Removing them for this processing", w.id(), w.nodes().windows(2).enumerate().filter(|(_i, w)| w[0] == w[1]).collect::<Vec<_>>());
+                    nodes_buf.truncate(0);
+                    nodes_buf.extend(w.nodes().iter().copied());
+                    nodes_buf.dedup();
+                    nodes_buf
+                } else {
+                    w.nodes()
+                };
+
                 // Don't add all the nodes, just the ones we need
                 while nodes.len() >= 2 {
-                    let i_opt = nodes.iter().skip(1).position(|nid| nids_in_ne2_ways.binary_search(nid).is_ok());
+                    let i_opt = nodes.iter().skip(1).position(|nid| nids_in_ne2_ways.contains(nid));
 
                     let mut i = i_opt.unwrap() + 1;
                     // can happen when a river splits and then joins again. try to stop reducing
                     // this little tributary away.
-                    while g.contains_edge(nodes[0], nodes[i]) && i > 1 {
+                    while ( g.contains_edge(nodes[0], nodes[i]) || nodes[0] == nodes[i] ) && i > 1 {
                         i -= 1;
                     }
                     // 2 nodes after another with nothing in between? That can happen with someone
@@ -264,6 +287,9 @@ fn main() -> Result<()> {
                         assert!(!g.contains_edge(nodes[0], nodes[i]), "already existing edge from {} to {} (there are {} nodes in the middle) i={}", nodes[0], nodes[i], nodes.len(), i);
                     }
 
+
+                    assert!(i != 0);
+                    assert!(nodes[0] != nodes[i], "Duplicate nodes in this way={:?} curr nodes={:?} i={}", w, nodes, i);
                     g.add_edge(nodes[0], nodes[i]);
 
                     if let Some(ref mut tagvalues_to_edges) = tagvalues_to_edges {
@@ -329,17 +355,18 @@ fn main() -> Result<()> {
         "Size of the connected graph: {} nodes",
         num_vertexes.to_formatted_string(&Locale::en)
     );
+    let mut tag_group_value = Vec::with_capacity(tagvalues_to_edges.len());
 
     // Convert the HashMap to something we can look up based on an edge. also throw away the
     // unneeded string value.
     if let Some(ref flow_follows_tag) = args.flow_follows_tag {
-        assert!(tagvalues_to_edges.len() < i32::MAX as usize);
+        assert!(tagvalues_to_edges.len() < u32::MAX as usize);
 
         let total_num_pairs = tagvalues_to_edges
             .par_iter()
             .map(|(_tagvalue, pairs)| pairs.len())
             .sum();
-        nid_pair_to_endtag_group.reserve(total_num_pairs);
+        nid_pair_to_tagid.reserve(total_num_pairs);
 
         info!(
             "Have following {} unique '{}' tags in {} node pairs",
@@ -347,22 +374,21 @@ fn main() -> Result<()> {
             flow_follows_tag,
             total_num_pairs.to_formatted_string(&Locale::en),
         );
-        for (_tagvalue, pairs) in tagvalues_to_edges.into_iter() {
-            let curr_id = nid_pair_to_endtag_group.len();
+        for (tagvalue, pairs) in tagvalues_to_edges.into_iter() {
+            let curr_id = tag_group_value.len();
             for pair in pairs.into_iter() {
-                nid_pair_to_endtag_group.insert(pair, curr_id as i32);
+                nid_pair_to_tagid.insert(pair, curr_id as u32);
             }
+            tag_group_value.push(tagvalue);
         }
         info!(
             "Total size of the '{}' lookup: {} bytes",
             flow_follows_tag,
-            nid_pair_to_endtag_group
+            nid_pair_to_tagid
                 .get_size()
                 .to_formatted_string(&Locale::en)
         );
     }
-    // convert to memory effecient sorted vec.
-    let nid_pair_to_endtag_group = SortedSliceMap::from(nid_pair_to_endtag_group.into_iter());
 
     let calc_components_bar = progress_bars.add(
         ProgressBar::new((num_vertexes * 2) as u64)
@@ -525,6 +551,7 @@ fn main() -> Result<()> {
         && args.ends_csv_file.is_none()
         && args.upstreams.is_none()
         && args.grouped_ends.is_none()
+        && args.grouped_waterways.is_none()
     {
         // nothing else to do
         return Ok(());
@@ -552,7 +579,16 @@ fn main() -> Result<()> {
     info!("Contracting the graph");
     for (vertex, replacement) in node_id_replaces.iter() {
         g.contract_vertex(vertex, replacement);
+
+        // If this segment is part of a cycle, then just delete it from the tag groups and move
+        // on.
+        nid_pair_to_tagid.remove(&(*vertex, *replacement));
+        nid_pair_to_tagid.remove(&(*replacement, *vertex));
     }
+
+    // convert to memory effecient sorted vec.
+    let nid_pair_to_tagid = SortedSliceMap::from_iter(nid_pair_to_tagid.into_iter());
+    let tag_group_value = tag_group_value.into_boxed_slice();
 
     // TODO do we need to sort topologically? Why not just calc lengths from upstreams
     let sorting_nodes_bar = progress_bars.add(
@@ -586,6 +622,7 @@ fn main() -> Result<()> {
     let mut nids_we_need = HashSet::with_capacity(g.num_vertexes());
     nids_we_need.extend(g.vertexes());
     nids_we_need.extend(inter_store.all_inter_nids());
+    nids_we_need.extend(node_id_replaces.keys());
     nids_we_need.shrink_to_fit();
 
     let setting_node_pos = progress_bars.add(
@@ -648,11 +685,10 @@ fn main() -> Result<()> {
     // Value is upstream_m just at the start of the from nid.
     let mut upstream_per_edge: Vec<((i64, i64), f64)> =
         Vec::with_capacity(topologically_sorted_nodes.len());
-    upstream_per_edge.extend(
-        topologically_sorted_nodes
-            .iter()
-            .flat_map(|&nid1| g.out_neighbours(nid1).map(move |nid2| ((nid1, nid2), -1.))),
-    );
+    upstream_per_edge.extend(topologically_sorted_nodes.iter().flat_map(|&nid1| {
+        g.out_neighbours(nid1)
+            .map(move |nid2| ((nid1, nid2), f64::NAN))
+    }));
     let mut upstream_per_edge = SortedSliceMap::from_vec(upstream_per_edge);
 
     let calc_all_upstreams = progress_bars.add(
@@ -690,9 +726,9 @@ fn main() -> Result<()> {
             // nothing to do
         } else if outs.len() > 1 {
             // For all the incoming edges, calculate how much goes in from each group
-            let inflow_per_group: SmallVec<[(Option<i32>, f64); 2]> = g
+            let inflow_per_group: SmallVec<[(Option<u32>, f64); 2]> = g
                 .in_neighbours(nid)
-                .map(|in_nid| (nid_pair_to_endtag_group.get(&(in_nid, nid)), (in_nid, nid)))
+                .map(|in_nid| (nid_pair_to_tagid.get(&(in_nid, nid)), (in_nid, nid)))
                 .map(|(group, (prev_nid, this_nid))| {
                     let edge_len = inter_store
                         .expand_directed(prev_nid, this_nid)
@@ -712,17 +748,12 @@ fn main() -> Result<()> {
                 });
 
             #[allow(clippy::type_complexity)]
-            let outs: SmallVec<[(Option<i32>, (i64, i64)); 2]> = outs
+            let outs: SmallVec<[(Option<u32>, (i64, i64)); 2]> = outs
                 .iter()
-                .map(|&nid2| {
-                    (
-                        nid_pair_to_endtag_group.get(&(nid, nid2)).copied(),
-                        (nid, nid2),
-                    )
-                })
+                .map(|&nid2| (nid_pair_to_tagid.get(&(nid, nid2)).copied(), (nid, nid2)))
                 .collect();
 
-            let num_outs_per_group: SmallVec<[(Option<i32>, usize); 2]> = outs
+            let num_outs_per_group: SmallVec<[(Option<u32>, usize); 2]> = outs
                 .iter()
                 .map(|(group, _nids)| group)
                 .fold(SmallVec::new(), |mut map, grp| {
@@ -735,7 +766,7 @@ fn main() -> Result<()> {
 
             // now update num_outs_per_group with the total
             // Allocate inflow that goes to the same group
-            let mut outflow_per_group: SmallVec<[(Option<i32>, f64); 2]> = SmallVec::new();
+            let mut outflow_per_group: SmallVec<[(Option<u32>, f64); 2]> = SmallVec::new();
             for (group, num_outs) in num_outs_per_group.iter() {
                 let inflow = inflow_per_group
                     .iter()
@@ -963,7 +994,7 @@ fn main() -> Result<()> {
     if let Some(ref ends_filename) = args.ends {
         let end_points_output = end_points_w_meta()
             .filter(|(_nid, _mbms, _end_tgs, len)| {
-                args.min_upstream_m.map_or(true, |min| *len >= &min)
+                args.min_upstream_m.is_none_or(|min| *len >= &min)
             })
             .map(|(nid, mbms, end_tags, len)| {
                 (nid, mbms, end_tags, len, nodeid_pos.get(nid).unwrap())
@@ -1059,6 +1090,27 @@ fn main() -> Result<()> {
     assert!(upstream_assigned_end.par_iter().all(|end| *end >= 0));
     let upstream_assigned_end = upstream_assigned_end.into_boxed_slice();
 
+    let new_progress_bar_func = |total: u64, message: &str| {
+        progress_bars.add(
+            ProgressBar::new(total)
+                .with_message(message.to_string())
+                .with_style(style.clone()),
+        )
+    };
+
+    let tag_group_data_opt = if args.upstreams.is_some() || args.grouped_waterways.is_some() {
+        Some(calc_tag_group(
+            &topologically_sorted_nodes,
+            &nid_pair_to_tagid,
+            &tag_group_value,
+            &g,
+            &upstream_per_edge,
+            new_progress_bar_func,
+        ))
+    } else {
+        None
+    };
+
     if let Some(ref grouped_ends) = args.grouped_ends {
         do_group_by_ends(
             grouped_ends,
@@ -1080,6 +1132,7 @@ fn main() -> Result<()> {
     }
 
     if let Some(ref upstream_filename) = args.upstreams {
+        let (nid_pair_to_taggroupid, tag_group_info) = tag_group_data_opt.as_ref().unwrap();
         do_write_upstreams(
             &args,
             upstream_filename,
@@ -1093,7 +1146,31 @@ fn main() -> Result<()> {
             &end_points,
             &end_point_upstreams,
             &end_point_tag_values,
-            &nid_pair_to_endtag_group,
+            &nid_pair_to_tagid,
+            nid_pair_to_taggroupid,
+            tag_group_info,
+            &tag_group_value,
+        )?;
+    }
+    if let Some(ref waterway_grouped_file) = args.grouped_waterways {
+        let (nid_pair_to_taggroupid, tag_group_info) = tag_group_data_opt.as_ref().unwrap();
+        do_waterway_grouped(
+            waterway_grouped_file,
+            &g,
+            &progress_bars,
+            &style,
+            &end_points,
+            &topologically_sorted_nodes,
+            &end_point_upstreams,
+            &upstream_assigned_end,
+            &upstream_per_edge,
+            &nodeid_pos,
+            &end_point_tag_values,
+            &args.ends_tag,
+            &inter_store,
+            nid_pair_to_taggroupid,
+            tag_group_info,
+            &tag_group_value,
         )?;
     }
 
@@ -1102,6 +1179,9 @@ fn main() -> Result<()> {
         formatting::format_duration(global_start.elapsed())
     );
 
+    // collect and output geometry
+
+    info!("slán");
     Ok(())
 }
 
@@ -1111,7 +1191,7 @@ fn do_read_nids_in_ne2_ways(
     tag_filter_func: &Option<tagfilter::TagFilterFunc>,
     input_bar: &ProgressBar,
     progress_bars: &MultiProgress,
-) -> Result<Box<[i64]>> {
+) -> Result<SortedSliceSet<i64>> {
     // how many vertexes are there per node id? (which do we need to keep)
     info!("About to preform first read of file, to calculate which nids we need to keep");
     let nid2nways = Arc::new(Mutex::new(HashMap::<i64, u8>::new()));
@@ -1140,13 +1220,11 @@ fn do_read_nids_in_ne2_ways(
     let nid2nways = Arc::try_unwrap(nid2nways).unwrap().into_inner().unwrap();
 
     let num_nids = nid2nways.len();
-    let mut nids_in_ne2_ways: Vec<i64> = nid2nways
+    let nids_in_ne2_ways: Vec<i64> = nid2nways
         .into_iter()
         .filter_map(|(nid, nvertexes)| if nvertexes != 2 { Some(nid) } else { None })
         .collect();
-    nids_in_ne2_ways.sort_unstable();
-    nids_in_ne2_ways.dedup();
-    let nids_in_ne2_ways: Box<[i64]> = nids_in_ne2_ways.into_boxed_slice();
+    let nids_in_ne2_ways = SortedSliceSet::from_vec(nids_in_ne2_ways);
     info!(
         "There are {} nodes in total, but only {} ({:.1}%) are pillar nodes",
         num_nids.to_formatted_string(&Locale::en),
@@ -1256,8 +1334,7 @@ where
     T: Ord + Send,
 {
     let mut result: Vec<T> = it.collect();
-    result.sort_unstable();
-    result.dedup();
+    sort_dedup!(result);
     result.shrink_to_fit();
     result
 }
@@ -1268,8 +1345,7 @@ where
     T: Ord + Send,
 {
     let mut result: Vec<T> = it.collect();
-    result.sort_unstable();
-    result.dedup();
+    sort_dedup!(result);
     result.shrink_to_fit();
     result
 }
@@ -1601,14 +1677,18 @@ fn do_write_upstreams(
     end_points: &[i64],
     end_point_upstreams: &[f64],
     end_point_tag_values: &[SmallVec<[Option<String>; 1]>],
-    nid_pair_to_endtag_group: &SortedSliceMap<(i64, i64), i32>,
+    nid_pair_to_tagid: &SortedSliceMap<(i64, i64), u32>,
+    nid_pair_to_taggroupid: &SortedSliceMap<(i64, i64), u64>,
+    tag_group_info: &[TagGroupInfo],
+    tag_group_value: &[String],
 ) -> Result<()> {
     assert!(!upstream_assigned_end.is_empty(), "When doing upstreams, we should have assigned each point to an end. Why was this not done?");
     assert_eq!(
         topologically_sorted_nodes.len(),
         upstream_assigned_end.len()
     );
-    let upstream_assigned_end_map: SortedSliceMap<i64, i32> = SortedSliceMap::from(
+
+    let upstream_assigned_end_map: SortedSliceMap<i64, i32> = SortedSliceMap::from_iter(
         topologically_sorted_nodes
             .iter()
             .copied()
@@ -1629,17 +1709,21 @@ fn do_write_upstreams(
         .progress_with(writing_upstreams_bar)
         .map(|((from_nid, to_nid), initial_upstream_len)| {
             let end_idx: usize = *upstream_assigned_end_map.get(to_nid).unwrap() as usize;
-            let flow_tag_group = nid_pair_to_endtag_group.get(&(*from_nid, *to_nid)).copied();
+            let flow_tag_group = nid_pair_to_tagid.get(&(*from_nid, *to_nid)).copied();
+            let tag_group_info = nid_pair_to_taggroupid
+                .get(&(*from_nid, *to_nid))
+                .map(|idx| &tag_group_info[*idx as usize]);
             (
                 from_nid,
                 to_nid,
                 initial_upstream_len,
                 end_idx,
                 flow_tag_group,
+                tag_group_info,
             )
         })
         .flat_map(
-            |(from_nid, to_nid, initial_upstream_len, end_idx, flow_tag_group)| {
+            |(from_nid, to_nid, initial_upstream_len, end_idx, flow_tag_group, tag_group_info)| {
                 // Expand all the intermediate nodes between these 2, and increase the current
                 // total upsteam, and output all that for the next iteration
                 inter_store
@@ -1661,6 +1745,7 @@ fn do_write_upstreams(
                                 *curr_upstream_len,
                                 end_idx,
                                 flow_tag_group,
+                                tag_group_info,
                             ))
                         },
                     )
@@ -1676,10 +1761,10 @@ fn do_write_upstreams(
                 to_upstream_len,
                 _end_idx,
                 _flow_tag_group,
+                _tag_group_info,
             )| {
-                args.upstreams_min_upstream_m.map_or(true, |min| {
-                    *from_upstream_len >= min || *to_upstream_len >= min
-                })
+                args.upstreams_min_upstream_m
+                    .is_none_or(|min| *from_upstream_len >= min || *to_upstream_len >= min)
             },
         )
         .map(
@@ -1692,12 +1777,26 @@ fn do_write_upstreams(
                 to_upstream_len,
                 end_idx,
                 flow_tag_group,
+                tag_group_info,
             )| {
                 // Round the upstream to only output 1 decimal place
                 let mut props = serde_json::json!({});
+                props["nids"] = format!("{},{}", _from_nid, _to_nid).into();
                 props["from_upstream_m"] = round(&from_upstream_len, 1).into();
                 props["to_upstream_m"] = round(&to_upstream_len, 1).into();
                 props["flow_tag_group"] = flow_tag_group.into();
+                props["stream_level"] = tag_group_info
+                    .map(|tg| tg.stream_level)
+                    .map(|sl| if sl == u64::MAX { None } else { Some(sl) })
+                    .into();
+                props["stream_level_code_str"] =
+                    tag_group_info.map(|tg| tg.stream_level_code_str()).into();
+                props["stream_level_code"] = tag_group_info
+                    .map(|tg| tg.stream_level_code.as_ref())
+                    .into();
+                props["tag_group_value"] = flow_tag_group
+                    .map(|i| tag_group_value[i as usize].as_str())
+                    .into();
 
                 for mult in args.upstreams_from_upstream_multiple.iter() {
                     props[format!("from_upstream_m_{}", mult)] =
@@ -1735,7 +1834,8 @@ fn do_write_upstreams(
             &fileio::format_for_filename(upstream_filename),
         )?;
     } else if upstream_filename.extension().unwrap() == "csv" {
-        num_written = write_csv_features_directly(lines, &mut f)?;
+        num_written =
+            write_csv_features_directly(lines, &mut f, fileio::OutputGeometryFormat::WKT)?;
     } else {
         anyhow::bail!("Unsupported output format");
     }
@@ -1744,6 +1844,822 @@ fn do_write_upstreams(
         "Wrote {} features to output file {}",
         num_written.to_formatted_string(&Locale::en),
         upstream_filename.display(),
+    );
+
+    Ok(())
+}
+
+#[derive(Debug, Clone)]
+struct TagGroupInfo {
+    upstream_m: f64,
+
+    unallocated_other_groups: SmallVec<[u64; 1]>,
+    branching_distributaries: SmallVec<[u64; 1]>,
+    terminal_distributaries: SmallVec<[u64; 1]>,
+    sibling_distributaries: SmallVec<[u64; 1]>,
+    tributaries: SmallVec<[u64; 1]>,
+    parent_channels: SmallVec<[u64; 1]>,
+    side_channels: SmallVec<[u64; 1]>,
+    parent_rivers: SmallVec<[u64; 1]>,
+
+    /// nids where this taggroup joins another. This is either a tributary or distributary
+    confluences: SmallVec<[i64; 2]>,
+
+    /// nids where a waterway starts
+    sources: SmallVec<[i64; 1]>,
+    /// nids where a waterway ends
+    sinks: SmallVec<[i64; 1]>,
+
+    stream_level: u64,
+    stream_level_code: SmallVec<[u32; 3]>,
+
+    /// Index in the tag value
+    /// None → This segment doesn't have a tag value
+    tagid: Option<u32>,
+    end_segments: SmallVec<[(i64, i64); 3]>,
+    min_nid: i64,
+}
+impl TagGroupInfo {
+    fn from_tagid(tagid: Option<u32>) -> Self {
+        let mut res = Self::default();
+        res.tagid = tagid;
+        res
+    }
+    fn stream_level_code_str(&self) -> String {
+        self.stream_level_code
+            .iter()
+            .map(|x| x.to_string())
+            .join(".")
+    }
+
+    fn no_stream_level(&self) -> bool {
+        self.stream_level == u64::MAX
+    }
+    fn has_stream_level(&self) -> bool {
+        !self.no_stream_level()
+    }
+}
+
+impl Default for TagGroupInfo {
+    fn default() -> Self {
+        TagGroupInfo {
+            stream_level: u64::MAX,
+            unallocated_other_groups: smallvec![],
+            branching_distributaries: smallvec![],
+            terminal_distributaries: smallvec![],
+            sibling_distributaries: smallvec![],
+            tributaries: smallvec![],
+            confluences: smallvec![],
+            parent_channels: smallvec![],
+            side_channels: smallvec![],
+            parent_rivers: smallvec![],
+            sources: smallvec![],
+            sinks: smallvec![],
+            upstream_m: 0.,
+            stream_level_code: smallvec![],
+            tagid: None,
+            end_segments: smallvec![],
+            min_nid: i64::MAX,
+        }
+    }
+}
+
+fn calc_tag_group(
+    topologically_sorted_nodes: &[i64],
+    nid_pair_to_tagid: &SortedSliceMap<(i64, i64), u32>,
+    tag_group_value: &[String],
+    g: &graph::DirectedGraph2,
+    upstream_per_edge: &SortedSliceMap<(i64, i64), f64>,
+    new_progress_bar_func: impl Fn(u64, &str) -> ProgressBar,
+) -> (SortedSliceMap<(i64, i64), u64>, Box<[TagGroupInfo]>) {
+    let started_calc = Instant::now();
+    // Step 1: What are the segments which are the end segment of their taggroup?
+    // list of segments which are the end of a group (i.e. there are 0 outgoing segments with the
+    // same tagid
+    let mut tag_group_ends: Vec<(i64, i64)> = vec![];
+    // special list of segments which have zero out neighbours.
+    let mut segments_into_nothing: Vec<(i64, i64)> = vec![];
+
+    // calc name end groups
+    let mut outgoing_groups: SmallVec<[_; 3]> = smallvec![];
+    let mut this_group;
+    let get_ends_bar = new_progress_bar_func(g.num_edges() as u64, "Finding the end segments");
+    for seg in get_ends_bar.wrap_iter(g.edges_iter()) {
+        outgoing_groups.truncate(0);
+        outgoing_groups.extend(g.out_edges(seg.1).map(|seg| nid_pair_to_tagid.get(&seg)));
+        outgoing_groups.dedup();
+        this_group = nid_pair_to_tagid.get(&seg);
+
+        if outgoing_groups.is_empty() {
+            segments_into_nothing.push(seg);
+            tag_group_ends.push(seg);
+        } else if outgoing_groups.iter().any(|&g| g == this_group) {
+            // there is an outsegment with the same group, so this isn't an end
+            continue;
+        } else if !outgoing_groups.is_empty() && outgoing_groups.iter().all(|&g| g != this_group) {
+            tag_group_ends.push(seg);
+        } else {
+            unreachable!()
+        }
+    }
+    let tag_group_ends = SortedSliceSet::from_vec(tag_group_ends);
+    assert!(tag_group_ends.len() < u64::MAX as usize);
+    let mut tag_group_info: Vec<TagGroupInfo> = Vec::with_capacity(tag_group_ends.len());
+
+    // Step 2: Group all the segments based on topological connectivness (yes this is like
+    // osm-lump-ways)
+    // for each segment, assign it to a group id
+    let curr_group_id = 0;
+    let mut nid_pair_to_taggroupid: SortedSliceMap<(i64, i64), u64> =
+        SortedSliceMap::from_iter(g.edges_iter().map(|seg| (seg, u64::MAX)));
+    let mut frontier: VecDeque<_> = VecDeque::new();
+    let assign_to_group = new_progress_bar_func(
+        nid_pair_to_taggroupid.len() as u64,
+        "Assigning each segment to an end",
+    );
+    for end_segment in tag_group_ends.iter() {
+        if nid_pair_to_taggroupid.get(end_segment).unwrap() != &u64::MAX {
+            // already assigned to a group
+            continue;
+        }
+        let this_tag_id = nid_pair_to_tagid.get(end_segment);
+        let mut this_tag_group = TagGroupInfo::from_tagid(this_tag_id.cloned());
+        this_tag_group.end_segments.push(*end_segment);
+
+        let curr_group_id = tag_group_info.len() as u64;
+        frontier.truncate(0);
+        frontier.push_back(*end_segment);
+        while let Some(seg) = frontier.pop_front() {
+            if nid_pair_to_tagid.get(&seg) != this_tag_id {
+                continue;
+            }
+            if nid_pair_to_taggroupid.get(&seg).unwrap() != &u64::MAX {
+                continue; // already done
+            }
+            if tag_group_ends.contains(&seg) {
+                this_tag_group.end_segments.push(seg);
+                this_tag_group.end_segments.dedup();
+            }
+
+            // save this group id
+            nid_pair_to_taggroupid.set(&seg, curr_group_id);
+            assign_to_group.inc(1);
+
+            // extend
+            frontier.extend(g.all_connected_edges(&seg));
+            this_tag_group.min_nid = min(this_tag_group.min_nid, min(seg.0, seg.1));
+        }
+        tag_group_info.push(this_tag_group);
+    }
+    assign_to_group.finish_and_clear();
+    tag_group_info.par_iter_mut().for_each(|tg| {
+        // minor clean up
+        sort_dedup!(tg.end_segments);
+        tg.end_segments.shrink_to_fit();
+    });
+    // For some reason, some segments don't get assigned a taggroupid
+    // For Irl, this doens't happen. For Br+Irl, there's 102 segs
+    // Hit it with a big hammer, and just loop over the missing and assign them to a matching.
+    let mut incomplete_segs = Vec::new();
+    let mut possible_taggroupids: SmallVec<[_; 3]> = SmallVec::new();
+    incomplete_segs.truncate(0);
+    incomplete_segs.extend(
+        nid_pair_to_taggroupid
+            .iter()
+            .filter(|(_seg, group_id)| *group_id == u64::MAX)
+            .map(|(seg, _)| seg)
+            .copied(),
+    );
+    while let Some(seg) = incomplete_segs.pop() {
+        assert!(!tag_group_ends.contains(&seg));
+        assert!(nid_pair_to_tagid.contains_key(&seg));
+        let this_tagid = nid_pair_to_tagid.get(&seg).unwrap();
+        possible_taggroupids.truncate(0);
+        possible_taggroupids.extend(
+            g.all_connected_edges(&seg)
+                .filter(|seg2| nid_pair_to_tagid.get(seg2) == Some(this_tagid))
+                .map(|seg2| nid_pair_to_taggroupid.get(&seg2).copied()),
+        );
+        sort_dedup!(possible_taggroupids);
+        assert_eq!(possible_taggroupids.len(), 1);
+        assert!(possible_taggroupids.iter().all(Option::is_some));
+        nid_pair_to_taggroupid.set(&seg, possible_taggroupids[0].unwrap());
+    }
+    assert_eq!(
+        nid_pair_to_taggroupid
+            .par_iter()
+            .filter(|(_seg, group_id)| *group_id == u64::MAX)
+            .count(),
+        0,
+        "Some segments have not been assigned to a tagroup, num segments {}",
+        nid_pair_to_taggroupid
+            .len()
+            .to_formatted_string(&Locale::en)
+    );
+
+    let groups_that_flow_into_nothing = segments_into_nothing
+        .into_iter()
+        .map(|seg| *nid_pair_to_taggroupid.get(&seg).unwrap())
+        .collect::<HashSet<u64>>();
+
+    let mut tag_group_info = tag_group_info.into_boxed_slice();
+
+    info!(
+        "There are {} different groups of connected named ways",
+        tag_group_info.len().to_formatted_string(&Locale::en)
+    );
+
+    // calculate combined upstream per group
+    for seg in tag_group_ends.iter() {
+        let group = nid_pair_to_taggroupid.get(seg).unwrap();
+        // TODO need to include last segment?
+        if upstream_per_edge.get(seg).is_none() {
+            //warn!("No upstream for {:?}", seg);
+        }
+        tag_group_info[*group as usize].upstream_m += upstream_per_edge.get(seg).unwrap_or(&0.);
+    }
+
+    // For every taggroup, calculate the tributaries, distributaries etc.
+    for (seg, group_id) in nid_pair_to_taggroupid.iter() {
+        let tg = &mut tag_group_info[*group_id as usize];
+        if g.num_in_neighbours(seg.0) == 0 {
+            tg.sources.push(seg.0);
+        }
+        if g.num_out_neighbours(seg.1) == 0 {
+            tg.sinks.push(seg.1);
+        }
+
+        for (other_seg, other_group_id) in g.out_edges(seg.1).filter_map(|seg| {
+            nid_pair_to_taggroupid
+                .get(&seg)
+                .filter(|g| *g != group_id)
+                .map(|g| (seg, g))
+        }) {
+            tg.confluences.push(seg.1);
+            tg.unallocated_other_groups.push(*other_group_id);
+        }
+        for (other_seg, other_group_id) in g.in_edges(seg.0).filter_map(|seg| {
+            nid_pair_to_taggroupid
+                .get(&seg)
+                .filter(|g| *g != group_id)
+                .map(|g| (seg, g))
+        }) {
+            tg.unallocated_other_groups.push(*other_group_id);
+            tg.confluences.push(seg.0);
+        }
+    }
+
+    tag_group_info.par_iter_mut().for_each(|tg| {
+        sort_dedup!(tg.unallocated_other_groups);
+    });
+
+    #[derive(PartialEq, Debug)]
+    enum FlowType {
+        In,
+        Out,
+        Through,
+        No,
+    }
+
+    let flow_type = |nid: i64, group_id: u64| -> FlowType {
+        let has_ins = g
+            .in_edges(nid)
+            .any(|seg| nid_pair_to_taggroupid.get(&seg) == Some(&group_id));
+        let has_outs = g
+            .out_edges(nid)
+            .any(|seg| nid_pair_to_taggroupid.get(&seg) == Some(&group_id));
+        match (has_ins, has_outs) {
+            (true, true) => FlowType::Through,
+            (true, false) => FlowType::In,
+            (false, true) => FlowType::Out,
+            (false, false) => FlowType::No,
+        }
+    };
+
+    let flows_out = |nid: i64, group_id: u64| -> bool { flow_type(nid, group_id) == FlowType::Out };
+    let flows_out_or_through = |nid: i64, group_id: u64| -> bool {
+        match flow_type(nid, group_id) {
+            FlowType::Out | FlowType::Through => true,
+            FlowType::In | FlowType::No => false,
+        }
+    };
+    let flows_in = |nid: i64, group_id: u64| -> bool { flow_type(nid, group_id) == FlowType::In };
+    let flows_through =
+        |nid: i64, group_id: u64| -> bool { flow_type(nid, group_id) == FlowType::Through };
+    let flows_through_or_in = |nid: i64, group_id: u64| -> bool {
+        match flow_type(nid, group_id) {
+            FlowType::Through | FlowType::In => true,
+            _ => false,
+        }
+    };
+    let flows_through_or_out = |nid: i64, group_id: u64| -> bool {
+        match flow_type(nid, group_id) {
+            FlowType::Through | FlowType::Out => true,
+            _ => false,
+        }
+    };
+
+    tag_group_info
+        .par_iter_mut()
+        .enumerate()
+        .filter(|(_taggroupid, tg)| !tg.unallocated_other_groups.is_empty())
+        .for_each(|(taggroupid, tg)| {
+            let taggroupid = taggroupid as u64;
+
+            let mut confluences: SmallVec<[_; 3]> = smallvec![]; // buffer
+            let mut put_back_in: SmallVec<[_; 2]> = smallvec![];
+
+            for other_taggroupid in tg.unallocated_other_groups.drain(..) {
+                assert!(other_taggroupid != taggroupid);
+                confluences.truncate(0);
+                confluences.extend(
+                    tg.confluences
+                        .iter()
+                        .flat_map(|&nid| g.in_edges(nid))
+                        .filter(|seg| nid_pair_to_taggroupid.get(seg) == Some(&other_taggroupid))
+                        .map(|seg| seg.1),
+                );
+                confluences.extend(
+                    tg.confluences
+                        .iter()
+                        .flat_map(|&nid| g.out_edges(nid))
+                        .filter(|seg| nid_pair_to_taggroupid.get(seg) == Some(&other_taggroupid))
+                        .map(|seg| seg.0),
+                );
+                sort_dedup!(confluences);
+                assert!(!confluences.is_empty());
+
+                if confluences.len() >= 2
+                    && confluences.iter().any(|nid| {
+                        flows_through_or_in(*nid, taggroupid) && flows_out(*nid, other_taggroupid)
+                    })
+                    && confluences.iter().any(|nid| {
+                        flows_through_or_out(*nid, taggroupid) && flows_in(*nid, other_taggroupid)
+                    })
+                {
+                    tg.side_channels.push(other_taggroupid);
+                } else if confluences.len() >= 2
+                    && confluences.iter().any(|nid| {
+                        flows_out(*nid, taggroupid) && flows_through_or_in(*nid, other_taggroupid)
+                    })
+                    && confluences.iter().any(|nid| {
+                        flows_in(*nid, taggroupid) && flows_through_or_out(*nid, other_taggroupid)
+                    })
+                {
+                    tg.parent_channels.push(other_taggroupid);
+                } else if confluences
+                    .iter()
+                    .all(|nid| flows_in(*nid, other_taggroupid))
+                {
+                    tg.tributaries.push(other_taggroupid);
+                } else if confluences.iter().any(|nid| flows_in(*nid, taggroupid)) {
+                    tg.terminal_distributaries.push(other_taggroupid)
+                } else if confluences
+                    .iter()
+                    .all(|nid| flows_out(*nid, taggroupid) && flows_through(*nid, other_taggroupid))
+                {
+                    tg.parent_rivers.push(other_taggroupid)
+                } else if confluences
+                    .iter()
+                    .all(|nid| flows_through(*nid, taggroupid) && flows_out(*nid, other_taggroupid))
+                {
+                    tg.branching_distributaries.push(other_taggroupid)
+                } else if confluences
+                    .iter()
+                    .any(|nid| flows_out(*nid, taggroupid) && flows_out(*nid, other_taggroupid))
+                {
+                    tg.sibling_distributaries.push(other_taggroupid)
+                } else {
+                    put_back_in.push(other_taggroupid);
+                    //unreachable!(
+                    //    "Unable to allocate. Main: {} other id: {} flows {:?}",
+                    //    tg.tagid
+                    //        .map_or("(no name tag)", |tagid| &tag_group_value[tagid as usize]),
+                    //    other_taggroupid,
+                    //    confluences
+                    //        .iter()
+                    //        .map(|nid| (
+                    //            nid,
+                    //            flow_type(*nid, taggroupid),
+                    //            flow_type(*nid, other_taggroupid)
+                    //        ))
+                    //        .collect::<Vec<_>>(),
+                    //);
+                }
+            }
+
+            sort_dedup!(put_back_in);
+            tg.unallocated_other_groups.extend(put_back_in);
+        });
+
+    tag_group_info.par_iter_mut().for_each(|tg| {
+        sort_dedup!(tg.unallocated_other_groups);
+        sort_dedup!(tg.branching_distributaries);
+        sort_dedup!(tg.terminal_distributaries);
+        sort_dedup!(tg.sibling_distributaries);
+        sort_dedup!(tg.tributaries);
+        sort_dedup!(tg.confluences);
+        sort_dedup!(tg.parent_channels);
+        sort_dedup!(tg.side_channels);
+        sort_dedup!(tg.parent_rivers);
+        sort_dedup!(tg.sources);
+        sort_dedup!(tg.sinks);
+    });
+
+    let mut taggroups_into_nothing = tag_group_info
+        .par_iter()
+        .enumerate()
+        .filter_map(|(tg_id, tg)| {
+            if !tg.sinks.is_empty() {
+                Some(tg_id as u64)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<u64>>();
+    taggroups_into_nothing.par_sort_unstable_by_key(|gid| {
+        OrderedFloat::from(-tag_group_info[*gid as usize].upstream_m)
+    });
+
+    // calculate the stream value (ie level) for every group
+    let mut frontier: VecDeque<u64> = VecDeque::new();
+    for (idx, tgid) in taggroups_into_nothing.drain(..).enumerate() {
+        tag_group_info[tgid as usize].stream_level = 0;
+        tag_group_info[tgid as usize]
+            .stream_level_code
+            .push(idx as u32 + 1);
+        frontier.push_back(tgid);
+    }
+
+    let mut buf = taggroups_into_nothing;
+
+    let mut existing_code: SmallVec<[_; 5]> = smallvec![];
+    let mut existing_level;
+    while let Some(tgid) = frontier.pop_front() {
+        let tgid = tgid as usize;
+        assert!(tag_group_info[tgid].has_stream_level());
+        assert!(!tag_group_info[tgid].stream_level_code.is_empty());
+        buf.truncate(0);
+        buf.extend(
+            tag_group_info[tgid]
+                .confluences
+                .iter()
+                .flat_map(|&nid| g.in_edges(nid))
+                .map(|seg| nid_pair_to_taggroupid.get(&seg).unwrap())
+                .filter(|other_tgid| **other_tgid != tgid as u64)
+                .filter(|other_tgid| !tag_group_info[**other_tgid as usize].has_stream_level())
+                .dedup()
+                .copied(),
+        );
+        sort_dedup!(buf);
+        buf.par_sort_unstable_by_key(|gid| {
+            OrderedFloat::from(-tag_group_info[*gid as usize].upstream_m)
+        });
+        existing_level = tag_group_info[tgid].stream_level;
+        existing_code.truncate(0);
+        existing_code.extend(tag_group_info[tgid].stream_level_code.iter().copied());
+        assert_eq!(
+            existing_code.len() as u64,
+            existing_level + 1,
+            "{:?}",
+            tag_group_info[tgid]
+        );
+        for (idx, other_tgid) in buf.drain(..).enumerate() {
+            let other_tg = &mut tag_group_info[other_tgid as usize];
+            assert!(other_tg.stream_level_code.is_empty());
+            other_tg.stream_level = existing_level + 1;
+            other_tg.stream_level_code.reserve(existing_code.len() + 1);
+            other_tg
+                .stream_level_code
+                .extend(existing_code.iter().copied());
+            other_tg.stream_level_code.push(idx as u32 + 1);
+            frontier.push_back(other_tgid);
+        }
+    }
+
+    assert!(tag_group_info.par_iter().all(|tg| tg.has_stream_level()));
+    assert!(
+        tag_group_info
+            .par_iter()
+            .all(|tg| !tg.stream_level_code.is_empty()),
+        "unset stream_level_code's {} of {} have no stream_level_code. first: {:?}",
+        tag_group_info
+            .par_iter()
+            .filter(|tg| tg.stream_level_code.is_empty())
+            .count(),
+        tag_group_info.len(),
+        tag_group_info
+            .par_iter()
+            .find_first(|tg| tg.stream_level_code.is_empty()),
+    );
+
+    assert!(
+        tag_group_info
+            .par_iter()
+            .all(|tg| !tg.stream_level_code.is_empty()),
+        "There are {} of {} tag groups with empty stream_level_code, first: {:?}",
+        tag_group_info
+            .par_iter()
+            .filter(|tg| tg.stream_level_code.is_empty())
+            .count(),
+        tag_group_info.len(),
+        tag_group_info
+            .par_iter()
+            .find_first(|tg| tg.stream_level_code.is_empty()),
+    );
+    assert!(
+        tag_group_info
+            .par_iter()
+            .all(|tg| tg.stream_level_code.len() as u64 == tg.stream_level + 1),
+        "There are {} of {} tag groups where stream_level_code.len ≠ stream_level, first: {:?}",
+        tag_group_info
+            .par_iter()
+            .filter(|tg| tg.stream_level_code.len() as u64 != tg.stream_level + 1)
+            .count(),
+        tag_group_info.len(),
+        tag_group_info
+            .par_iter()
+            .find_first(|tg| tg.stream_level_code.len() as u64 != tg.stream_level + 1),
+    );
+    info!("The stream level code string has been calculated for every group");
+
+    info!(
+        "Finished calculating all tag groups in {}",
+        formatting::format_duration(started_calc.elapsed()),
+    );
+
+    (nid_pair_to_taggroupid, tag_group_info)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn do_waterway_grouped(
+    output_filename: &Path,
+    g: &graph::DirectedGraph2,
+    progress_bars: &MultiProgress,
+    style: &ProgressStyle,
+    end_points: &[i64],
+    topologically_sorted_nodes: &[i64],
+    end_point_upstreams: &[f64],
+    upstream_assigned_end: &[i32],
+    upstream_per_edge: &SortedSliceMap<(i64, i64), f64>,
+    nodeid_pos: &impl NodeIdPosition,
+    end_point_tag_values: &[SmallVec<[Option<String>; 1]>],
+    ends_tags: &[String],
+    inter_store: &inter_store::InterStore,
+    nid_pair_to_taggroupid: &SortedSliceMap<(i64, i64), u64>,
+    tag_group_info: &[TagGroupInfo],
+    tag_group_value: &[String],
+) -> Result<()> {
+    let started_do_waterway_grouped = Instant::now();
+    let writing_output_bar = progress_bars.add(
+        ProgressBar::new(tag_group_info.len() as u64)
+            .with_message("Writing waterway groups")
+            .with_style(style.clone()),
+    );
+
+    let seg_length = |seg: &(i64, i64)| -> f64 {
+        inter_store
+            .expand_directed(seg.0, seg.1)
+            .map(|nid| nodeid_pos.get(&nid).unwrap())
+            .tuple_windows::<(_, _)>()
+            .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
+            .sum::<f64>()
+    };
+    let seg_to_distrib_json = |seg: &(i64, i64), nid: i64, incl_len: bool| -> serde_json::Value {
+        let pos = nodeid_pos.get(&nid).unwrap();
+        let extra = if incl_len { seg_length(seg) } else { 0. };
+        json!({
+            "nid": nid,
+            "lat": round(&pos.1, 7), "lon": round(&pos.0, 7),
+            "upstream_m": round(&(upstream_per_edge.get(seg).unwrap()+extra), 1),
+        })
+    };
+
+    let taggroups_with_geom = tag_group_info
+        .iter()
+        .progress_with(writing_output_bar)
+        .enumerate()
+        .map(|(taggroupid, tg)| {
+            let taggroupid = taggroupid as u64;
+            let mut lines: Vec<Vec<(i64, i64)>> = vec![];
+
+            let mut incoming_store: SmallVec<[(i64, i64); 2]> = smallvec![];
+            let mut end_segments_to_build_from: SmallVec<[(i64, i64); 5]> = smallvec![];
+            end_segments_to_build_from.extend(tg.end_segments.iter().copied());
+            assert!(tg
+                .end_segments
+                .par_iter()
+                .all(|seg| *nid_pair_to_taggroupid.get(seg).unwrap() == taggroupid));
+
+            while let Some(seg) = end_segments_to_build_from.pop() {
+                let mut line = Vec::new();
+                let mut seg = seg;
+                loop {
+                    if lines
+                        .par_iter()
+                        .any(|line| line.par_iter().any(|&other_seg| seg == other_seg))
+                    {
+                        break;
+                    }
+                    line.push(seg);
+                    incoming_store.truncate(0);
+                    incoming_store.extend(g.in_edges(seg.0).filter(
+                        |seg2| {
+                            nid_pair_to_taggroupid
+                                .get(seg2).is_some_and(|&other_taggroupid| other_taggroupid == taggroupid)
+                        },
+                    ));
+                    if incoming_store.is_empty() {
+                        break;
+                    }
+                    if incoming_store.len() > 1 {
+                        end_segments_to_build_from.extend(incoming_store.drain(1..));
+                    }
+                    seg = incoming_store.pop().unwrap();
+                }
+                if !line.is_empty() {
+                    line.reverse();
+                    lines.push(line);
+                }
+            }
+
+            let lines = lines
+                .into_par_iter()
+                .map(|line| {
+                    let mut new_line = Vec::with_capacity(line.len() + 2);
+                    new_line.push(line[0].0);
+                    new_line.extend(line.into_iter().map(|seg| seg.1));
+                    new_line.shrink_to_fit();
+                    new_line
+                })
+                .collect::<Vec<Vec<i64>>>();
+
+            (taggroupid, tg, lines)
+        })
+        //.filter(|(_taggroupid, tg, _lines)| tg.tagid.map_or(false, |tagid| tag_group_value[tagid as usize] == "Liffey"))
+        .map(|(taggroupid, tg, lines)| {
+            let mut props = serde_json::json!({});
+            if tg.stream_level < u64::MAX {
+                props["stream_level"] = tg.stream_level.into();
+            }
+            assert!(!tg.stream_level_code.is_empty(), "{:?}", tg);
+            if !tg.stream_level_code.is_empty() {
+                props["stream_level_code_str"] = tg.stream_level_code_str().into();
+                props["stream_level_code"] = tg.stream_level_code.as_ref().into();
+            }
+
+            props["tag_group_value"] = tg.tagid.map(|tagid| tag_group_value[tagid as usize].as_str()).into();
+            props["taggroupid"] = taggroupid.into();
+
+            let multilinestrings: Vec<_> = lines
+                .into_par_iter()
+                .map(|line| {
+                    inter_store
+                        .expand_line_directed(&line)
+                        .map(|nid| nodeid_pos.get(&nid).unwrap_or_else(|_| panic!("TagGroupInfo {:?}", tg)))
+                        .collect::<Vec<_>>()
+                })
+                .take(1)
+                .collect();
+
+            let length_m = multilinestrings.par_iter().map(|line|
+                line.iter()
+                .tuple_windows::<(_, _)>()
+                .par_bridge()
+                .map(|(&p1, &p2)| haversine::haversine_m_fpair(p1, p2))
+                .sum::<f64>()
+            ).sum::<f64>();
+            // Round the upstream to only output 1 decimal place
+            props["length_m"] = round(&length_m, 1).into();
+            props["min_nid"] = tg.min_nid.into();
+
+            props["side_channels"] = tg.side_channels.iter().copied().collect::<Vec<_>>().into();
+
+            props["branching_distributaries"] = tg.branching_distributaries
+                .iter()
+                .map(|dist_tg_idx| (dist_tg_idx, &tag_group_info[*dist_tg_idx as usize]))
+                .map(|(dist_tg_idx, dist_tg)| {
+                    let confluences = tg.confluences
+                        .iter().filter(|nid| dist_tg.confluences.contains(nid))
+                        .flat_map(|&nid| g.out_edges(nid))
+                        .filter(|seg| nid_pair_to_taggroupid.get(seg).unwrap() == dist_tg_idx)
+                        .map(|seg| seg_to_distrib_json(&seg, seg.0, false))
+                        .collect::<Vec<_>>();
+                    assert!(!confluences.is_empty(), "Can't find confluence with a distributary main: {:?} & dist: {:?}", tg, dist_tg);
+                    serde_json::json!({
+                        "tag_group_value": dist_tg.tagid.map(|t| tag_group_value[t as usize].clone()),
+                        "min_nid": dist_tg.min_nid,
+                        "stream_level_code": dist_tg.stream_level_code.as_ref(),
+                        "dist_tg_idx": dist_tg_idx,
+                        "confluences": confluences,
+                        "outflow_m": confluences.iter().map(|c| c["upstream_m"].as_f64().unwrap()).sum::<f64>(),
+                    })
+            })
+            .collect::<Vec<_>>().into();
+            props["terminal_distributaries"] = tg.terminal_distributaries
+                .iter()
+                .map(|dist_tg_idx| (dist_tg_idx, &tag_group_info[*dist_tg_idx as usize]))
+                .map(|(dist_tg_idx, dist_tg)| {
+                    let confluences = tg.confluences
+                        .iter().filter(|nid| dist_tg.confluences.contains(nid))
+                        .flat_map(|&nid| g.out_edges(nid))
+                        .filter(|seg| nid_pair_to_taggroupid.get(seg).unwrap() == dist_tg_idx)
+                        .map(|seg| seg_to_distrib_json(&seg, seg.0, false))
+                        .collect::<Vec<_>>();
+                    assert!(!confluences.is_empty(), "Can't find confluence with a distributary main: {:?} & dist: {:?}", tg, dist_tg);
+                    serde_json::json!({
+                        "tag_group_value": dist_tg.tagid.map(|t| tag_group_value[t as usize].clone()),
+                        "min_nid": dist_tg.min_nid,
+                        "stream_level_code": dist_tg.stream_level_code.as_ref(),
+                        "dist_tg_idx": dist_tg_idx,
+                        "confluences": confluences,
+                        "outflow_m": confluences.iter().map(|c| c["upstream_m"].as_f64().unwrap()).sum::<f64>(),
+                    })
+            })
+            .collect::<Vec<_>>().into();
+            props["branching_distributaries"].as_array_mut().unwrap().sort_by_key(|e| OrderedFloat(-e["outflow_m"].as_f64().unwrap()));
+            props["terminal_distributaries"].as_array_mut().unwrap().sort_by_key(|e| OrderedFloat(-e["outflow_m"].as_f64().unwrap()));
+            props["distributaries_sea"] = tg.sinks.iter()
+                .flat_map(|&nid| g.in_edges(nid))
+                .filter(|seg| nid_pair_to_taggroupid.get(seg).unwrap() == &taggroupid)
+                .map(|seg| seg_to_distrib_json(&seg, seg.1, true))
+            .collect::<Vec<_>>().into();
+            props["distributaries_sea"].as_array_mut().unwrap().sort_by_key(|e| OrderedFloat(-e["upstream_m"].as_f64().unwrap()));
+
+            props["tributaries"] = tg.tributaries
+                .par_iter()
+                .map(|trib_tg_idx| (trib_tg_idx, &tag_group_info[*trib_tg_idx as usize]))
+                //.filter(|(_trib_tg_idx, trib_tg)| trib_tg.tagid.map_or(false, |t| tag_group_value[t as usize] == "Ballylow Brook"))
+                .map(|(trib_tg_idx, trib_tg)| {
+                let confluences = tg.confluences
+                    .iter().filter(|nid| trib_tg.confluences.contains(nid))
+                    .flat_map(|&nid| g.in_edges(nid))
+                    .filter(|seg| nid_pair_to_taggroupid.get(seg).unwrap() == trib_tg_idx)
+                    .map(|seg| seg_to_distrib_json(&seg, seg.1, true))
+                    .collect::<Vec<_>>();
+                assert!(!confluences.is_empty(), "Can't find confluence with a tributaries main: {:?} & trib: {:?} taggroupid {} trib_tg_idx {}", tg, trib_tg, taggroupid, trib_tg_idx);
+                serde_json::json!({
+                    "tag_group_value": trib_tg.tagid.map(|t| tag_group_value[t as usize].clone()),
+                    "min_nid": trib_tg.min_nid,
+                    "stream_level_code": trib_tg.stream_level_code.as_ref(),
+                    "confluences": confluences,
+                    "inflow_m": confluences.iter().map(|c| c["upstream_m"].as_f64().unwrap()).sum::<f64>(),
+                })
+            }).collect::<Vec<_>>().into();
+            props["tributaries"].as_array_mut().unwrap().sort_by_key(|e| OrderedFloat(-e["inflow_m"].as_f64().unwrap()));
+
+            props["parent_rivers"] = tg.parent_rivers
+                .par_iter()
+                .map(|parent_tg_idx| (parent_tg_idx, &tag_group_info[*parent_tg_idx as usize]))
+                .map(|(parent_tg_idx, parent_tg)| {
+                let confluences = tg.confluences
+                    .iter().filter(|nid| parent_tg.confluences.contains(nid))
+                    .flat_map(|&nid| g.out_edges(nid))
+                    .filter(|seg| nid_pair_to_taggroupid.get(seg).unwrap() == &taggroupid)
+                    .map(|seg| seg_to_distrib_json(&seg, seg.0, false))
+                    .collect::<Vec<_>>();
+                assert!(!confluences.is_empty(), "Can't find confluence with a parent river main: {:?} & parent_river: {:?} taggroupid {} trib_tg_idx {}", tg, parent_tg, taggroupid, parent_tg_idx);
+                serde_json::json!({
+                    "tag_group_value": parent_tg.tagid.map(|t| tag_group_value[t as usize].clone()),
+                    "min_nid": parent_tg.min_nid,
+                    "stream_level_code": parent_tg.stream_level_code.as_ref(),
+                    "confluences": confluences,
+                    //"inflow_m": confluences.iter().map(|c| c["upstream_m"].as_f64().unwrap()).sum::<f64>(),
+                })
+            }).collect::<Vec<_>>().into();
+            //props["parent_rivers"].as_array_mut().unwrap().sort_by_key(|e| OrderedFloat(-e["inflow_m"].as_f64().unwrap()));
+
+
+            (props, multilinestrings)
+        });
+
+    let mut f = std::io::BufWriter::new(std::fs::File::create(output_filename)?);
+
+    let num_written;
+    if output_filename.extension().unwrap() == "geojsons"
+        || output_filename.extension().unwrap() == "geojson"
+    {
+        num_written = write_geojson_features_directly(
+            taggroups_with_geom,
+            &mut f,
+            &fileio::format_for_filename(output_filename),
+        )?;
+    } else if output_filename.extension().unwrap() == "csv" {
+        num_written = write_csv_features_directly(
+            taggroups_with_geom,
+            &mut f,
+            fileio::OutputGeometryFormat::GeoJSON,
+        )?;
+    } else {
+        anyhow::bail!("Unsupported output format");
+    }
+
+    let do_waterway_grouped_duration = started_do_waterway_grouped.elapsed();
+    info!(
+        "Calculated & wrote {} features to output file {} in {}",
+        num_written.to_formatted_string(&Locale::en),
+        output_filename.display(),
+        formatting::format_duration(do_waterway_grouped_duration),
     );
 
     Ok(())

@@ -66,12 +66,12 @@ impl TagFilter {
             TagFilter::NotHasK(k) => !o.has_tag(k),
             TagFilter::NotHasReK(kre) => !o.tags().any(|(k, _v)| kre.is_match(k)),
             TagFilter::KV(k, v) => o.tag(k) == Some(v),
-            TagFilter::KneV(k, v) => o.tag(k).map_or(true, |v2| v != v2),
-            TagFilter::KinV(k, vs) => vs.iter().any(|v| o.tag(k).map_or(false, |v2| v == v2)),
+            TagFilter::KneV(k, v) => o.tag(k).is_none_or(|v2| v != v2),
+            TagFilter::KinV(k, vs) => vs.iter().any(|v| o.tag(k).is_some_and(|v2| v == v2)),
             TagFilter::KnotInV(k, vs) => o
                 .tag(k)
-                .map_or(true, |tag_value| vs.iter().all(|v| v != tag_value)),
-            TagFilter::KreV(k, r) => o.tag(k).map_or(false, |v| r.is_match(v)),
+                .is_none_or(|tag_value| vs.iter().all(|v| v != tag_value)),
+            TagFilter::KreV(k, r) => o.tag(k).is_some_and(|v| r.is_match(v)),
             TagFilter::Or(tfs) => tfs.iter().any(|tf| tf.filter(o)),
             TagFilter::And(tfs) => tfs.iter().all(|tf| tf.filter(o)),
         }

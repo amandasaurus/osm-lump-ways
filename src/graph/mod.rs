@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 use super::*;
 use anyhow::{Context, Result};
-use haversine::{haversine_m_fpair, haversine_m_fpair_ord};
+use haversine::haversine_m_fpair_ord;
 use ordered_float::OrderedFloat;
 use rayon::prelude::ParallelIterator;
 use smallvec::SmallVec;
-use std::collections::{BTreeMap, BinaryHeap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 
 use crate::kosaraju;
 use itertools::Itertools;
@@ -515,13 +515,34 @@ where
 pub trait DirectedGraphTrait: Send + Sized {
     fn new() -> Self;
 
-    fn in_neighbours(&self, from_vertex: i64) -> impl Iterator<Item = i64>;
-    fn num_in_neighbours(&self, from_vertex: i64) -> usize {
-        self.in_neighbours(from_vertex).count()
+    fn in_neighbours(&self, to_vertex: i64) -> impl Iterator<Item = i64>;
+    fn num_in_neighbours(&self, to_vertex: i64) -> usize {
+        self.in_neighbours(to_vertex).count()
+    }
+    /// Returns (a, to_vertex) where a is an in neighbour of to_vertex
+    fn in_edges(&self, to_vertex: i64) -> impl Iterator<Item = (i64, i64)> {
+        self.in_neighbours(to_vertex)
+            .map(move |nid0| (nid0, to_vertex))
     }
     fn out_neighbours(&self, from_vertex: i64) -> impl Iterator<Item = i64>;
     fn num_out_neighbours(&self, from_vertex: i64) -> usize {
         self.out_neighbours(from_vertex).count()
+    }
+    /// Returns (from_vertex, b) where b is an out neighbour of from_vertex
+    fn out_edges(&self, from_vertex: i64) -> impl Iterator<Item = (i64, i64)> {
+        self.out_neighbours(from_vertex)
+            .map(move |nid2| (from_vertex, nid2))
+    }
+
+    // For an edge (defined by 2 vertexes), return all other edges which are connected to the first
+    // or last vertex (excl. this edge)
+    fn all_connected_edges(&self, edge: &(i64, i64)) -> impl Iterator<Item = (i64, i64)> {
+        self.in_neighbours(edge.0)
+            .map(|v0| (v0, edge.0))
+            .chain(self.out_neighbours(edge.0).map(|v2| (edge.0, v2)))
+            .chain(self.in_neighbours(edge.1).map(|v0| (v0, edge.1)))
+            .chain(self.out_neighbours(edge.1).map(|v2| (edge.1, v2)))
+            .filter(move |new_edge| new_edge != edge)
     }
 
     fn contains_edge(&self, from_vertex: impl Into<i64>, to_vertex: impl Into<i64>) -> bool {
@@ -994,7 +1015,7 @@ impl DirectedGraphTrait for DirectedGraph2 {
     fn num_ins_zero(&self, vid: &i64) -> bool {
         self.edges
             .get(vid)
-            .map_or(true, |(ins, _outs)| ins.is_empty())
+            .is_none_or(|(ins, _outs)| ins.is_empty())
     }
 
     fn is_empty(&self) -> bool {
@@ -1010,7 +1031,7 @@ impl DirectedGraphTrait for DirectedGraph2 {
     fn neighbors_in_xor_out(&mut self, v: &i64) -> bool {
         self.edges
             .get(v)
-            .map_or(false, |(ins, outs)| !ins.is_empty() ^ !outs.is_empty())
+            .is_some_and(|(ins, outs)| !ins.is_empty() ^ !outs.is_empty())
     }
     fn remove_edge(&mut self, vertex1: &i64, vertex2: &i64) {
         if let Some(from_v1) = &mut self.edges.get_mut(vertex1).map(|(_to, from)| from) {
@@ -1019,7 +1040,7 @@ impl DirectedGraphTrait for DirectedGraph2 {
         if self
             .edges
             .get(vertex1)
-            .map_or(false, |(from, to)| from.is_empty() && to.is_empty())
+            .is_some_and(|(from, to)| from.is_empty() && to.is_empty())
         {
             self.edges.remove(vertex1);
         }
@@ -1029,7 +1050,7 @@ impl DirectedGraphTrait for DirectedGraph2 {
         if self
             .edges
             .get(vertex2)
-            .map_or(false, |(from, to)| from.is_empty() && to.is_empty())
+            .is_some_and(|(from, to)| from.is_empty() && to.is_empty())
         {
             self.edges.remove(vertex2);
         }
@@ -1460,16 +1481,16 @@ impl Graph2 {
         }
         if let Some(others) = self.edges.get_mut(&vertex1) {
             if others.contains(&vertex2) {
-                return true;
+                true
             } else {
                 others.push(vertex2);
                 self.edges.entry(vertex2).or_default().push(vertex1);
-                return false;
+                false
             }
         } else {
             self.edges.insert(vertex1, smallvec![vertex2]);
             self.edges.entry(vertex2).or_default().push(vertex1);
-            return false;
+            false
         }
     }
 
@@ -1534,17 +1555,17 @@ impl Graph2 {
     pub fn contains_edge(&self, v1: i64, v2: i64) -> bool {
         self.edges
             .get(&v1)
-            .map_or(false, |neighs| neighs.contains(&v2))
+            .is_some_and(|neighs| neighs.contains(&v2))
     }
 
     pub fn remove_vertex(&mut self, vertex: i64) -> Option<SmallNidVec> {
         let others = self.edges.remove(&vertex);
         if let Some(ref others) = others {
             for o in others {
-                let oo = self.edges.get_mut(&o).unwrap();
+                let oo = self.edges.get_mut(o).unwrap();
                 oo.retain(|n| *n != vertex);
                 if oo.is_empty() {
-                    self.edges.remove(&o);
+                    self.edges.remove(o);
                 }
             }
         }
@@ -1555,7 +1576,7 @@ impl Graph2 {
         if self
             .edges
             .get(&vertex1)
-            .map_or(false, |v1_neighs| v1_neighs.contains(&vertex2))
+            .is_some_and(|v1_neighs| v1_neighs.contains(&vertex2))
         {
             self.edges
                 .get_mut(&vertex1)
@@ -1643,9 +1664,8 @@ impl Graph2 {
             loop {
                 last = curr_path.last().unwrap();
                 next = graph
-                    .neighbours(&last)
-                    .filter(|v| !curr_path.contains(*v))
-                    .next()
+                    .neighbours(last)
+                    .find(|v| !curr_path.contains(*v))
                     .copied();
                 match next {
                     None => {
@@ -1662,10 +1682,10 @@ impl Graph2 {
         })
     }
 
-    pub fn into_lines_as_crow_flies<'a>(
+    pub fn into_lines_as_crow_flies(
         self,
-        nodeid_pos: &'a impl NodeIdPosition,
-    ) -> impl Iterator<Item = Box<[i64]>> + 'a {
+        nodeid_pos: &impl NodeIdPosition,
+    ) -> impl Iterator<Item = Box<[i64]>> + '_ {
         let mut graphs = vec![self];
 
         std::iter::from_fn(move || {
@@ -1712,7 +1732,7 @@ impl Graph2 {
             }
 
             if !graph.is_empty() {
-                let old_num_graphs = graphs.len();
+                let _old_num_graphs = graphs.len();
                 graphs.extend(graph.into_disconnected_graphs(None));
             }
 
@@ -1727,8 +1747,8 @@ pub fn rwindows2<T>(slice: &[T]) -> impl Iterator<Item = (&T, &T)> {
     (1..slice.len()).rev().map(|i| (&slice[i - 1], &slice[i]))
 }
 
-fn ext<T: Clone>(v: &Vec<T>, new: T) -> Vec<T> {
-    let mut result = v.clone();
+fn ext<T: Clone>(v: &[T], new: T) -> Vec<T> {
+    let mut result: Vec<T> = v.to_vec();
     result.push(new);
     result
 }

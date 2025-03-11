@@ -245,7 +245,7 @@ With `--upstream-assign-end-by-tag TAG`, it will attempt to follow the same OSM
 tag upstream from an end point. When used with the `name` tag, this usually
 produces maps that are more like what people expect.
 
-### Way network, grouped by end point (`--grouped\_ends FILENAME`)
+### Way network, grouped by end point (`--grouped-ends FILENAME`)
 
 Ways grouped by downhill and the end point they flow into. The upstream value
 of each segment isn't included, and it attemptes to generate long LineStrings,
@@ -314,6 +314,12 @@ CSV file with following columns:
 And then one column for each `--ends-tag` value, with that tag name as column
 name. e.g. `--ends-tag name` causes the ends geojson file to have GeoJSON
 property called `tag:name`, however in this CSV file, the column is `name`. 
+
+### Every connected group with the same tag value (`--grouped-waterways FILENAME`)
+
+Based on the value of the `--flow-follows-tag` argument, ways are grouped into
+connected GeoJSON Features, along with many attributes about what is connected
+to what.
 
 ## Loop removal
 

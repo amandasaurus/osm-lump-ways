@@ -68,7 +68,7 @@ where
         let k = split_key(key);
         self.inner
             .get(&k[0])
-            .map_or(false, |i2| i2.contains_key(&k[1]))
+            .is_some_and(|i2| i2.contains_key(&k[1]))
     }
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()

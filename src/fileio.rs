@@ -8,6 +8,15 @@ pub trait Geometry {
     fn type_name(&self) -> &[u8];
     fn write_coords(&self, f: &mut impl Write) -> Result<()>;
     fn write_wkt(&self, buf: &mut Vec<u8>);
+
+    fn write_geojson(&self, f: &mut impl Write) -> Result<()> {
+        f.write_all(b"{\"type\":\"")?;
+        f.write_all(self.type_name())?;
+        f.write_all(b"\", \"coordinates\": ")?;
+        self.write_coords(f)?;
+        f.write_all(b"}")?;
+        Ok(())
+    }
 }
 
 impl Geometry for Vec<Vec<(f64, f64)>> {
@@ -85,6 +94,12 @@ pub enum OutputFormat {
     GeoJSONSeq,
 }
 
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum OutputGeometryFormat {
+    WKT,
+    GeoJSON,
+}
+
 pub fn format_for_filename(f: &Path) -> OutputFormat {
     if f.extension().unwrap() == "geojsons" {
         OutputFormat::GeoJSONSeq
@@ -143,12 +158,10 @@ where
     f.write_all(b"{\"properties\":")?;
     #[allow(clippy::needless_borrows_for_generic_args)]
     serde_json::to_writer(&mut f, &feature.0)?;
-    f.write_all(b", \"geometry\": {\"type\":\"")?;
-    f.write_all(feature.1.type_name())?;
-    f.write_all(b"\", \"coordinates\": ")?;
-    feature.1.write_coords(&mut f)?;
+    f.write_all(b", \"geometry\": ")?;
+    feature.1.write_geojson(&mut f)?;
 
-    f.write_all(b"}, \"type\": \"Feature\"}")?;
+    f.write_all(b", \"type\": \"Feature\"}")?;
     if output_format == &OutputFormat::GeoJSONSeq {
         f.write_all(b"\x0A")?;
     }
@@ -202,15 +215,17 @@ fn write_linestring_coords(
 pub fn write_csv_features_directly<G>(
     features: impl Iterator<Item = (serde_json::Value, G)>,
     f: &mut impl Write,
+    output_geom_format: impl Into<OutputGeometryFormat>,
 ) -> Result<usize>
 where
     G: Geometry,
 {
+    let output_geom_format = output_geom_format.into();
     let mut headers: Vec<String> = Vec::with_capacity(10);
 
     let mut num_written = 0;
 
-    let mut wtr = csv::Writer::from_writer(f);
+    let mut wtr = csv::WriterBuilder::new().double_quote(false).from_writer(f);
 
     let mut buf = Vec::new();
     for (props, geom) in features {
@@ -234,7 +249,10 @@ where
             wtr.write_field(props[&col].to_string())?;
         }
         buf.clear();
-        geom.write_wkt(&mut buf);
+        match output_geom_format {
+            OutputGeometryFormat::WKT => geom.write_wkt(&mut buf),
+            OutputGeometryFormat::GeoJSON => geom.write_geojson(&mut buf)?,
+        }
         wtr.write_field(&buf)?;
         wtr.write_record(None::<&[u8]>)?;
 

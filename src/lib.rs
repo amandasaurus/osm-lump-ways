@@ -1,9 +1,5 @@
-#![allow(warnings)]
 use get_size::GetSize;
-use log::{
-    debug, info, log, trace, warn,
-    Level::{Debug, Trace},
-};
+use log::{debug, info, trace, warn};
 use rayon::prelude::*;
 
 use std::cmp::Ordering;
