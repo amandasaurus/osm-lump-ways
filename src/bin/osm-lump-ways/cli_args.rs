@@ -223,7 +223,10 @@ where
 
         if res.is_err() && std::path::Path::new(arg_val).is_file() {
             let original_error = res.unwrap_err();
-            Err(format!("Unable to parse {:?}. However that is a filename. Did you mean @{} ? Original Error: {}", arg_val, arg_val, original_error))
+            Err(format!(
+                "Unable to parse {:?}. However that is a filename. Did you mean @{} ? Original Error: {}",
+                arg_val, arg_val, original_error
+            ))
         } else {
             res
         }

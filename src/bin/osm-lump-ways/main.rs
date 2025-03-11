@@ -7,12 +7,12 @@ use indicatif_log_bridge::LogWrapper;
 use itertools::Itertools;
 use kdtree::KdTree;
 use log::{
-    debug, error, info, log, trace, warn,
     Level::{Debug, Trace},
+    debug, error, info, log, trace, warn,
 };
 use osm_lump_ways::inter_store;
-use osmio::prelude::*;
 use osmio::OSMObjBase;
+use osmio::prelude::*;
 use rayon::prelude::*;
 use smallvec::SmallVec;
 use std::iter;
@@ -88,23 +88,37 @@ fn main() -> Result<()> {
         anyhow::bail!("No %s found in output filename ({})", args.output_filename);
     }
     if !args.split_files_by_group && args.output_filename.contains("%s") {
-        warn!("The output filename ({}) contains '%s'. Did you forget --split-files-by-group ? Continuing without splitting by group", args.output_filename);
+        warn!(
+            "The output filename ({}) contains '%s'. Did you forget --split-files-by-group ? Continuing without splitting by group",
+            args.output_filename
+        );
     }
 
     if !args.output_filename.ends_with(".geojson") && !args.output_filename.ends_with(".geojsons") {
-        warn!("Output filename '{}' doesn't end with '.geojson' or '.geojsons'. This programme only created GeoJSON or GeoJSONSeq files", args.output_filename);
+        warn!(
+            "Output filename '{}' doesn't end with '.geojson' or '.geojsons'. This programme only created GeoJSON or GeoJSONSeq files",
+            args.output_filename
+        );
     }
 
     if args.split_files_by_group && args.tag_group_k.is_empty() {
-        warn!("You have asked to split into separate files by group without saying what to group by! Everything will go into one group. Use -g in future.");
+        warn!(
+            "You have asked to split into separate files by group without saying what to group by! Everything will go into one group. Use -g in future."
+        );
     }
 
     if !args.split_files_by_group
         && !args.overwrite
         && std::path::Path::new(&args.output_filename).exists()
     {
-        error!("Output file {} already exists and --overwrite not used. Refusing to overwrite, and exiting early", args.output_filename);
-        anyhow::bail!("Output file {} already exists and --overwrite not used. Refusing to overwrite, and exiting early", args.output_filename);
+        error!(
+            "Output file {} already exists and --overwrite not used. Refusing to overwrite, and exiting early",
+            args.output_filename
+        );
+        anyhow::bail!(
+            "Output file {} already exists and --overwrite not used. Refusing to overwrite, and exiting early",
+            args.output_filename
+        );
     }
 
     if !args.input_filename.is_file() {
@@ -157,10 +171,13 @@ fn main() -> Result<()> {
 
     info!("Input file: {:?}", &args.input_filename);
     if args.tag_filter.is_empty() {
-        if let Some(ref tff) = args.tag_filter_func {
-            info!("Tag filter function in operation: {:?}", tff);
-        } else {
-            info!("No tag filtering in operation. All ways in the file will be used.");
+        match args.tag_filter_func {
+            Some(ref tff) => {
+                info!("Tag filter function in operation: {:?}", tff);
+            }
+            _ => {
+                info!("No tag filtering in operation. All ways in the file will be used.");
+            }
         }
     } else {
         info!("Tag filter(s) in operation: {:?}", args.tag_filter);
@@ -242,11 +259,7 @@ fn main() -> Result<()> {
     let num_nids = nid2nways.len();
     let mut nids_in_ne2_ways: SortedSliceSet<i64> =
         SortedSliceSet::from_iter(nid2nways.into_iter().filter_map(|(nid, nvertexes)| {
-            if nvertexes != 2 {
-                Some(nid)
-            } else {
-                None
-            }
+            if nvertexes != 2 { Some(nid) } else { None }
         }));
     info!(
         "There are {} nodes in total, but only {} ({:.1}%) are pillar nodes. It took {} to do this first read",
@@ -736,10 +749,16 @@ fn main() -> Result<()> {
 
     if total_files_written == 0 {
         if !args.only_these_way_groups.is_empty() {
-            warn!("No files have been written, and you specified to only process the following waygroups: {:?}. Perhaps nothing in your input data matches that", args.only_these_way_groups);
+            warn!(
+                "No files have been written, and you specified to only process the following waygroups: {:?}. Perhaps nothing in your input data matches that",
+                args.only_these_way_groups
+            );
         }
         if !args.only_these_way_groups_nodeid.is_empty() {
-            warn!("No files have been written, and you specified to only include way groups with the following nodeids {:?}. Perhaps nothing in your input data matches that", args.only_these_way_groups_nodeid);
+            warn!(
+                "No files have been written, and you specified to only include way groups with the following nodeids {:?}. Perhaps nothing in your input data matches that",
+                args.only_these_way_groups_nodeid
+            );
         }
         if args.only_these_way_groups.is_empty() && args.only_these_way_groups_nodeid.is_empty() {
             warn!("No files have been written.");

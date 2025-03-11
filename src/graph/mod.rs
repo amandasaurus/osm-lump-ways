@@ -282,7 +282,7 @@ where
     }
 
     /// All the neighbours of this vertex and the edge weight
-    pub fn neighbors(&self, i: &V) -> impl Iterator<Item = (&V, &E)> {
+    pub fn neighbors(&self, i: &V) -> impl Iterator<Item = (&V, &E)> + use<'_, V, E> {
         self.edges[i]
             .iter()
             .map(|(j, (edge_weight, _intermediates))| (j, edge_weight))
@@ -417,8 +417,7 @@ where
         let initial_num_vertexes = self.num_vertexes();
         trace!(
             "Starting contract_edges with {} edges and {} vertexes",
-            initial_num_edges,
-            initial_num_vertexes
+            initial_num_edges, initial_num_vertexes
         );
         if initial_num_edges == 1 {
             return false;
@@ -465,7 +464,14 @@ where
             }
         }
 
-        debug!("End of contract_edges there are now {} edges and {} vertexes. Removed {} edges and {} vertexes in {} rounds", self.num_edges(), self.num_vertexes(), initial_num_edges-self.num_edges(), initial_num_vertexes-self.num_vertexes(), contraction_round);
+        debug!(
+            "End of contract_edges there are now {} edges and {} vertexes. Removed {} edges and {} vertexes in {} rounds",
+            self.num_edges(),
+            self.num_vertexes(),
+            initial_num_edges - self.num_edges(),
+            initial_num_vertexes - self.num_vertexes(),
+            contraction_round
+        );
         graph_has_been_modified
     }
 
@@ -649,19 +655,22 @@ pub trait DirectedGraphTrait: Send + Sized {
                 let mut ins = self
                     .in_neighbours(curr_point)
                     .filter(|i| !seen_vertexes.contains(i));
-                if let Some(nxt) = ins.next() {
-                    // any other out neighbours of this point need to be visited later
-                    frontier.extend(
-                        ins.filter(|n| incl_nid(n))
-                            .map(|in_nid| (in_nid, Some(curr_latlng))),
-                    );
+                match ins.next() {
+                    Some(nxt) => {
+                        // any other out neighbours of this point need to be visited later
+                        frontier.extend(
+                            ins.filter(|n| incl_nid(n))
+                                .map(|in_nid| (in_nid, Some(curr_latlng))),
+                        );
 
-                    curr_point = nxt;
-                    continue;
-                } else {
-                    // no more neighbours here
-                    curr_path.reverse();
-                    return Some(curr_path);
+                        curr_point = nxt;
+                        continue;
+                    }
+                    _ => {
+                        // no more neighbours here
+                        curr_path.reverse();
+                        return Some(curr_path);
+                    }
                 }
             }
         })
@@ -905,7 +914,10 @@ impl DirectedGraph2 {
 
             while !vertexes_to_remove.is_empty() {
                 debug!(
-                    "remove_vertexes_with_in_xor_out: round {round}. vertexes_to_remove.len() = {} num_vertexes {}", vertexes_to_remove.len(), self.num_vertexes());
+                    "remove_vertexes_with_in_xor_out: round {round}. vertexes_to_remove.len() = {} num_vertexes {}",
+                    vertexes_to_remove.len(),
+                    self.num_vertexes()
+                );
                 more_vertexes_to_remove.truncate(0);
                 for v in vertexes_to_remove.drain(..) {
                     let ins_outs = self.remove_vertex(&v);
@@ -1171,12 +1183,12 @@ impl DirectedGraphTrait for DirectedGraphVec {
     fn add_edge(&mut self, vertex1: i64, vertex2: i64) -> bool {
         let i1 = self.id_for_vertex(&vertex1).unwrap();
         let i2 = self.id_for_vertex(&vertex2).unwrap();
-        self.edges[i1].1 .1.push(i2.try_into().unwrap());
-        self.edges[i1].1 .1.sort();
-        self.edges[i1].1 .1.dedup();
-        self.edges[i2].1 .0.push(i1.try_into().unwrap());
-        self.edges[i2].1 .0.sort();
-        self.edges[i2].1 .0.dedup();
+        self.edges[i1].1.1.push(i2.try_into().unwrap());
+        self.edges[i1].1.1.sort();
+        self.edges[i1].1.1.dedup();
+        self.edges[i2].1.0.push(i1.try_into().unwrap());
+        self.edges[i2].1.0.sort();
+        self.edges[i2].1.0.dedup();
         false
     }
 
@@ -1306,19 +1318,22 @@ impl DirectedGraphTrait for DirectedGraphVec {
                 let mut ins = self
                     .in_neighbours(curr_point)
                     .filter(|i| !seen_vertexes.contains(i));
-                if let Some(nxt) = ins.next() {
-                    // any other out neighbours of this point need to be visited later
-                    frontier.extend(
-                        ins.filter(|n| incl_nid(n))
-                            .map(|in_nid| (in_nid, Some(curr_latlng))),
-                    );
+                match ins.next() {
+                    Some(nxt) => {
+                        // any other out neighbours of this point need to be visited later
+                        frontier.extend(
+                            ins.filter(|n| incl_nid(n))
+                                .map(|in_nid| (in_nid, Some(curr_latlng))),
+                        );
 
-                    curr_point = nxt;
-                    continue;
-                } else {
-                    // no more neighbours here
-                    curr_path.reverse();
-                    return Some(curr_path);
+                        curr_point = nxt;
+                        continue;
+                    }
+                    _ => {
+                        // no more neighbours here
+                        curr_path.reverse();
+                        return Some(curr_path);
+                    }
                 }
             }
         })
@@ -1334,21 +1349,21 @@ impl DirectedGraphTrait for DirectedGraphVec {
             .unwrap();
         let mut v = &mut self.edges[vidx1 as usize];
         assert_eq!(v.0, *vertex1);
-        v.1 .0.retain(|other| *other != vidx2);
-        v.1 .0.sort_unstable();
-        v.1 .0.shrink_to_fit();
-        v.1 .1.retain(|other| *other != vidx2);
-        v.1 .1.sort_unstable();
-        v.1 .1.shrink_to_fit();
+        v.1.0.retain(|other| *other != vidx2);
+        v.1.0.sort_unstable();
+        v.1.0.shrink_to_fit();
+        v.1.1.retain(|other| *other != vidx2);
+        v.1.1.sort_unstable();
+        v.1.1.shrink_to_fit();
 
         v = &mut self.edges[vidx2 as usize];
         assert_eq!(v.0, *vertex2);
-        v.1 .0.retain(|other| *other != vidx1);
-        v.1 .0.sort_unstable();
-        v.1 .0.shrink_to_fit();
-        v.1 .1.retain(|other| *other != vidx1);
-        v.1 .1.sort_unstable();
-        v.1 .1.shrink_to_fit();
+        v.1.0.retain(|other| *other != vidx1);
+        v.1.0.sort_unstable();
+        v.1.0.shrink_to_fit();
+        v.1.1.retain(|other| *other != vidx1);
+        v.1.1.sort_unstable();
+        v.1.1.shrink_to_fit();
     }
 
     /// Removes this vertex (& associated edges) from this graph, and return the list of in- &
@@ -1401,24 +1416,24 @@ impl DirectedGraphTrait for DirectedGraphVec {
                 vertex = g.edges[vertex_idx as usize].0;
                 //dbg!(vertexes_to_look_at.len());
                 buf.truncate(0);
-                buf.extend(g.edges[vertex_idx as usize].1 .0.drain(..));
+                buf.extend(g.edges[vertex_idx as usize].1.0.drain(..));
                 for in_vertex_idx in buf.drain(..) {
                     in_vertex = g.edges[in_vertex_idx as usize].0;
                     new_graph.add_edge(in_vertex, vertex);
                     vertexes_to_look_at.push(in_vertex_idx);
                     g.edges[in_vertex_idx as usize]
                         .1
-                         .1
+                        .1
                         .retain(|other| *other != vertex_idx);
                 }
-                buf.extend(g.edges[vertex_idx as usize].1 .1.drain(..));
+                buf.extend(g.edges[vertex_idx as usize].1.1.drain(..));
                 for out_vertex_idx in buf.drain(..) {
                     out_vertex = g.edges[out_vertex_idx as usize].0;
                     new_graph.add_edge(vertex, out_vertex);
                     vertexes_to_look_at.push(out_vertex_idx);
                     g.edges[out_vertex_idx as usize]
                         .1
-                         .0
+                        .0
                         .retain(|other| *other != vertex_idx);
                 }
             }
@@ -1479,18 +1494,21 @@ impl Graph2 {
         if vertex1 == vertex2 {
             return false;
         }
-        if let Some(others) = self.edges.get_mut(&vertex1) {
-            if others.contains(&vertex2) {
-                true
-            } else {
-                others.push(vertex2);
+        match self.edges.get_mut(&vertex1) {
+            Some(others) => {
+                if others.contains(&vertex2) {
+                    true
+                } else {
+                    others.push(vertex2);
+                    self.edges.entry(vertex2).or_default().push(vertex1);
+                    false
+                }
+            }
+            _ => {
+                self.edges.insert(vertex1, smallvec![vertex2]);
                 self.edges.entry(vertex2).or_default().push(vertex1);
                 false
             }
-        } else {
-            self.edges.insert(vertex1, smallvec![vertex2]);
-            self.edges.entry(vertex2).or_default().push(vertex1);
-            false
         }
     }
 
@@ -1522,7 +1540,7 @@ impl Graph2 {
         })
     }
 
-    pub fn neighbours(&self, vertex: &i64) -> impl Iterator<Item = &i64> {
+    pub fn neighbours(&self, vertex: &i64) -> impl Iterator<Item = &i64> + use<'_> {
         self.edges.get(vertex).into_iter().flat_map(|ns| ns.iter())
     }
 
@@ -1720,7 +1738,7 @@ impl Graph2 {
             let dest_p = dest.1;
 
             let res = dij::path_one_to_one(
-                (*src.0, (OrderedFloat(src.1 .0), OrderedFloat(src.1 .1))),
+                (*src.0, (OrderedFloat(src.1.0), OrderedFloat(src.1.1))),
                 (*dest_nid, (OrderedFloat(dest_p.0), OrderedFloat(dest_p.1))),
                 nodeid_pos,
                 &graph,

@@ -123,10 +123,9 @@ impl<T: Ord + Send> SortedSliceSet<T> {
         self.data.binary_search(value).ok()
     }
     pub fn get_by_idx(&self, idx: impl TryInto<usize>) -> Option<&T> {
-        if let Ok(idx) = idx.try_into() {
-            self.data.get(idx)
-        } else {
-            None
+        match idx.try_into() {
+            Ok(idx) => self.data.get(idx),
+            _ => None,
         }
     }
 

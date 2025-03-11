@@ -3,9 +3,9 @@
 use super::*;
 use geo::algorithm::convex_hull::qhull::quick_hull;
 use geo::{
+    CoordsIter,
     algorithm::convex_hull::ConvexHull,
     geometry::{Coord, MultiPoint, Point},
-    CoordsIter,
 };
 use graph::Graph2;
 use graph::UndirectedAdjGraph;
@@ -200,9 +200,5 @@ impl Ord for WayGroup {
 }
 
 fn min_max<T: PartialOrd>(a: T, b: T) -> (T, T) {
-    if a < b {
-        (a, b)
-    } else {
-        (b, a)
-    }
+    if a < b { (a, b) } else { (b, a) }
 }

@@ -6,11 +6,11 @@ use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressIterator
 use indicatif_log_bridge::LogWrapper;
 #[allow(unused_imports)]
 use log::{
-    debug, error, info, log, trace, warn,
     Level::{Debug, Trace},
+    debug, error, info, log, trace, warn,
 };
-use osmio::prelude::*;
 use osmio::OSMObjBase;
+use osmio::prelude::*;
 use rayon::prelude::*;
 
 use itertools::Itertools;
@@ -29,7 +29,7 @@ use std::sync::{Arc, Mutex};
 use num_format::{Locale, ToFormattedString};
 use smallvec::SmallVec;
 
-use country_boundaries::{CountryBoundaries, LatLon, BOUNDARIES_ODBL_360X180};
+use country_boundaries::{BOUNDARIES_ODBL_360X180, CountryBoundaries, LatLon};
 use ordered_float::OrderedFloat;
 
 mod cli_args;
@@ -73,7 +73,7 @@ macro_rules! info_memory_used {
 //}
 
 macro_rules! sort_dedup {
-    ($item:expr) => {
+    ($item:expr_2021) => {
         $item.par_sort_unstable();
         $item.dedup();
     };
@@ -142,19 +142,28 @@ fn main() -> Result<()> {
         || args.ends_csv_file.is_some())
         && !(args.flow_split_equally || args.flow_follows_tag.is_some())
     {
-        error!("If you want to output upstreams or ends, you must specificy one of --flow-split-equally or --flow-follows-tag TAG");
-        anyhow::bail!("If you want to output upstreams or ends, you must specificy one of --flow-split-equally or --flow-follows-tag TAG");
+        error!(
+            "If you want to output upstreams or ends, you must specificy one of --flow-split-equally or --flow-follows-tag TAG"
+        );
+        anyhow::bail!(
+            "If you want to output upstreams or ends, you must specificy one of --flow-split-equally or --flow-follows-tag TAG"
+        );
     }
     if args.ends_csv_file.is_some() && args.ends_tag.is_empty() {
-        warn!("The ends CSV file only makes sense with the --ends-tag arguments. Since you have specified no end tags, nothing will be written to the ends CSV file");
+        warn!(
+            "The ends CSV file only makes sense with the --ends-tag arguments. Since you have specified no end tags, nothing will be written to the ends CSV file"
+        );
     }
 
     info!("Input file: {:?}", &args.input_filename);
     if args.tag_filter.is_empty() {
-        if let Some(ref tff) = args.tag_filter_func {
-            info!("Tag filter function in operation: {:?}", tff);
-        } else {
-            info!("No tag filtering in operation. All ways in the file will be used.");
+        match args.tag_filter_func {
+            Some(ref tff) => {
+                info!("Tag filter function in operation: {:?}", tff);
+            }
+            _ => {
+                info!("No tag filtering in operation. All ways in the file will be used.");
+            }
         }
     } else {
         info!("Tag filter(s) in operation: {:?}", args.tag_filter);
@@ -1682,7 +1691,10 @@ fn do_write_upstreams(
     tag_group_info: &[TagGroupInfo],
     tag_group_value: &[String],
 ) -> Result<()> {
-    assert!(!upstream_assigned_end.is_empty(), "When doing upstreams, we should have assigned each point to an end. Why was this not done?");
+    assert!(
+        !upstream_assigned_end.is_empty(),
+        "When doing upstreams, we should have assigned each point to an end. Why was this not done?"
+    );
     assert_eq!(
         topologically_sorted_nodes.len(),
         upstream_assigned_end.len()

@@ -421,7 +421,7 @@ mod test {
     use super::*;
 
     macro_rules! test_round_trip {
-        ( $name:ident, $bucket_shift: expr, $input:expr ) => {
+        ( $name:ident, $bucket_shift: expr_2021, $input:expr_2021 ) => {
             #[test]
             fn $name() {
                 let input = $input;

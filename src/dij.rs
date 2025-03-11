@@ -13,11 +13,7 @@ pub enum SplitPathsMethod {
 }
 
 fn min_max<T: PartialOrd>(a: T, b: T) -> (T, T) {
-    if a < b {
-        (a, b)
-    } else {
-        (b, a)
-    }
+    if a < b { (a, b) } else { (b, a) }
 }
 
 //pub fn into_segments(
@@ -402,10 +398,12 @@ pub(crate) fn paths_one_to_many<'a>(
 ) -> impl ParallelIterator<Item = ((i64, i64), Vec<i64>)> + 'a {
     let (start_idx, _start_pos) = start;
     assert!(edges.contains_vertex(start_idx));
-    assert!(targets
-        .par_iter()
-        .map(|(i, _)| i)
-        .all(|i| edges.contains_vertex(*i)));
+    assert!(
+        targets
+            .par_iter()
+            .map(|(i, _)| i)
+            .all(|i| edges.contains_vertex(*i))
+    );
 
     // TODO keep best_dist_prev between each targetted run
 
@@ -476,8 +474,8 @@ pub(crate) fn path_one_to_one<'a>(
                         *prev_id = curr_id;
                         *path_dist = this_path_dist;
                         this_luft_dist = OrderedFloat(haversine_m(
-                            curr_pos.0 .0,
-                            curr_pos.1 .0,
+                            curr_pos.0.0,
+                            curr_pos.1.0,
                             *target_pos.0,
                             *target_pos.1,
                         ));
@@ -497,8 +495,8 @@ pub(crate) fn path_one_to_one<'a>(
                 .or_insert_with(|| {
                     //info!("Never seen this neighbour before, adding it to frontier");
                     this_luft_dist = OrderedFloat(haversine_m(
-                        curr_pos.0 .0,
-                        curr_pos.1 .0,
+                        curr_pos.0.0,
+                        curr_pos.1.0,
                         *target_pos.0,
                         *target_pos.1,
                     ));

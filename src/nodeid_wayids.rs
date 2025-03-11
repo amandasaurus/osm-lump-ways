@@ -247,7 +247,7 @@ impl NodeIdWayIdsBucketWayIndex {
         bucket
     }
 
-    fn ways_for_nid(&self, nid: &i64) -> impl Iterator<Item = &i32> {
+    fn ways_for_nid(&self, nid: &i64) -> impl Iterator<Item = &i32> + use<'_> {
         let nid = *nid;
         let bucketid = self.nodeid_bucket(nid);
         self.nodeid_bucket_wayid
@@ -345,11 +345,15 @@ enum NodeIdWayIdsAuto {
 
 impl NodeIdWayIdsAuto {
     fn possibly_switch_backend(&mut self) {
-        if let Self::MultiMap(ref mut multi_map) = self {
+        if let Self::MultiMap(multi_map) = self {
             if multi_map.len() > SWITCH_TO_BUCKET {
                 let multi_map = std::mem::take(multi_map);
                 let started_conversion = std::time::Instant::now();
-                info!("There are {} nodes in the nodeid:wayid (> {}). Switching from CPU-faster memory-ineffecient MultiMap, to CPU-slower memory-effecientier Bucket Index", multi_map.len().to_formatted_string(&Locale::en), SWITCH_TO_BUCKET);
+                info!(
+                    "There are {} nodes in the nodeid:wayid (> {}). Switching from CPU-faster memory-ineffecient MultiMap, to CPU-slower memory-effecientier Bucket Index",
+                    multi_map.len().to_formatted_string(&Locale::en),
+                    SWITCH_TO_BUCKET
+                );
                 debug!("Old object: {}", multi_map.detailed_size());
                 let old_size = multi_map.get_size();
 

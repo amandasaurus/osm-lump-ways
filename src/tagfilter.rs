@@ -84,7 +84,10 @@ impl std::str::FromStr for TagFilter {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = s.trim();
         if s.starts_with('"') || s.ends_with('"') {
-            warn!("Input string {} starts and/or ends with a double quote. Have you accidentally over-quoted? Continuing with that.", s);
+            warn!(
+                "Input string {} starts and/or ends with a double quote. Have you accidentally over-quoted? Continuing with that.",
+                s
+            );
         }
         if s.contains('∨') {
             let tfs = s
@@ -303,7 +306,7 @@ pub fn obj_pass_filters(
 ) -> bool {
     if !tag_filters.is_empty() {
         tag_filters.par_iter().all(|tf| tf.filter(o))
-    } else if let Some(ref tff) = tag_filter_func {
+    } else if let Some(tff) = tag_filter_func {
         tff.result(o)
             .expect("Tag Filter func did not complete. Perhaps missing last element of T or F?")
     } else {
@@ -317,7 +320,7 @@ mod tests {
     use osmio::OSMObjBase;
 
     macro_rules! test_parse {
-        ( $name:ident, $input:expr, $expected_output:expr ) => {
+        ( $name:ident, $input:expr_2021, $expected_output:expr_2021 ) => {
             #[test]
             fn $name() {
                 assert_eq!(($input).parse::<TagFilter>().unwrap(), $expected_output);
@@ -457,7 +460,7 @@ mod tests {
     }
 
     macro_rules! test_parse_tag_filter_func {
-        ( $name:ident, $input_tff:expr, $input_tags:expr, $expected_output:expr ) => {
+        ( $name:ident, $input_tff:expr_2021, $input_tags:expr_2021, $expected_output:expr_2021 ) => {
             #[test]
             fn $name() {
                 let tff: TagFilterFuncElement = $input_tff.parse().unwrap();
@@ -500,7 +503,7 @@ mod tests {
     }
 
     macro_rules! test_parse_tag_filter_func_list {
-        ( $name:ident, $input_tff:expr, $input_tags:expr, $expected_output:expr ) => {
+        ( $name:ident, $input_tff:expr_2021, $input_tags:expr_2021, $expected_output:expr_2021 ) => {
             #[test]
             fn $name() {
                 let tff: TagFilterFunc = $input_tff.parse().unwrap();

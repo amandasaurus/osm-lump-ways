@@ -33,14 +33,22 @@ impl InterStore {
             self.0.insert((edge.1, edge.0), bytes);
         }
     }
-    pub fn inters_directed(&self, from: &i64, to: &i64) -> impl Iterator<Item = i64> + '_ {
+    pub fn inters_directed(
+        &self,
+        from: &i64,
+        to: &i64,
+    ) -> impl Iterator<Item = i64> + '_ + use<'_> {
         self.0
             .get(&(*from, *to))
             .into_iter()
             .flat_map(|it_bytes| vartyint::read_many_delta(it_bytes).map(|res| res.unwrap()))
     }
 
-    pub fn inters_undirected(&self, from: &i64, to: &i64) -> impl Iterator<Item = i64> + '_ {
+    pub fn inters_undirected(
+        &self,
+        from: &i64,
+        to: &i64,
+    ) -> impl Iterator<Item = i64> + '_ + use<'_> {
         if from < to {
             Box::new(
                 self.0.get(&(*from, *to)).into_iter().flat_map(|it_bytes| {
@@ -90,9 +98,5 @@ impl InterStore {
 }
 
 fn min_max<T: PartialOrd>(a: T, b: T) -> (T, T) {
-    if a < b {
-        (a, b)
-    } else {
-        (b, a)
-    }
+    if a < b { (a, b) } else { (b, a) }
 }

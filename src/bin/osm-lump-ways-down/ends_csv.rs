@@ -1,7 +1,7 @@
 //! Generating CSV ends stats
+use crate::NodeIdPosition;
 use crate::cli_args;
 use crate::round;
-use crate::NodeIdPosition;
 use anyhow::Result;
 use log::{info, warn};
 use num_format::{Locale, ToFormattedString};
@@ -37,7 +37,10 @@ pub(crate) fn init(
         let mut rdr = csv::Reader::from_reader(std::fs::File::open(csv_stats_file).unwrap());
         let first_row = rdr.headers().unwrap();
         if first_row != headers {
-            warn!("Differnet headers. Expected {:?} got {:?}. Are you using a different set (or order) of --ends-tag ? Continuing anyway, and writing the columns we expect.", headers, first_row);
+            warn!(
+                "Differnet headers. Expected {:?} got {:?}. Are you using a different set (or order) of --ends-tag ? Continuing anyway, and writing the columns we expect.",
+                headers, first_row
+            );
         }
     }
     csv::Writer::from_writer(std::io::BufWriter::new(
@@ -67,8 +70,10 @@ pub(crate) fn write_ends<'a>(
         .filter(|(_nid, end_tags, _len)| {
             !args.ends_csv_only_tagged || end_tags.iter().any(|t| t.is_some())
         })
-        .filter(|(_nid, _end_tags, &len)| args.ends_csv_min_length_m.is_none_or(|min| len >= min))
-        .filter(|(_nid, _end_tags, &len)| len > 1.)
+        .filter(|&(ref _nid, ref _end_tags, &len)| {
+            args.ends_csv_min_length_m.is_none_or(|min| len >= min)
+        })
+        .filter(|&(ref _nid, ref _end_tags, &len)| len > 1.)
         .collect::<Vec<_>>();
     end_points_w_meta.sort_by_key(|(_nid, _end_tags, len)| -OrderedFloat(**len));
 

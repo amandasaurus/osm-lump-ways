@@ -75,14 +75,15 @@ where
     }
     pub fn remove(&mut self, key: &i64) -> Option<V> {
         let k = split_key(key);
-        if let Some(i2) = self.inner.get_mut(&k[0]) {
-            let res = i2.remove(&k[1]);
-            if i2.is_empty() {
-                self.inner.remove(&k[0]);
+        match self.inner.get_mut(&k[0]) {
+            Some(i2) => {
+                let res = i2.remove(&k[1]);
+                if i2.is_empty() {
+                    self.inner.remove(&k[0]);
+                }
+                res
             }
-            res
-        } else {
-            None
+            _ => None,
         }
     }
     pub fn entry(&mut self, key: i64) -> std::collections::btree_map::Entry<i32, V> {
