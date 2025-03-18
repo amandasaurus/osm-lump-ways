@@ -225,7 +225,7 @@ where
 
     let mut num_written = 0;
 
-    let mut wtr = csv::WriterBuilder::new().double_quote(false).from_writer(f);
+    let mut wtr = csv::WriterBuilder::new().from_writer(f);
 
     let mut buf = Vec::new();
     for (props, geom) in features {
