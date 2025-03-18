@@ -1,6 +1,6 @@
 [package]
 name = "osm-lump-ways"
-version = "3.0.0-rc1"
+version = "3.0.0-rc2"
 edition = "2024"
 authors = ["Amanda McCann <amanda@technomancy.org>"]
 license = "MIT OR Apache-2.0"
