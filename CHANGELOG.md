@@ -1,6 +1,6 @@
 # Changelog
 
-## v3.0.0-rc2 (2025-03-11)
+## v3.0.0 (2025-04-21)
 
 * Big new feature: --grouped-waterways which returns a hierachial table of all
   named waterways
