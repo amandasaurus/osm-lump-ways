@@ -402,13 +402,7 @@ fn main() -> Result<()> {
 
     debug!("{}", nodeid_pos.detailed_size());
 
-    debug!(
-        "Size of group_wayid_nodes: {} = {} bytes",
-        group_wayid_nodes.get_size(),
-        group_wayid_nodes
-            .get_size()
-            .to_formatted_string(&Locale::en)
-    );
+    debug_var_size("group_wayid_nodes", group_wayid_nodes.get_size());
 
     let total_files_written = AtomicUsize::new(0);
     let total_features_written = AtomicUsize::new(0);
@@ -886,4 +880,13 @@ fn do_frames(
     );
 
     Ok(())
+}
+
+fn debug_var_size(name: &str, size: usize) {
+    debug!(
+        "Size of {}: {} = {} bytes",
+        name,
+        size,
+        size.to_formatted_string(&Locale::en)
+    );
 }
