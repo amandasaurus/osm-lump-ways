@@ -238,7 +238,7 @@ point(s) that the segment eventually flows into.
 
 #### Assigning to an end point
 
-With `--upstream-outpout-biggest-end`, each segment will be assigned to the end
+With `--upstream-output-biggest-end`, each segment will be assigned to the end
 point that it flows into which has the largest total outflow value.
 
 With `--upstream-assign-end-by-tag TAG`, it will attempt to follow the same OSM
@@ -251,7 +251,7 @@ Ways grouped by downhill and the end point they flow into. The upstream value
 of each segment isn't included, and it attemptes to generate long LineStrings,
 grouped by the end point that it flows into.
 
-See the `--upstream-outpout-biggest-end` & `--upstream-assign-end-by-tag TAG`
+See the `--upstream-output-biggest-end` & `--upstream-assign-end-by-tag TAG`
 arguments.
 
 ### End points (`--ends FILENAME`)
