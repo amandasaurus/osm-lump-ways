@@ -339,7 +339,7 @@ fn main() -> Result<()> {
     let num_ways_read = ways_added.position();
     drop(nids_in_ne2_ways);
     info!(
-        "Finshed reading file and building graph data structure. {} ways read in {}, {:.3e} ways/sec",
+        "Finished reading file and building graph data structure. {} ways read in {}, {:.3e} ways/sec",
         num_ways_read.to_formatted_string(&Locale::en),
         formatting::format_duration(started_reading_ways.elapsed()),
         (num_ways_read as f64) / started_reading_ways.elapsed().as_secs_f64(),
@@ -394,7 +394,7 @@ fn main() -> Result<()> {
 
     setting_node_pos.finish_and_clear();
     info!(
-        "Finshed reading all node positions. {} nodes read in {}, {:.3e} nodes/sec",
+        "Finished reading all node positions. {} nodes read in {}, {:.3e} nodes/sec",
         setting_node_pos.position().to_formatted_string(&Locale::en),
         formatting::format_duration(started_reading_nodes.elapsed()),
         (setting_node_pos.position() as f64) / started_reading_nodes.elapsed().as_secs_f64(),
@@ -456,7 +456,7 @@ fn main() -> Result<()> {
         .collect::<Vec<WayGroup>>();
 
     info!(
-        "Finshed splitting into groups in {}",
+        "Finished splitting into groups in {}",
         formatting::format_duration(started_bfs.elapsed()),
     );
     // ↑ The breath first search is done
