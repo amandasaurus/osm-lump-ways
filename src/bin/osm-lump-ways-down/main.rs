@@ -2537,7 +2537,7 @@ fn do_waterway_grouped(
             let length_m = multilinestrings.par_iter().map(|line|
                 line.iter()
                 .tuple_windows::<(_, _)>()
-                .par_bridge()
+				.par_bridge()
                 .map(|(&p1, &p2)| haversine::haversine_m_fpair(p1, p2))
                 .sum::<f64>()
             ).sum::<f64>();
