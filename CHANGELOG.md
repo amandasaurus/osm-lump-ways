@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.1.0 (2025-05-17)
+
+* Switch to Haversine distance function from the `geo` crate.
+
 ## v3.0.0 (2025-04-21)
 
 * Big new feature: --grouped-waterways which returns a hierachial table of all
