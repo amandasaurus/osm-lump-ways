@@ -162,6 +162,7 @@ GeoJSONSeq output format only.
 * [Longest O'Connell Street in Ireland](https://en.osm.town/@amapanda/110270516183776589)
 * [Road most split in UK&Irl](https://en.osm.town/@amapanda/110762435236476901)
 * [Die Bahnhofstrassen in jeder Schweizer Sprachregion (german language only)](https://habi.gna.ch/2023/11/14/die-bahnhofstrassen-in-jeder-schweizer-sprachregion/)
+* [Roads without etymology data](https://en.osm.town/@amapanda/114562398764953834)
 * Your project here!
 
 # `osm-lump-ways-down`
