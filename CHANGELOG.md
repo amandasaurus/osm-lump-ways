@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* `--min-length-m` works for `--grouped-waterways`.
+
 ## v3.1.0 (2025-05-17)
 
 * Switch to Haversine distance function from the `geo` crate.

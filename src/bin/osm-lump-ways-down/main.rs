@@ -1180,6 +1180,7 @@ fn main() -> Result<()> {
             nid_pair_to_taggroupid,
             tag_group_info,
             &tag_group_value,
+            args.min_length_m,
         )?;
     }
 
@@ -2421,6 +2422,7 @@ fn do_waterway_grouped(
     nid_pair_to_taggroupid: &SortedSliceMap<(i64, i64), u64>,
     tag_group_info: &[TagGroupInfo],
     tag_group_value: &[String],
+    min_length_m: Option<f64>,
 ) -> Result<()> {
     let started_do_waterway_grouped = Instant::now();
     let writing_output_bar = progress_bars.add(
@@ -2508,8 +2510,7 @@ fn do_waterway_grouped(
 
             (taggroupid, tg, lines)
         })
-        //.filter(|(_taggroupid, tg, _lines)| tg.tagid.map_or(false, |tagid| tag_group_value[tagid as usize] == "Liffey"))
-        .map(|(taggroupid, tg, lines)| {
+        .filter_map(|(taggroupid, tg, lines)| {
             let mut props = serde_json::json!({});
             if tg.stream_level < u64::MAX {
                 props["stream_level"] = tg.stream_level.into();
@@ -2541,6 +2542,11 @@ fn do_waterway_grouped(
                 .map(|(&p1, &p2)| haversine::haversine_m_fpair(p1, p2))
                 .sum::<f64>()
             ).sum::<f64>();
+			if let Some(min_length_m) = min_length_m {
+				if length_m < min_length_m {
+					return None;
+				}
+			}
             // Round the upstream to only output 1 decimal place
             props["length_m"] = round(&length_m, 1).into();
             props["min_nid"] = tg.min_nid.into();
@@ -2642,7 +2648,7 @@ fn do_waterway_grouped(
             //props["parent_rivers"].as_array_mut().unwrap().sort_by_key(|e| OrderedFloat(-e["inflow_m"].as_f64().unwrap()));
 
 
-            (props, multilinestrings)
+            Some((props, multilinestrings))
         });
 
     let mut f = std::io::BufWriter::new(std::fs::File::create(output_filename)?);
