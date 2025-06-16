@@ -1864,6 +1864,11 @@ fn do_write_upstreams(
 
 #[derive(Debug, Clone)]
 struct TagGroupInfo {
+    /// Index in the tag value
+    /// None → This segment doesn't have a tag value
+    tagid: Option<u32>,
+
+    min_nid: i64,
     upstream_m: f64,
 
     unallocated_other_groups: SmallVec<[u64; 1]>,
@@ -1886,11 +1891,7 @@ struct TagGroupInfo {
     stream_level: u64,
     stream_level_code: SmallVec<[u32; 3]>,
 
-    /// Index in the tag value
-    /// None → This segment doesn't have a tag value
-    tagid: Option<u32>,
     end_segments: SmallVec<[(i64, i64); 3]>,
-    min_nid: i64,
 }
 impl TagGroupInfo {
     fn from_tagid(tagid: Option<u32>) -> Self {
