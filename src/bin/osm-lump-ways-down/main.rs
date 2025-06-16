@@ -2533,7 +2533,6 @@ fn do_waterway_grouped(
                         .map(|nid| nodeid_pos.get(&nid).unwrap_or_else(|_| panic!("TagGroupInfo {:?}", tg)))
                         .collect::<Vec<_>>()
                 })
-                .take(1)
                 .collect();
 
             let length_m = multilinestrings.par_iter().map(|line|
