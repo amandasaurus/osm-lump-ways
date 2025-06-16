@@ -1,4 +1,5 @@
 use rayon::prelude::*;
+use std::borrow::Borrow;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -58,16 +59,24 @@ where
         self.data.binary_search_by_key(&k, |(k2, _v)| k2).is_ok()
     }
 
-    pub fn get(&self, k: &K) -> Option<&V> {
+    pub fn get<Q>(&self, k: &Q) -> Option<&V>
+    where
+        K: Borrow<Q>,
+        Q: Eq + Ord + ?Sized,
+    {
         self.data
-            .binary_search_by_key(&k, |(k2, _v)| k2)
+            .binary_search_by_key(&k, |(k2, _v)| k2.borrow())
             .ok()
             .map(|i| &self.data[i].1)
     }
 
-    pub fn get_mut(&mut self, k: &K) -> Option<&mut V> {
+    pub fn get_mut<Q>(&mut self, k: &Q) -> Option<&mut V>
+    where
+        K: Borrow<Q>,
+        Q: Eq + Ord + ?Sized,
+    {
         self.data
-            .binary_search_by_key(&k, |(k2, _v)| k2)
+            .binary_search_by_key(&k, |(k2, _v)| k2.borrow())
             .ok()
             .and_then(|i| self.data.get_mut(i))
             .map(|(_k, v)| v)
