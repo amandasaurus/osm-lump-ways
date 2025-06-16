@@ -1,9 +1,9 @@
-use geo::{Haversine, Distance};
 use geo::Point;
+use geo::{Distance, Haversine};
 use ordered_float::OrderedFloat;
 
 pub fn haversine_m(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
-	Haversine.distance(Point::new(lat1, lon1), Point::new(lat2, lon2))
+    Haversine.distance(Point::new(lat1, lon1), Point::new(lat2, lon2))
 }
 
 pub fn haversine_m_arr(lat_lon1: &[f64], lat_lon2: &[f64]) -> f64 {
