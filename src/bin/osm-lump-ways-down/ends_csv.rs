@@ -70,10 +70,10 @@ pub(crate) fn write_ends<'a>(
         .filter(|(_nid, end_tags, _len)| {
             !args.ends_csv_only_tagged || end_tags.iter().any(|t| t.is_some())
         })
-        .filter(|&(ref _nid, ref _end_tags, &len)| {
+        .filter(|&(_nid, _end_tags, &len)| {
             args.ends_csv_min_length_m.is_none_or(|min| len >= min)
         })
-        .filter(|&(ref _nid, ref _end_tags, &len)| len > 1.)
+        .filter(|&(_nid, _end_tags, &len)| len > 1.)
         .collect::<Vec<_>>();
     end_points_w_meta.sort_by_key(|(_nid, _end_tags, len)| -OrderedFloat(**len));
 

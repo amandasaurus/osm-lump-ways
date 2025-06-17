@@ -1967,7 +1967,7 @@ fn calc_tag_group(
         if outgoing_groups.is_empty() {
             segments_into_nothing.push(seg);
             tag_group_ends.push(seg);
-        } else if outgoing_groups.iter().any(|&g| g == this_group) {
+        } else if outgoing_groups.contains(&this_group) {
             // there is an outsegment with the same group, so this isn't an end
             continue;
         } else if !outgoing_groups.is_empty() && outgoing_groups.iter().all(|&g| g != this_group) {
