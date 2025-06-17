@@ -3,7 +3,7 @@
 ## Unreleased
 
 * `--min-length-m` works for `--grouped-waterways`.
-* Fix bug, where only the longest line was being output.
+* Fix bug, where only the longest line was being output for `--grouped-waterways`
 
 ## v3.1.0 (2025-05-17)
 
