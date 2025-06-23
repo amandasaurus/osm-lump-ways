@@ -1008,18 +1008,18 @@ impl DirectedGraphTrait for DirectedGraph2 {
     }
 
     fn detailed_size(&self) -> String {
-        let mut s = format!(
+        let s = format!(
             "DirectedGraph2: num_vertexes {} num_edges {}",
             self.num_vertexes(),
             self.num_edges(),
         );
-        s.push_str(&format!(
-            "\nSize of graph: {} = {} bytes.\nbytes/vertex = {:>.5}\nbytes/edge = {:>.5}",
-            self.get_size(),
-            self.get_size().to_formatted_string(&Locale::en),
-            self.get_size() as f64 / self.num_vertexes() as f64,
-            self.get_size() as f64 / self.num_edges() as f64,
-        ));
+        //s.push_str(&format!(
+        //    "\nSize of graph: {} = {} bytes.\nbytes/vertex = {:>.5}\nbytes/edge = {:>.5}",
+        //    self.get_size(),
+        //    self.get_size().to_formatted_string(&Locale::en),
+        //    self.get_size() as f64 / self.num_vertexes() as f64,
+        //    self.get_size() as f64 / self.num_edges() as f64,
+        //));
 
         s
     }
