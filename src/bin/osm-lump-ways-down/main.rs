@@ -37,6 +37,7 @@ mod cli_args;
 use graph::DirectedGraphTrait;
 use haversine::haversine_m;
 use nodeid_position::NodeIdPosition;
+use osm_lump_ways::dij;
 use osm_lump_ways::graph;
 use osm_lump_ways::haversine;
 use osm_lump_ways::inter_store;
@@ -2702,4 +2703,41 @@ fn do_waterway_grouped(
     );
 
     Ok(())
+}
+
+fn calc_through_path_length(
+    lines: &Vec<Vec<i64>>,
+    inter_store: &inter_store::InterStore,
+    nodeid_pos: &impl NodeIdPosition,
+    src_nids: &[i64],
+    sink_nids: &[i64],
+) -> f64 {
+    let mut g = graph::DirectedGraph2::new();
+    for line in lines.iter() {
+        for seg in line.windows(2) {
+            g.add_edge(seg[0], seg[1]);
+        }
+    }
+
+    let longest_path_len = src_nids
+        .par_iter()
+        .flat_map(|src_nid| {
+            sink_nids
+                .par_iter()
+                .map(move |sink_nid| (src_nid, sink_nid))
+        })
+        .map(|(src_nid, sink_nid)| {
+            dij::a_star_directed_single(
+                *src_nid,
+                *sink_nid,
+                nodeid_pos,
+                inter_store,
+                &g,
+            )
+        })
+        .filter_map(|opt_dist| opt_dist.map(|d| OrderedFloat(d)))
+        .max()
+        .unwrap();
+
+    *longest_path_len
 }
