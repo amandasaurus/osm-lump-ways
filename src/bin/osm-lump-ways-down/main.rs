@@ -2535,6 +2535,7 @@ fn do_waterway_grouped(
 
             props["tag_group_value"] = tg.tagid.map(|tagid| tag_group_value[tagid as usize].as_str()).into();
             props["taggroupid"] = taggroupid.into();
+            props["min_nid"] = tg.min_nid.into();
 
             let multilinestrings: Vec<_> = lines
                 .into_par_iter()
@@ -2561,7 +2562,6 @@ fn do_waterway_grouped(
 			}
             // Round the upstream to only output 1 decimal place
             props["cum_length_m"] = round(&cum_length_m, 1).into();
-            props["min_nid"] = tg.min_nid.into();
 
             props["side_channels"] = tg.side_channels.iter().copied().collect::<Vec<_>>().into();
 
