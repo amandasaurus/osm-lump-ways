@@ -232,10 +232,11 @@ impl std::str::FromStr for TagFilterFunc {
 
         let mut s = contents.trim().to_owned();
 
+        let new_s_regex = Regex::new("(?m)^include ([^;]+);").unwrap();
+
         loop {
             //include FILENAME;
-            let new_s = Regex::new("(?m)^include ([^;]+);")
-                .unwrap()
+            let new_s = new_s_regex
                 .replace_all(&s, |caps: &regex::Captures| {
                     let incl_filename = &caps[1];
                     let incl_path = filename
