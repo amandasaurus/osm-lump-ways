@@ -642,7 +642,9 @@ pub fn a_star_directed_single<'a>(
         }
     }
 
-    best_dist_prev.remove(&target_idx).map(|(dist, _prev_idx)| *dist)
+    best_dist_prev
+        .remove(&target_idx)
+        .map(|(dist, _prev_idx)| *dist)
 }
 
 ///// Return the first cycle we find, starting at this vertex
