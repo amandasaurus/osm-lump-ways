@@ -2542,7 +2542,7 @@ fn do_waterway_grouped(
                 .par_iter()
                 .map(|line| {
                     inter_store
-                        .expand_line_directed(&line)
+                        .expand_line_directed(line)
                         .map(|nid| nodeid_pos.get(&nid).unwrap_or_else(|_| panic!("TagGroupInfo {:?}", tg)))
                         .collect::<Vec<_>>()
                 })
@@ -2565,7 +2565,7 @@ fn do_waterway_grouped(
                 }
             }
 
-            let length_m = calc_through_path_length(&lines, &inter_store, nodeid_pos, &src_sink_nids.0, &src_sink_nids.1);
+            let length_m = calc_through_path_length(&lines, inter_store, nodeid_pos, &src_sink_nids.0, &src_sink_nids.1);
 
             if let Some(min_length_m) = min_length_m {
                 if length_m < min_length_m {
@@ -2732,7 +2732,7 @@ fn calc_through_path_length(
         .map(|(src_nid, sink_nid)| {
             dij::a_star_directed_single(*src_nid, *sink_nid, nodeid_pos, inter_store, &g)
         })
-        .filter_map(|opt_dist| opt_dist.map(|d| OrderedFloat(d)))
+        .filter_map(|opt_dist| opt_dist.map(OrderedFloat))
         .max()
         .unwrap();
 
