@@ -2535,7 +2535,7 @@ fn do_waterway_grouped(
                 })
                 .collect();
 
-            let length_m = multilinestrings.par_iter().map(|line|
+            let cum_length_m = multilinestrings.par_iter().map(|line|
                 line.iter()
                 .tuple_windows::<(_, _)>()
 				.par_bridge()
@@ -2543,12 +2543,13 @@ fn do_waterway_grouped(
                 .sum::<f64>()
             ).sum::<f64>();
 			if let Some(min_length_m) = min_length_m {
-				if length_m < min_length_m {
-					return None;
-				}
+                warn!("Unimplemnted");
+				//if length_m < min_length_m {
+				//	return None;
+				//}
 			}
             // Round the upstream to only output 1 decimal place
-            props["length_m"] = round(&length_m, 1).into();
+            props["cum_length_m"] = round(&cum_length_m, 1).into();
             props["min_nid"] = tg.min_nid.into();
 
             props["side_channels"] = tg.side_channels.iter().copied().collect::<Vec<_>>().into();
