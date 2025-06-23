@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+* Grouped waterways:
+ * `length_m` property is length of longest continuous path, which makes heaviy
+   branching groups much more sensible
+ * `cum_length_m` (Cumulative lenth) is the prvious value of `length_m` and the
+   total length of all the ways in this connected group
+
 ## v3.2.0 (2025-06-16)
 
 * `--min-length-m` works for `--grouped-waterways`.
