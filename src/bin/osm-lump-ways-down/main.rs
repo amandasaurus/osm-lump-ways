@@ -1896,9 +1896,7 @@ struct TagGroupInfo {
 }
 impl TagGroupInfo {
     fn from_tagid(tagid: Option<u32>) -> Self {
-        let mut res = Self::default();
-        res.tagid = tagid;
-        res
+        TagGroupInfo { tagid, ..Default::default() }
     }
     fn stream_level_code_str(&self) -> String {
         self.stream_level_code
