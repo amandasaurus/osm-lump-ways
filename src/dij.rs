@@ -1,7 +1,8 @@
 #![allow(clippy::type_complexity, dead_code)]
 use super::*;
-use graph::{Graph2, UndirectedAdjGraph};
+use graph::{DirectedGraph2, DirectedGraphTrait, Graph2, UndirectedAdjGraph};
 use haversine::haversine_m_fpair;
+use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use std::collections::BinaryHeap;
 
@@ -529,6 +530,119 @@ pub(crate) fn path_one_to_one<'a>(
     contracted_path.reverse();
 
     ((start_idx, target_idx), contracted_path)
+}
+
+pub fn a_star_directed_single<'a>(
+    start_idx: i64,
+    target_idx: i64,
+    nodeid_pos: &'a impl NodeIdPosition,
+    inter_store: &inter_store::InterStore,
+    edges: &'a DirectedGraph2,
+) -> Option<f64> {
+    assert!(edges.contains_vertex(&start_idx));
+    assert!(edges.contains_vertex(&target_idx));
+    let start_pos = nodeid_pos.get(&start_idx).unwrap();
+    let target_pos = nodeid_pos.get(&target_idx).unwrap();
+    let start_pos = (OrderedFloat(start_pos.0), OrderedFloat(start_pos.1));
+    let target_pos = (OrderedFloat(target_pos.0), OrderedFloat(target_pos.1));
+
+    let mut frontier = BinaryHeap::new();
+    let mut best_dist_prev: HashMap<i64, (OrderedFloat<f64>, i64)> = HashMap::new();
+    best_dist_prev.clear();
+    best_dist_prev.insert(start_idx, (OrderedFloat(0.), start_idx));
+    frontier.clear();
+    frontier.push((
+        OrderedFloat(-haversine_m(
+            *start_pos.0,
+            *start_pos.1,
+            *target_pos.0,
+            *target_pos.1,
+        )),
+        OrderedFloat(-0.),
+        start_idx,
+        start_pos,
+    ));
+
+    let mut this_luft_dist = Default::default();
+    let mut neighbor_pos_raw = Default::default();
+    let mut neighbor_pos = Default::default();
+    let mut this_path_dist;
+
+    while let Some((_est_dist, mut curr_path_dist, curr_id, curr_pos)) = frontier.pop() {
+        curr_path_dist *= -1.;
+        if curr_id == target_idx {
+            assert!(
+                best_dist_prev.contains_key(&target_idx),
+                "Something went wrong with nid {}",
+                target_idx
+            );
+            // finished
+            break;
+        }
+        if curr_path_dist > best_dist_prev[&curr_id].0 {
+            // already found a shorter path to this vertex
+            continue;
+        }
+        for neighbor_idx in edges.out_neighbours(curr_id) {
+            let edge_len = inter_store
+                .inters_directed(&curr_id, &neighbor_idx)
+                .map(|nid| nodeid_pos.get(&nid).unwrap())
+                .tuple_windows::<(_, _)>()
+                .par_bridge()
+                .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
+                .sum::<f64>();
+
+            this_path_dist = curr_path_dist + OrderedFloat(edge_len);
+            best_dist_prev
+                .entry(neighbor_idx)
+                .and_modify(|(path_dist, prev_id)| {
+                    if this_path_dist < *path_dist {
+                        // This is shorter, so update path_dist & prev_id
+                        *prev_id = curr_id;
+                        *path_dist = this_path_dist;
+                        this_luft_dist = OrderedFloat(haversine_m(
+                            curr_pos.0.0,
+                            curr_pos.1.0,
+                            *target_pos.0,
+                            *target_pos.1,
+                        ));
+                        neighbor_pos_raw = nodeid_pos.get(&neighbor_idx).unwrap();
+                        neighbor_pos = (
+                            OrderedFloat(neighbor_pos_raw.0),
+                            OrderedFloat(neighbor_pos_raw.1),
+                        );
+                        frontier.push((
+                            -(this_path_dist + this_luft_dist),
+                            -this_path_dist,
+                            neighbor_idx,
+                            neighbor_pos,
+                        ));
+                    }
+                })
+                .or_insert_with(|| {
+                    this_luft_dist = OrderedFloat(haversine_m(
+                        curr_pos.0.0,
+                        curr_pos.1.0,
+                        *target_pos.0,
+                        *target_pos.1,
+                    ));
+                    neighbor_pos_raw = nodeid_pos.get(&neighbor_idx).unwrap();
+                    neighbor_pos = (
+                        OrderedFloat(neighbor_pos_raw.0),
+                        OrderedFloat(neighbor_pos_raw.1),
+                    );
+                    frontier.push((
+                        -(this_path_dist + this_luft_dist),
+                        -this_path_dist,
+                        neighbor_idx,
+                        neighbor_pos,
+                    ));
+                    (this_path_dist, curr_id)
+                });
+        }
+    }
+
+    best_dist_prev.remove(&target_idx).map(|(dist, _prev_idx)| *dist)
 }
 
 ///// Return the first cycle we find, starting at this vertex
