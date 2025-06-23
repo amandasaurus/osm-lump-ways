@@ -1896,7 +1896,10 @@ struct TagGroupInfo {
 }
 impl TagGroupInfo {
     fn from_tagid(tagid: Option<u32>) -> Self {
-        TagGroupInfo { tagid, ..Default::default() }
+        TagGroupInfo {
+            tagid,
+            ..Default::default()
+        }
     }
     fn stream_level_code_str(&self) -> String {
         self.stream_level_code
@@ -2160,16 +2163,10 @@ fn calc_tag_group(
     let flows_through =
         |nid: i64, group_id: u64| -> bool { flow_type(nid, group_id) == FlowType::Through };
     let flows_through_or_in = |nid: i64, group_id: u64| -> bool {
-        match flow_type(nid, group_id) {
-            FlowType::Through | FlowType::In => true,
-            _ => false,
-        }
+        matches!(flow_type(nid, group_id), FlowType::Through | FlowType::In)
     };
     let flows_through_or_out = |nid: i64, group_id: u64| -> bool {
-        match flow_type(nid, group_id) {
-            FlowType::Through | FlowType::Out => true,
-            _ => false,
-        }
+        matches!(flow_type(nid, group_id), FlowType::Through | FlowType::Out)
     };
 
     tag_group_info
