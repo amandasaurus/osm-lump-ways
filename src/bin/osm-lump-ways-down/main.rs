@@ -2704,7 +2704,7 @@ fn do_waterway_grouped(
 }
 
 fn calc_through_path_length(
-    lines: &Vec<Vec<i64>>,
+    lines: &[Vec<i64>],
     inter_store: &inter_store::InterStore,
     nodeid_pos: &impl NodeIdPosition,
     src_nids: &[i64],
