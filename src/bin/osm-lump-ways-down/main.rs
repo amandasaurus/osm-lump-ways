@@ -2457,6 +2457,8 @@ fn do_waterway_grouped(
         .map(|(taggroupid, tg)| {
             let taggroupid = taggroupid as u64;
             let mut lines: Vec<Vec<(i64, i64)>> = vec![];
+            let mut seen_out_nids = HashSet::<i64>::new();
+            let mut seen_in_nids = HashSet::<i64>::new();
 
             let mut incoming_store: SmallVec<[(i64, i64); 2]> = smallvec![];
             let mut end_segments_to_build_from: SmallVec<[(i64, i64); 5]> = smallvec![];
@@ -2477,6 +2479,8 @@ fn do_waterway_grouped(
                         break;
                     }
                     line.push(seg);
+                    seen_out_nids.insert(seg.0);
+                    seen_in_nids.insert(seg.1);
                     incoming_store.truncate(0);
                     incoming_store.extend(g.in_edges(seg.0).filter(
                         |seg2| {
@@ -2509,9 +2513,16 @@ fn do_waterway_grouped(
                 })
                 .collect::<Vec<Vec<i64>>>();
 
-            (taggroupid, tg, lines)
+            let mut src_nids = seen_out_nids.difference(&seen_in_nids).copied().collect::<Vec<i64>>();
+            let mut sink_nids = seen_in_nids.difference(&seen_out_nids).copied().collect::<Vec<i64>>();
+            drop(seen_out_nids);
+            drop(seen_in_nids);
+            sort_dedup!(src_nids);
+            sort_dedup!(sink_nids);
+            (taggroupid, tg, lines, (src_nids, sink_nids))
         })
-        .filter_map(|(taggroupid, tg, lines)| {
+
+        .filter_map(|(taggroupid, tg, lines, src_sink_nids)| {
             let mut props = serde_json::json!({});
             if tg.stream_level < u64::MAX {
                 props["stream_level"] = tg.stream_level.into();
