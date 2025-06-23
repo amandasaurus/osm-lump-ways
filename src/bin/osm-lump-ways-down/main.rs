@@ -2555,12 +2555,6 @@ fn do_waterway_grouped(
                 .map(|(&p1, &p2)| haversine::haversine_m_fpair(p1, p2))
                 .sum::<f64>()
             ).sum::<f64>();
-            if let Some(min_length_m) = min_length_m {
-                warn!("Unimplemnted");
-                //if length_m < min_length_m {
-                //	return None;
-                //}
-            }
             // Round the upstream to only output 1 decimal place
             props["cum_length_m"] = round(&cum_length_m, 1).into();
 
@@ -2570,6 +2564,15 @@ fn do_waterway_grouped(
                     return None;
                 }
             }
+
+            let length_m = calc_through_path_length(&lines, &inter_store, nodeid_pos, &src_sink_nids.0, &src_sink_nids.1);
+
+            if let Some(min_length_m) = min_length_m {
+                if length_m < min_length_m {
+                    return None;
+                }
+            }
+            props["length_m"] = round(&length_m, 1).into();
 
             drop(lines);
 
@@ -2727,13 +2730,7 @@ fn calc_through_path_length(
                 .map(move |sink_nid| (src_nid, sink_nid))
         })
         .map(|(src_nid, sink_nid)| {
-            dij::a_star_directed_single(
-                *src_nid,
-                *sink_nid,
-                nodeid_pos,
-                inter_store,
-                &g,
-            )
+            dij::a_star_directed_single(*src_nid, *sink_nid, nodeid_pos, inter_store, &g)
         })
         .filter_map(|opt_dist| opt_dist.map(|d| OrderedFloat(d)))
         .max()
