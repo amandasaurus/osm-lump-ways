@@ -2563,6 +2563,13 @@ fn do_waterway_grouped(
             // Round the upstream to only output 1 decimal place
             props["cum_length_m"] = round(&cum_length_m, 1).into();
 
+            if let Some(min_length_m) = min_length_m {
+                if cum_length_m < min_length_m {
+                    // this will definitely be to small
+                    return None;
+                }
+            }
+
             drop(lines);
 
             props["side_channels"] = tg.side_channels.iter().copied().collect::<Vec<_>>().into();
