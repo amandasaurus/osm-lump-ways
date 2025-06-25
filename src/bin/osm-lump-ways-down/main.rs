@@ -203,6 +203,25 @@ fn main() -> Result<()> {
         .map(|f| ends_csv::init(f, &args));
 
     let mut relation_tags = WayIdToRelationTags::default();
+    if args.relation_tags_overwrite {
+        let input_fp = std::fs::File::open(&args.input_filename)?;
+        let input_bar = progress_bars.add(
+            ProgressBar::new(input_fp.metadata()?.len())
+                .with_message("Collecting relation tags")
+                .with_style(file_reading_style.clone()),
+        );
+        let rdr = input_bar.wrap_read(input_fp);
+        let mut reader = osmio::stringpbf::PBFReader::new(rdr);
+        info!("Reading all relations");
+        for rel in reader
+            .relations()
+            .filter(|r| tagfilter::obj_pass_filters(r, &tag_filter, &args.tag_filter_func))
+        {
+            relation_tags.record_relation(&rel, args.relation_tags_role.as_slice());
+        }
+        input_bar.finish_and_clear();
+        info!("All relations read. {}", relation_tags.summary());
+    }
     let relation_tags = relation_tags;
 
     let boundaries = CountryBoundaries::from_reader(BOUNDARIES_ODBL_360X180)?;

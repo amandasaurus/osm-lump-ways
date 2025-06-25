@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* osm-lump-ways-down can now read the relations, and overwrite the tags from a
+  relation on a way
 * Grouped waterways:
  * `length_m` property is length of longest continuous path, which makes heaviy
    branching groups much more sensible

@@ -24,7 +24,7 @@ be mapped as many different ways. `osm-lump-ways` will assemble them all togethe
 
 # Filtering OSM Data
 
-There are 2 ways to select which OSM ways will be used. All relations are currently ignored.
+There are 2 ways to select which OSM ways will be used.
 
 ## Tag Filter Rules
 
@@ -78,6 +78,23 @@ Comments start with `#` and continue to the end of the line. Since the `;` is
 special, it cannot be directly used in tag filtering. Use `\u{3B}` instead.
 e.g. `waterway=put_in\u{3B}egress→F;` is a rule to exclude any tag with key
 `waterway` and value `put_in;egress`.
+
+## Relations
+
+The programme `osm-lump-ways` ignores relations.
+
+`osm-lump-ways-down` will ignore all relations, unless the
+`--relation-tags-overwrite` is used.
+
+### `--relation-tags-overwrite`
+
+If a relation matches the tag filter, then the relation's ways will be assumed
+to have the relation tags and will be included. By default all relation member
+ways are included. If `--relation-tags-role` only the ways in the relation with
+that role will be included (can be specified more than once).
+
+If a relation has a tag, and a way has a tag (e.g. `name`) the tag value from
+the relation will be used not the way.
 
 # Output
 
