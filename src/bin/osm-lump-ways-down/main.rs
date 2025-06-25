@@ -106,14 +106,6 @@ fn main() -> Result<()> {
                 ProgressStyle::with_template(
         "[{elapsed_precise}] {percent:>3}% done. eta {eta:>4} {bar:10.cyan/blue} {bytes:>7}/{total_bytes:7} {per_sec:>12} {msg}",
             ).unwrap();
-    let input_fp = std::fs::File::open(&args.input_filename)?;
-    let input_bar = progress_bars.add(
-        ProgressBar::new(input_fp.metadata()?.len())
-            .with_message("Reading input file")
-            .with_style(file_reading_style.clone()),
-    );
-    let rdr = input_bar.wrap_read(input_fp);
-    let reader = osmio::stringpbf::PBFReader::new(rdr);
 
     if !args.input_filename.is_file() {
         error!(
@@ -212,6 +204,14 @@ fn main() -> Result<()> {
     let boundaries = CountryBoundaries::from_reader(BOUNDARIES_ODBL_360X180)?;
 
     // how many vertexes are there per node id? (which do we need to keep)
+    let input_fp = std::fs::File::open(&args.input_filename)?;
+    let input_bar = progress_bars.add(
+        ProgressBar::new(input_fp.metadata()?.len())
+            .with_message("Reading input file")
+            .with_style(file_reading_style.clone()),
+    );
+    let rdr = input_bar.wrap_read(input_fp);
+    let reader = osmio::stringpbf::PBFReader::new(rdr);
     let nids_in_ne2_ways = do_read_nids_in_ne2_ways(
         reader,
         &tag_filter,
