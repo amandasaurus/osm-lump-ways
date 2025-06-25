@@ -24,6 +24,7 @@ pub mod kosaraju;
 pub mod nodeid_wayids;
 pub mod sorted_slice_store;
 pub mod taggrouper;
+pub mod way_id_rel_tags;
 
 pub mod fileio;
 pub mod formatting;
