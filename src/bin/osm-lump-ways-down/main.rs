@@ -44,6 +44,7 @@ use osm_lump_ways::inter_store;
 use osm_lump_ways::nodeid_position;
 use osm_lump_ways::sorted_slice_store::{SortedSliceMap, SortedSliceSet};
 use osm_lump_ways::tagfilter;
+use osm_lump_ways::way_id_rel_tags::WayIdToRelationTags;
 
 use fileio::{write_csv_features_directly, write_geojson_features_directly};
 use osm_lump_ways::fileio;
@@ -201,6 +202,9 @@ fn main() -> Result<()> {
         .as_ref()
         .map(|f| ends_csv::init(f, &args));
 
+    let mut relation_tags = WayIdToRelationTags::default();
+    let relation_tags = relation_tags;
+
     let boundaries = CountryBoundaries::from_reader(BOUNDARIES_ODBL_360X180)?;
 
     // how many vertexes are there per node id? (which do we need to keep)
@@ -218,6 +222,7 @@ fn main() -> Result<()> {
         &args.tag_filter_func,
         &input_bar,
         &progress_bars,
+        &relation_tags,
     )?;
 
     let g = graph::DirectedGraph2::new();
@@ -250,7 +255,7 @@ fn main() -> Result<()> {
         .ways()
         .par_bridge()
         .inspect(|_| obj_reader.inc(1))
-        .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, &args.tag_filter_func))
+        .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, &args.tag_filter_func) || relation_tags.contains_wid(w.id()))
         .inspect(|_| ways_added.inc(1))
         // TODO support grouping by tag value
         .for_each_with((g.clone(), inter_store.clone(), tagvalues_to_edges.clone(), Vec::<i64>::new()),
@@ -265,7 +270,7 @@ fn main() -> Result<()> {
                 // If we're assigning based on tag, get the hashset where it'll be stored
                 let mut tagvalues_to_edges = args.flow_follows_tag
                     .as_ref()
-                    .and_then(|flow_follows_tag| w.tag(flow_follows_tag))
+                    .and_then(|flow_follows_tag| relation_tags.way_tags(w.id(), flow_follows_tag).or(w.tag(flow_follows_tag)))
                     .map(|way_tag_value| seen_tagvalues.entry(way_tag_value.to_string()).or_default());
 
                 // Possibly remove duplicate nodes in a way. IME this happens once in the planet.
@@ -1201,6 +1206,7 @@ fn do_read_nids_in_ne2_ways(
     tag_filter_func: &Option<tagfilter::TagFilterFunc>,
     input_bar: &ProgressBar,
     progress_bars: &MultiProgress,
+    relation_tags: &WayIdToRelationTags,
 ) -> Result<SortedSliceSet<i64>> {
     // how many vertexes are there per node id? (which do we need to keep)
     info!("Reading file, to calculate which nids we need to keep");
@@ -1208,7 +1214,7 @@ fn do_read_nids_in_ne2_ways(
     reader
         .ways()
         .par_bridge()
-        .filter(|w| tagfilter::obj_pass_filters(w, tag_filter, tag_filter_func))
+        .filter(|w| tagfilter::obj_pass_filters(w, tag_filter, tag_filter_func) || relation_tags.contains_wid(w.id()))
         // TODO support grouping by tag value
         .for_each_with(nid2nways.clone(), |nid2nways, w| {
             assert!(w.id() > 0, "This file has a way id < 0. negative ids are not supported in this tool Use osmium sort & osmium renumber to convert this file and run again.");

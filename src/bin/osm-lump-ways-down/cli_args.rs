@@ -292,4 +292,13 @@ pub struct Args {
     /// --flow-follows-tag value).
     #[arg(long)]
     pub grouped_waterways: Option<PathBuf>,
+
+    /// If a way is in a relation, which matches the tag filters, then apply that relation tags to
+    /// this way
+    #[arg(long, default_value = "false")]
+    pub relation_tags_overwrite: bool,
+
+    /// If using relation_tags_overwrite, only relation members with this role will be used.
+    #[arg(long, requires = "relation_tags_overwrite")]
+    pub relation_tags_role: Vec<String>,
 }
