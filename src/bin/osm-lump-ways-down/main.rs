@@ -241,7 +241,6 @@ fn main() -> Result<()> {
     let rdr = input_bar.wrap_read(input_fp);
     let mut reader = osmio::stringpbf::PBFReader::new(rdr);
     let inter_store = inter_store::InterStore::new();
-    //let inter_store: HashMap<(i64, i64), Box<[i64]>> = Default::default();
     let inter_store = Arc::new(Mutex::new(inter_store));
     let tagvalues_to_edges = Arc::new(Mutex::new(
         HashMap::new() as HashMap<String, HashSet<(i64, i64)>>
@@ -1204,7 +1203,7 @@ fn do_read_nids_in_ne2_ways(
     progress_bars: &MultiProgress,
 ) -> Result<SortedSliceSet<i64>> {
     // how many vertexes are there per node id? (which do we need to keep)
-    info!("About to preform first read of file, to calculate which nids we need to keep");
+    info!("Reading file, to calculate which nids we need to keep");
     let nid2nways = Arc::new(Mutex::new(HashMap::<i64, u8>::new()));
     reader
         .ways()
@@ -1863,6 +1862,7 @@ fn do_write_upstreams(
     Ok(())
 }
 
+/// When grouping rivers, this represents one river
 #[derive(Debug, Clone)]
 struct TagGroupInfo {
     /// Index in the tag value
@@ -1982,8 +1982,8 @@ fn calc_tag_group(
     assert!(tag_group_ends.len() < u64::MAX as usize);
     let mut tag_group_info: Vec<TagGroupInfo> = Vec::with_capacity(tag_group_ends.len());
 
-    // Step 2: Group all the segments based on topological connectivness (yes this is like
-    // osm-lump-ways)
+    // Step 2: Group all the segments based on topological connectivness
+    // (yes this is like osm-lump-ways)
     // for each segment, assign it to a group id
     let curr_group_id = 0;
     let mut nid_pair_to_taggroupid: SortedSliceMap<(i64, i64), u64> =
@@ -2446,11 +2446,13 @@ fn do_waterway_grouped(
         })
     };
 
-    let taggroups_with_geom = tag_group_info
-        .iter()
+    // Here is the big iterator to generate all the GeoJSON Feature's for this file
+    let taggroups_with_geom = tag_group_info.iter()
         .progress_with(writing_output_bar)
         .enumerate()
         .map(|(taggroupid, tg)| {
+            // For each taggroup, we assemble all the lines that are in the group, by walking
+            // upwards from the end segments.
             let taggroupid = taggroupid as u64;
             let mut lines: Vec<Vec<(i64, i64)>> = vec![];
             let mut seen_out_nids = HashSet::<i64>::new();
@@ -2459,17 +2461,14 @@ fn do_waterway_grouped(
             let mut incoming_store: SmallVec<[(i64, i64); 2]> = smallvec![];
             let mut end_segments_to_build_from: SmallVec<[(i64, i64); 5]> = smallvec![];
             end_segments_to_build_from.extend(tg.end_segments.iter().copied());
-            assert!(tg
-                .end_segments
-                .par_iter()
+            assert!(tg.end_segments.par_iter()
                 .all(|seg| *nid_pair_to_taggroupid.get(seg).unwrap() == taggroupid));
 
             while let Some(seg) = end_segments_to_build_from.pop() {
                 let mut line = Vec::new();
                 let mut seg = seg;
                 loop {
-                    if lines
-                        .par_iter()
+                    if lines.par_iter()
                         .any(|line| line.par_iter().any(|&other_seg| seg == other_seg))
                     {
                         break;
@@ -2498,8 +2497,7 @@ fn do_waterway_grouped(
                 }
             }
 
-            let lines = lines
-                .into_par_iter()
+            let lines = lines.into_par_iter()
                 .map(|line| {
                     let mut new_line = Vec::with_capacity(line.len() + 2);
                     new_line.push(line[0].0);
