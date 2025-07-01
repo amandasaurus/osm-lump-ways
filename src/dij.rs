@@ -532,6 +532,7 @@ pub(crate) fn path_one_to_one<'a>(
     ((start_idx, target_idx), contracted_path)
 }
 
+/// Do an A* search from the start index to the end index.
 pub fn a_star_directed_single<'a>(
     start_idx: i64,
     target_idx: i64,

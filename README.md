@@ -1,7 +1,7 @@
 # `osm-lump-ways` group OSM ways based on topology & shared tags
 
 ![Crates.io Number of Downloads](https://img.shields.io/crates/d/osm-lump-ways)
-![Crates.io Latest Version](https://img.shields.io/crates/v/osm-lump-ways)
+[![Crates.io Latest Version](https://img.shields.io/crates/v/osm-lump-ways)](https://crates.io/crates/osm-lump-ways)
 
 > Answer questions about OSM data like:
 >
@@ -13,14 +13,15 @@
 
 2 similar programmes are included: `osm-lump-ways`, which ignores the direction
 of the OSM way, and `osm-lump-ways-down`, which uses direction of OSM ways to
-produce data, incl. QA suitable files. Both share similarities.
+produce data, incl. QA suitable files.
 
 # Background
 
 OSM linear features (eg roads, rivers, walls) are stored as [way
 object](https://wiki.openstreetmap.org/wiki/Way). The [OSM tagging
 model](https://wiki.openstreetmap.org/wiki/Tags) often requires one feature to
-be mapped as many different ways. `osm-lump-ways` will assemble them all together.
+be mapped as many different ways, “splitting the way”. `osm-lump-ways` will
+undo this splitting, and recursively merge the original OSM objects together.
 
 # Filtering OSM Data
 
@@ -83,7 +84,7 @@ e.g. `waterway=put_in\u{3B}egress→F;` is a rule to exclude any tag with key
 
 The programme `osm-lump-ways` ignores relations.
 
-`osm-lump-ways-down` will ignore all relations, unless the
+`osm-lump-ways-down` by default ignores relations, unless
 `--relation-tags-overwrite` is used.
 
 ### `--relation-tags-overwrite`
@@ -95,6 +96,11 @@ that role will be included (can be specified more than once).
 
 If a relation has a tag, and a way has a tag (e.g. `name`) the tag value from
 the relation will be used not the way.
+
+If a way is a member of more than one relation, then the last seen relation
+will be used (which for normal, sorted, OSM files is the highest numbered
+relation). Only one level of way-in-relation membership is included. Relations
+as members in other relations are ignored.
 
 # Output
 
@@ -215,9 +221,9 @@ It can output different files, depending on the options:
 
 ### Loops (Cycles) (`--loops FILENAME`)
 
-Cycles in the network. Each is a [strongly connected
-component](https://en.wikipedia.org/wiki/Strongly_connected_component), and
-`MultiLineString`.
+Cycles in the network. Each is a
+[strongly connected component](https://en.wikipedia.org/wiki/Strongly_connected_component),
+and `MultiLineString`.
 
 #### Feature Properties
 

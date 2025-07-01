@@ -2740,6 +2740,9 @@ fn calc_through_path_length(
         }
     }
 
+    // Rather than doing an A* search from every start point to every other,
+    // it might be better to do a Dijksra flood fill from every start point, and take the
+    // longest...
     let longest_path_len = src_nids
         .par_iter()
         .flat_map(|src_nid| {
