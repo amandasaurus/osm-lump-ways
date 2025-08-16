@@ -184,11 +184,10 @@ impl NodeIdPositionBucket {
         let bucket_shift = self.bucket_shift();
 
         // Do we have a cache that isn't for this node id? If so, write that out
-        if let Some(cache) = &mut self.cache {
-            if cache.0 != bucket_id {
+        if let Some(cache) = &mut self.cache
+            && cache.0 != bucket_id {
                 self.write_out_cache();
             }
-        }
 
         // Have to duplicate it for lifetime reasons
         if let Some(cache) = &mut self.cache {
@@ -241,8 +240,8 @@ impl NodeIdPosition for NodeIdPositionBucket {
 
     fn get(&self, nid: &i64) -> Result<(f64, f64)> {
         let (bucket_id, local_index) = self.nodeid_bucket_local(*nid);
-        if let Some((cache_bucket_id, cache_latlngs)) = &self.cache {
-            if *cache_bucket_id == bucket_id {
+        if let Some((cache_bucket_id, cache_latlngs)) = &self.cache
+            && *cache_bucket_id == bucket_id {
                 return cache_latlngs[local_index]
                     .map(|(lat_i32, lng_i32)| {
                         (
@@ -252,7 +251,6 @@ impl NodeIdPosition for NodeIdPositionBucket {
                     })
                     .ok_or_else(|| anyhow::anyhow!("Couldn't get node position for nid {nid}"));
             }
-        }
 
         self.inner
             .get(&bucket_id)

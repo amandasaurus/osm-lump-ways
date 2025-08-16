@@ -2576,20 +2576,18 @@ fn do_waterway_grouped(
             // Round the upstream to only output 1 decimal place
             props["cum_length_m"] = round(&cum_length_m, 1).into();
 
-            if let Some(min_length_m) = min_length_m {
-                if cum_length_m < min_length_m {
+            if let Some(min_length_m) = min_length_m
+                && cum_length_m < min_length_m {
                     // this will definitely be to small
                     return None;
                 }
-            }
 
             let length_m = calc_through_path_length(&lines, inter_store, nodeid_pos, &src_sink_nids.0, &src_sink_nids.1);
 
-            if let Some(min_length_m) = min_length_m {
-                if length_m < min_length_m {
+            if let Some(min_length_m) = min_length_m
+                && length_m < min_length_m {
                     return None;
                 }
-            }
             props["length_m"] = round(&length_m, 1).into();
 
             drop(lines);

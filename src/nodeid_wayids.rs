@@ -345,8 +345,8 @@ enum NodeIdWayIdsAuto {
 
 impl NodeIdWayIdsAuto {
     fn possibly_switch_backend(&mut self) {
-        if let Self::MultiMap(multi_map) = self {
-            if multi_map.len() > SWITCH_TO_BUCKET {
+        if let Self::MultiMap(multi_map) = self
+            && multi_map.len() > SWITCH_TO_BUCKET {
                 let multi_map = std::mem::take(multi_map);
                 let started_conversion = std::time::Instant::now();
                 info!(
@@ -377,7 +377,6 @@ impl NodeIdWayIdsAuto {
                 // and we're that now
                 *self = Self::BucketMap(new_bucket);
             }
-        }
     }
 }
 
