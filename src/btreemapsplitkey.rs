@@ -86,7 +86,7 @@ where
             _ => None,
         }
     }
-    pub fn entry(&mut self, key: i64) -> std::collections::btree_map::Entry<i32, V> {
+    pub fn entry(&mut self, key: i64) -> std::collections::btree_map::Entry<'_, i32, V> {
         let k = split_key(&key);
         self.inner.entry(k[0]).or_default().entry(k[1])
     }
