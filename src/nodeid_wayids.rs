@@ -346,37 +346,38 @@ enum NodeIdWayIdsAuto {
 impl NodeIdWayIdsAuto {
     fn possibly_switch_backend(&mut self) {
         if let Self::MultiMap(multi_map) = self
-            && multi_map.len() > SWITCH_TO_BUCKET {
-                let multi_map = std::mem::take(multi_map);
-                let started_conversion = std::time::Instant::now();
-                info!(
-                    "There are {} nodes in the nodeid:wayid (> {}). Switching from CPU-faster memory-ineffecient MultiMap, to CPU-slower memory-effecientier Bucket Index",
-                    multi_map.len().to_formatted_string(&Locale::en),
-                    SWITCH_TO_BUCKET
-                );
-                debug!("Old object: {}", multi_map.detailed_size());
-                let old_size = multi_map.get_size();
+            && multi_map.len() > SWITCH_TO_BUCKET
+        {
+            let multi_map = std::mem::take(multi_map);
+            let started_conversion = std::time::Instant::now();
+            info!(
+                "There are {} nodes in the nodeid:wayid (> {}). Switching from CPU-faster memory-ineffecient MultiMap, to CPU-slower memory-effecientier Bucket Index",
+                multi_map.len().to_formatted_string(&Locale::en),
+                SWITCH_TO_BUCKET
+            );
+            debug!("Old object: {}", multi_map.detailed_size());
+            let old_size = multi_map.get_size();
 
-                // Create a new bucket and convert the old to this.
-                let mut new_bucket = NodeIdWayIdsBucketWayIndex::with_bucket(7);
-                for (nid, wid) in multi_map.drain_all() {
-                    new_bucket.insert(nid, wid);
-                }
-
-                let converstion_duration = std::time::Instant::now() - started_conversion;
-                debug!("New object: {}", new_bucket.detailed_size());
-                debug!(
-                    "It took {} sec to convert to bucket index",
-                    converstion_duration.as_secs()
-                );
-                debug!(
-                    "New index is {}% the size of the old one",
-                    (100 * new_bucket.get_size()) / old_size
-                );
-
-                // and we're that now
-                *self = Self::BucketMap(new_bucket);
+            // Create a new bucket and convert the old to this.
+            let mut new_bucket = NodeIdWayIdsBucketWayIndex::with_bucket(7);
+            for (nid, wid) in multi_map.drain_all() {
+                new_bucket.insert(nid, wid);
             }
+
+            let converstion_duration = std::time::Instant::now() - started_conversion;
+            debug!("New object: {}", new_bucket.detailed_size());
+            debug!(
+                "It took {} sec to convert to bucket index",
+                converstion_duration.as_secs()
+            );
+            debug!(
+                "New index is {}% the size of the old one",
+                (100 * new_bucket.get_size()) / old_size
+            );
+
+            // and we're that now
+            *self = Self::BucketMap(new_bucket);
+        }
     }
 }
 
