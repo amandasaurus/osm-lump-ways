@@ -172,7 +172,7 @@ where
     }
 }
 
-pub trait DirectedGraphTrait<V, E>: Send + Sized {
+pub trait DirectedGraphTrait<V, E>: Send + Sync + Sized {
     fn new() -> Self;
 
     fn in_neighbours(&self, to_vertex: i64) -> impl Iterator<Item = i64>;
