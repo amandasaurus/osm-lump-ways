@@ -34,7 +34,7 @@ use ordered_float::OrderedFloat;
 
 mod cli_args;
 
-use graph::DirectedGraphTrait;
+use graph::{DirectedGraphTrait, DirectedGraph2};
 use haversine::haversine_m;
 use nodeid_position::NodeIdPosition;
 use osm_lump_ways::dij;
