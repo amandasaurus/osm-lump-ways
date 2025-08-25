@@ -42,7 +42,7 @@ use osm_lump_ways::graph;
 use osm_lump_ways::haversine;
 use osm_lump_ways::inter_store;
 use osm_lump_ways::nodeid_position;
-use osm_lump_ways::sorted_slice_store::{SortedSliceMap, SortedSliceSet};
+use osm_lump_ways::sorted_slice_store::SortedSliceSet;
 use osm_lump_ways::tagfilter;
 use osm_lump_ways::way_id_rel_tags::WayIdToRelationTags;
 
@@ -101,7 +101,14 @@ struct EdgeProperty {
     length_m: f64,
     /// the from value
     upstream_m: f64,
-    tagid: u32,
+
+    // Stores the tagvalue group for each segment.
+    // OSM tag vaules are strings, but we don't need to store the strings. We give each string a
+    // unique id (u32) and store that. We don't need to know what the tagvalue for 2 segments is,
+    // we only need to know if they are the same or not.
+    tagid: Option<u32>,
+
+    taggroupid: u64,
 }
 
 impl Default for EdgeProperty {
@@ -109,7 +116,8 @@ impl Default for EdgeProperty {
         EdgeProperty {
             length_m: f64::NAN,
             upstream_m: f64::NAN,
-            tagid: u32::MAX,
+            tagid: None,
+            taggroupid: u64::MAX,
         }
     }
 }
@@ -280,12 +288,6 @@ fn main() -> Result<()> {
     let g: DirectedGraph2<VertexProperty, EdgeProperty> = DirectedGraph2::new();
     let g = Arc::new(Mutex::new(g));
 
-    // Stores the tagvalue group for each segment.
-    // OSM tag vaules are strings, but we don't need to store the strings. We give each string a
-    // unique id (u32) and store that. We don't need to know what the tagvalue for 2 segments is,
-    // we only need to know if they are the same or not.
-    let mut nid_pair_to_tagid: HashMap<(i64, i64), u32> = HashMap::new();
-
     // first step, get all the cycles
     let latest_timestamp = AtomicI64::new(0);
     let start_reading_ways = Instant::now();
@@ -442,7 +444,7 @@ fn main() -> Result<()> {
         for (tagvalue, pairs) in tagvalues_to_edges.into_iter() {
             let curr_id = tag_group_value.len();
             for pair in pairs.into_iter() {
-                nid_pair_to_tagid.insert(pair, curr_id as u32);
+                g.edge_property_mut(pair).tagid = Some(curr_id as u32);
             }
             tag_group_value.push(tagvalue);
         }
@@ -647,7 +649,6 @@ fn main() -> Result<()> {
     g.assert_consistancy();
 
     // convert to memory effecient sorted vec.
-    let nid_pair_to_tagid = SortedSliceMap::from_iter(nid_pair_to_tagid.into_iter());
     let tag_group_value = tag_group_value.into_boxed_slice();
 
     // TODO do we need to sort topologically? Why not just calc lengths from upstreams
@@ -785,7 +786,12 @@ fn main() -> Result<()> {
             // For all the incoming edges, calculate how much goes in from each group
             let inflow_per_group: SmallVec<[(Option<u32>, f64); 2]> = g
                 .in_neighbours(nid)
-                .map(|in_nid| (nid_pair_to_tagid.get(&(in_nid, nid)), (in_nid, nid)))
+                .map(|in_nid| {
+                    (
+                        g.edge_property_unchecked((in_nid, nid)).tagid,
+                        (in_nid, nid),
+                    )
+                })
                 .map(|(group, (prev_nid, this_nid))| {
                     let edge_len = inter_store
                         .expand_directed(prev_nid, this_nid)
@@ -795,7 +801,7 @@ fn main() -> Result<()> {
                         .sum::<f64>();
                     let edge_pre_upstream =
                         g.edge_property_unchecked((prev_nid, this_nid)).upstream_m;
-                    (group.copied(), edge_len + edge_pre_upstream)
+                    (group, edge_len + edge_pre_upstream)
                 })
                 .fold(SmallVec::new(), |mut map, (grp, inflow)| {
                     match map.iter_mut().find(|(g, _)| *g == grp) {
@@ -808,7 +814,7 @@ fn main() -> Result<()> {
             #[allow(clippy::type_complexity)]
             let outs: SmallVec<[(Option<u32>, (i64, i64)); 2]> = outs
                 .iter()
-                .map(|&nid2| (nid_pair_to_tagid.get(&(nid, nid2)).copied(), (nid, nid2)))
+                .map(|&nid2| (g.edge_property_unchecked((nid, nid2)).tagid, (nid, nid2)))
                 .collect();
 
             let num_outs_per_group: SmallVec<[(Option<u32>, usize); 2]> = outs
@@ -874,21 +880,6 @@ fn main() -> Result<()> {
         "Have calculated the upstream values for {} different edges",
         g.num_edges().to_formatted_string(&Locale::en)
     );
-
-    let calc_all_upstream_bar = progress_bars.add(
-        ProgressBar::new(end_points.len() as u64)
-            .with_message("Calculating upstream value for all End points")
-            .with_style(style.clone()),
-    );
-    calc_all_upstream_bar.set_length(topologically_sorted_nodes.len() as u64);
-
-    info!(
-        "Calculated the upstream value for {} nodes",
-        topologically_sorted_nodes
-            .len()
-            .to_formatted_string(&Locale::en)
-    );
-    info_memory_used!();
 
     let end_point_memberships = Arc::new(std::sync::RwLock::new(end_point_memberships));
     let end_point_tag_values = Arc::new(std::sync::RwLock::new(end_point_tag_values));
@@ -1157,9 +1148,8 @@ fn main() -> Result<()> {
     let tag_group_data_opt = if args.upstreams.is_some() || args.grouped_waterways.is_some() {
         Some(calc_tag_group(
             &topologically_sorted_nodes,
-            &nid_pair_to_tagid,
             &tag_group_value,
-            &g,
+            &mut g,
             new_progress_bar_func,
         ))
     } else {
@@ -1184,7 +1174,7 @@ fn main() -> Result<()> {
     }
 
     if let Some(ref upstream_filename) = args.upstreams {
-        let (nid_pair_to_taggroupid, tag_group_info) = tag_group_data_opt.as_ref().unwrap();
+        let tag_group_info = tag_group_data_opt.as_ref().unwrap();
         do_write_upstreams(
             &args,
             &g,
@@ -1196,14 +1186,12 @@ fn main() -> Result<()> {
             &nodeid_pos,
             &end_points,
             &end_point_tag_values,
-            &nid_pair_to_tagid,
-            nid_pair_to_taggroupid,
             tag_group_info,
             &tag_group_value,
         )?;
     }
     if let Some(ref waterway_grouped_file) = args.grouped_waterways {
-        let (nid_pair_to_taggroupid, tag_group_info) = tag_group_data_opt.as_ref().unwrap();
+        let tag_group_info = tag_group_data_opt.as_ref().unwrap();
         do_waterway_grouped(
             waterway_grouped_file,
             &g,
@@ -1215,7 +1203,6 @@ fn main() -> Result<()> {
             &end_point_tag_values,
             &args.ends_tag,
             &inter_store,
-            nid_pair_to_taggroupid,
             tag_group_info,
             &tag_group_value,
             args.min_length_m,
@@ -1706,8 +1693,6 @@ fn do_write_upstreams(
     nodeid_pos: &impl NodeIdPosition,
     end_points: &[i64],
     end_point_tag_values: &[SmallVec<[Option<String>; 1]>],
-    nid_pair_to_tagid: &SortedSliceMap<(i64, i64), u32>,
-    nid_pair_to_taggroupid: &SortedSliceMap<(i64, i64), u64>,
     tag_group_info: &[TagGroupInfo],
     tag_group_value: &[String],
 ) -> Result<()> {
@@ -1726,10 +1711,10 @@ fn do_write_upstreams(
         .map(|(from_nid, to_nid, eprop)| {
             let initial_upstream_len = eprop.upstream_m;
             let end_idx: usize = g.vertex_property_unchecked(&to_nid).assigned_end_idx as usize;
-            let flow_tag_group = nid_pair_to_tagid.get(&(from_nid, to_nid)).copied();
-            let tag_group_info = nid_pair_to_taggroupid
-                .get(&(from_nid, to_nid))
-                .map(|idx| &tag_group_info[*idx as usize]);
+            let flow_tag_group = g.edge_property_unchecked((from_nid, to_nid)).tagid;
+            let tag_group_info = Some(
+                &tag_group_info[g.edge_property_unchecked((from_nid, to_nid)).taggroupid as usize],
+            );
             (
                 from_nid,
                 to_nid,
@@ -1946,11 +1931,10 @@ impl Default for TagGroupInfo {
 
 fn calc_tag_group(
     topologically_sorted_nodes: &[i64],
-    nid_pair_to_tagid: &SortedSliceMap<(i64, i64), u32>,
     tag_group_value: &[String],
-    g: &graph::DirectedGraph2<VertexProperty, EdgeProperty>,
+    g: &mut graph::DirectedGraph2<VertexProperty, EdgeProperty>,
     new_progress_bar_func: impl Fn(u64, &str) -> ProgressBar,
-) -> (SortedSliceMap<(i64, i64), u64>, Box<[TagGroupInfo]>) {
+) -> Box<[TagGroupInfo]> {
     let started_calc = Instant::now();
     // Step 1: What are the segments which are the end segment of their taggroup?
     // list of segments which are the end of a group (i.e. there are 0 outgoing segments with the
@@ -1963,11 +1947,15 @@ fn calc_tag_group(
     let mut outgoing_groups: SmallVec<[_; 3]> = smallvec![];
     let mut this_group;
     let get_ends_bar = new_progress_bar_func(g.num_edges() as u64, "Finding the end segments");
-    for seg in get_ends_bar.wrap_iter(g.edges_iter()) {
+    for (nid1, nid2, eprop) in get_ends_bar.wrap_iter(g.edges_iter_w_prop()) {
+        let seg = (nid1, nid2);
         outgoing_groups.truncate(0);
-        outgoing_groups.extend(g.out_edges(seg.1).map(|seg| nid_pair_to_tagid.get(&seg)));
+        outgoing_groups.extend(
+            g.out_edges_w_prop(nid2)
+                .map(|(_nid, out, eprop)| eprop.tagid),
+        );
         outgoing_groups.dedup();
-        this_group = nid_pair_to_tagid.get(&seg);
+        this_group = eprop.tagid;
 
         if outgoing_groups.is_empty() {
             segments_into_nothing.push(seg);
@@ -1989,30 +1977,28 @@ fn calc_tag_group(
     // (yes this is like osm-lump-ways)
     // for each segment, assign it to a group id
     let curr_group_id = 0;
-    let mut nid_pair_to_taggroupid: SortedSliceMap<(i64, i64), u64> =
-        SortedSliceMap::from_iter(g.edges_iter().map(|seg| (seg, u64::MAX)));
     let mut frontier: VecDeque<_> = VecDeque::new();
-    let assign_to_group = new_progress_bar_func(
-        nid_pair_to_taggroupid.len() as u64,
-        "Assigning each segment to an end",
-    );
+    let assign_to_group =
+        new_progress_bar_func(g.num_edges() as u64, "Assigning each segment to an end");
     for end_segment in tag_group_ends.iter() {
-        if nid_pair_to_taggroupid.get(end_segment).unwrap() != &u64::MAX {
+        let eprop = g.edge_property_unchecked(*end_segment);
+        if eprop.taggroupid != u64::MAX {
             // already assigned to a group
             continue;
         }
-        let this_tag_id = nid_pair_to_tagid.get(end_segment);
-        let mut this_tag_group = TagGroupInfo::from_tagid(this_tag_id.cloned());
+        let this_tag_id: Option<u32> = eprop.tagid;
+        let mut this_tag_group = TagGroupInfo::from_tagid(this_tag_id);
         this_tag_group.end_segments.push(*end_segment);
 
         let curr_group_id = tag_group_info.len() as u64;
         frontier.truncate(0);
         frontier.push_back(*end_segment);
         while let Some(seg) = frontier.pop_front() {
-            if nid_pair_to_tagid.get(&seg) != this_tag_id {
+            let seg_eprop = g.edge_property_unchecked(seg);
+            if seg_eprop.tagid != this_tag_id {
                 continue;
             }
-            if nid_pair_to_taggroupid.get(&seg).unwrap() != &u64::MAX {
+            if seg_eprop.taggroupid != u64::MAX {
                 continue; // already done
             }
             if tag_group_ends.contains(&seg) {
@@ -2021,7 +2007,7 @@ fn calc_tag_group(
             }
 
             // save this group id
-            nid_pair_to_taggroupid.set(&seg, curr_group_id);
+            g.edge_property_mut(seg).taggroupid = curr_group_id;
             assign_to_group.inc(1);
 
             // extend
@@ -2043,42 +2029,42 @@ fn calc_tag_group(
     let mut possible_taggroupids: SmallVec<[_; 3]> = SmallVec::new();
     incomplete_segs.truncate(0);
     incomplete_segs.extend(
-        nid_pair_to_taggroupid
-            .iter()
-            .filter(|(_seg, group_id)| *group_id == u64::MAX)
-            .map(|(seg, _)| seg)
-            .copied(),
+        g.edges_iter_w_prop()
+            .filter(|(_nid1, _nid2, eprop)| eprop.taggroupid == u64::MAX)
+            .map(|(nid1, nid2, _eprop)| (nid1, nid2)), //nid_pair_to_taggroupid
+                                                       //    .iter()
+                                                       //    .filter(|(_seg, group_id)| *group_id == u64::MAX)
+                                                       //    .map(|(seg, _)| seg)
+                                                       //    .copied(),
     );
     while let Some(seg) = incomplete_segs.pop() {
         assert!(!tag_group_ends.contains(&seg));
-        assert!(nid_pair_to_tagid.contains_key(&seg));
-        let this_tagid = nid_pair_to_tagid.get(&seg).unwrap();
+        let this_tagid = g.edge_property_unchecked(seg).tagid.unwrap();
         possible_taggroupids.truncate(0);
-        possible_taggroupids.extend(
-            g.all_connected_edges(&seg)
-                .filter(|seg2| nid_pair_to_tagid.get(seg2) == Some(this_tagid))
-                .map(|seg2| nid_pair_to_taggroupid.get(&seg2).copied()),
-        );
+        possible_taggroupids.extend(g.all_connected_edges(&seg).filter_map(|seg2| {
+            let eprop = g.edge_property_unchecked(seg2);
+            if eprop.tagid == Some(this_tagid) {
+                Some(eprop.taggroupid)
+            } else {
+                None
+            }
+        }));
         sort_dedup!(possible_taggroupids);
         assert_eq!(possible_taggroupids.len(), 1);
-        assert!(possible_taggroupids.iter().all(Option::is_some));
-        nid_pair_to_taggroupid.set(&seg, possible_taggroupids[0].unwrap());
+        g.edge_property_mut(seg).taggroupid = possible_taggroupids[0];
     }
     assert_eq!(
-        nid_pair_to_taggroupid
-            .par_iter()
-            .filter(|(_seg, group_id)| *group_id == u64::MAX)
+        g.edges_par_iter_w_prop()
+            .filter(|(_nid1, _nid2, eprop)| eprop.taggroupid == u64::MAX)
             .count(),
         0,
-        "Some segments have not been assigned to a tagroup, num segments {}",
-        nid_pair_to_taggroupid
-            .len()
-            .to_formatted_string(&Locale::en)
+        "Some segments have not been assigned to a tagroup, total num segments {}",
+        g.num_edges().to_formatted_string(&Locale::en)
     );
 
     let groups_that_flow_into_nothing = segments_into_nothing
         .into_iter()
-        .map(|seg| *nid_pair_to_taggroupid.get(&seg).unwrap())
+        .map(|seg| g.edge_property_unchecked(seg).taggroupid)
         .collect::<HashSet<u64>>();
 
     let mut tag_group_info = tag_group_info.into_boxed_slice();
@@ -2090,41 +2076,38 @@ fn calc_tag_group(
 
     // calculate combined upstream per group
     for seg in tag_group_ends.iter() {
-        let group = nid_pair_to_taggroupid.get(seg).unwrap();
+        let group = g.edge_property_unchecked(*seg).taggroupid;
         // TODO need to include last segment?
         if !g.contains_edge(seg.0, seg.1) {
             warn!("No upstream for {:?}", seg);
         }
-        tag_group_info[*group as usize].upstream_m += g.edge_property_unchecked(*seg).upstream_m;
+        tag_group_info[group as usize].upstream_m += g.edge_property_unchecked(*seg).upstream_m;
     }
 
     // For every taggroup, calculate the tributaries, distributaries etc.
-    for (seg, group_id) in nid_pair_to_taggroupid.iter() {
-        let tg = &mut tag_group_info[*group_id as usize];
-        if g.num_in_neighbours(seg.0) == 0 {
-            tg.sources.push(seg.0);
+    for (nid1, nid2, eprop) in g.edges_iter_w_prop() {
+        let group_id = eprop.taggroupid;
+        let tg = &mut tag_group_info[group_id as usize];
+        if g.num_in_neighbours(nid1) == 0 {
+            tg.sources.push(nid1);
         }
-        if g.num_out_neighbours(seg.1) == 0 {
-            tg.sinks.push(seg.1);
+        if g.num_out_neighbours(nid2) == 0 {
+            tg.sinks.push(nid2);
         }
 
-        for (other_seg, other_group_id) in g.out_edges(seg.1).filter_map(|seg| {
-            nid_pair_to_taggroupid
-                .get(&seg)
-                .filter(|g| *g != group_id)
-                .map(|g| (seg, g))
-        }) {
-            tg.confluences.push(seg.1);
-            tg.unallocated_other_groups.push(*other_group_id);
+        for (_nid2, nid3, eprop2) in g
+            .out_edges_w_prop(nid2)
+            .filter(|(_, _, eprop2)| eprop2.taggroupid != group_id)
+        {
+            tg.confluences.push(nid2);
+            tg.unallocated_other_groups.push(eprop2.taggroupid);
         }
-        for (other_seg, other_group_id) in g.in_edges(seg.0).filter_map(|seg| {
-            nid_pair_to_taggroupid
-                .get(&seg)
-                .filter(|g| *g != group_id)
-                .map(|g| (seg, g))
-        }) {
-            tg.unallocated_other_groups.push(*other_group_id);
-            tg.confluences.push(seg.0);
+        for (nid0, _nid2, eprop0) in g
+            .in_edges_w_prop(nid1)
+            .filter(|(_, _, eprop0)| eprop0.taggroupid != group_id)
+        {
+            tg.unallocated_other_groups.push(eprop0.taggroupid);
+            tg.confluences.push(nid1);
         }
     }
 
@@ -2142,11 +2125,11 @@ fn calc_tag_group(
 
     let flow_type = |nid: i64, group_id: u64| -> FlowType {
         let has_ins = g
-            .in_edges(nid)
-            .any(|seg| nid_pair_to_taggroupid.get(&seg) == Some(&group_id));
+            .in_edges_w_prop(nid)
+            .any(|(_, _, eprop)| eprop.taggroupid == group_id);
         let has_outs = g
-            .out_edges(nid)
-            .any(|seg| nid_pair_to_taggroupid.get(&seg) == Some(&group_id));
+            .out_edges_w_prop(nid)
+            .any(|(_, _, eprop)| eprop.taggroupid == group_id);
         match (has_ins, has_outs) {
             (true, true) => FlowType::Through,
             (true, false) => FlowType::In,
@@ -2188,16 +2171,20 @@ fn calc_tag_group(
                 confluences.extend(
                     tg.confluences
                         .iter()
-                        .flat_map(|&nid| g.in_edges(nid))
-                        .filter(|seg| nid_pair_to_taggroupid.get(seg) == Some(&other_taggroupid))
-                        .map(|seg| seg.1),
+                        .flat_map(|&nid| {
+                            g.in_edges_w_prop(nid)
+                                .filter(|(_, _, eprop)| eprop.taggroupid == other_taggroupid)
+                        })
+                        .map(|(_, nid2, _)| nid2),
                 );
                 confluences.extend(
                     tg.confluences
                         .iter()
-                        .flat_map(|&nid| g.out_edges(nid))
-                        .filter(|seg| nid_pair_to_taggroupid.get(seg) == Some(&other_taggroupid))
-                        .map(|seg| seg.0),
+                        .flat_map(|&nid| {
+                            g.out_edges_w_prop(nid)
+                                .filter(|(_, _, eprop)| eprop.taggroupid == other_taggroupid)
+                        })
+                        .map(|(nid1, _, _)| nid1),
                 );
                 sort_dedup!(confluences);
                 assert!(!confluences.is_empty());
@@ -2317,12 +2304,11 @@ fn calc_tag_group(
             tag_group_info[tgid]
                 .confluences
                 .iter()
-                .flat_map(|&nid| g.in_edges(nid))
-                .map(|seg| nid_pair_to_taggroupid.get(&seg).unwrap())
-                .filter(|other_tgid| **other_tgid != tgid as u64)
-                .filter(|other_tgid| !tag_group_info[**other_tgid as usize].has_stream_level())
-                .dedup()
-                .copied(),
+                .flat_map(|&nid| g.in_edges_w_prop(nid))
+                .map(|(nid1, nid2, eprop)| eprop.taggroupid)
+                .filter(|other_tgid| *other_tgid != tgid as u64)
+                .filter(|other_tgid| !tag_group_info[*other_tgid as usize].has_stream_level())
+                .dedup(),
         );
         sort_dedup!(buf);
         buf.par_sort_unstable_by_key(|gid| {
@@ -2401,7 +2387,7 @@ fn calc_tag_group(
         formatting::format_duration(started_calc.elapsed()),
     );
 
-    (nid_pair_to_taggroupid, tag_group_info)
+    tag_group_info
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2416,7 +2402,6 @@ fn do_waterway_grouped(
     end_point_tag_values: &[SmallVec<[Option<String>; 1]>],
     ends_tags: &[String],
     inter_store: &inter_store::InterStore,
-    nid_pair_to_taggroupid: &SortedSliceMap<(i64, i64), u64>,
     tag_group_info: &[TagGroupInfo],
     tag_group_value: &[String],
     min_length_m: Option<f64>,
@@ -2462,7 +2447,7 @@ fn do_waterway_grouped(
             let mut end_segments_to_build_from: SmallVec<[(i64, i64); 5]> = smallvec![];
             end_segments_to_build_from.extend(tg.end_segments.iter().copied());
             assert!(tg.end_segments.par_iter()
-                .all(|seg| *nid_pair_to_taggroupid.get(seg).unwrap() == taggroupid));
+                .all(|seg| g.edge_property_unchecked(*seg).taggroupid == taggroupid));
 
             while let Some(seg) = end_segments_to_build_from.pop() {
                 let mut line = Vec::new();
@@ -2479,8 +2464,7 @@ fn do_waterway_grouped(
                     incoming_store.truncate(0);
                     incoming_store.extend(g.in_edges(seg.0).filter(
                         |seg2| {
-                            nid_pair_to_taggroupid
-                                .get(seg2).is_some_and(|&other_taggroupid| other_taggroupid == taggroupid)
+							g.edge_property_unchecked(*seg2).taggroupid == taggroupid
                         },
                     ));
                     if incoming_store.is_empty() {
@@ -2576,7 +2560,7 @@ fn do_waterway_grouped(
                     let confluences = tg.confluences
                         .iter().filter(|nid| dist_tg.confluences.contains(nid))
                         .flat_map(|&nid| g.out_edges(nid))
-                        .filter(|seg| nid_pair_to_taggroupid.get(seg).unwrap() == dist_tg_idx)
+                        .filter(|seg| g.edge_property_unchecked(*seg).taggroupid == *dist_tg_idx)
                         .map(|seg| seg_to_distrib_json(&seg, seg.0, false))
                         .collect::<Vec<_>>();
                     assert!(!confluences.is_empty(), "Can't find confluence with a distributary main: {:?} & dist: {:?}", tg, dist_tg);
@@ -2597,7 +2581,7 @@ fn do_waterway_grouped(
                     let confluences = tg.confluences
                         .iter().filter(|nid| dist_tg.confluences.contains(nid))
                         .flat_map(|&nid| g.out_edges(nid))
-                        .filter(|seg| nid_pair_to_taggroupid.get(seg).unwrap() == dist_tg_idx)
+                        .filter(|seg| g.edge_property_unchecked(*seg).taggroupid == *dist_tg_idx)
                         .map(|seg| seg_to_distrib_json(&seg, seg.0, false))
                         .collect::<Vec<_>>();
                     assert!(!confluences.is_empty(), "Can't find confluence with a distributary main: {:?} & dist: {:?}", tg, dist_tg);
@@ -2615,7 +2599,7 @@ fn do_waterway_grouped(
             props["terminal_distributaries"].as_array_mut().unwrap().sort_by_key(|e| OrderedFloat(-e["outflow_m"].as_f64().unwrap()));
             props["distributaries_sea"] = tg.sinks.iter()
                 .flat_map(|&nid| g.in_edges(nid))
-                .filter(|seg| nid_pair_to_taggroupid.get(seg).unwrap() == &taggroupid)
+                .filter(|seg| g.edge_property_unchecked(*seg).taggroupid == taggroupid)
                 .map(|seg| seg_to_distrib_json(&seg, seg.1, true))
             .collect::<Vec<_>>().into();
             props["distributaries_sea"].as_array_mut().unwrap().sort_by_key(|e| OrderedFloat(-e["upstream_m"].as_f64().unwrap()));
@@ -2628,7 +2612,7 @@ fn do_waterway_grouped(
                 let confluences = tg.confluences
                     .iter().filter(|nid| trib_tg.confluences.contains(nid))
                     .flat_map(|&nid| g.in_edges(nid))
-                    .filter(|seg| nid_pair_to_taggroupid.get(seg).unwrap() == trib_tg_idx)
+                    .filter(|seg| g.edge_property_unchecked(*seg).taggroupid == *trib_tg_idx)
                     .map(|seg| seg_to_distrib_json(&seg, seg.1, true))
                     .collect::<Vec<_>>();
                 assert!(!confluences.is_empty(), "Can't find confluence with a tributaries main: {:?} & trib: {:?} taggroupid {} trib_tg_idx {}", tg, trib_tg, taggroupid, trib_tg_idx);
@@ -2649,7 +2633,7 @@ fn do_waterway_grouped(
                 let confluences = tg.confluences
                     .iter().filter(|nid| parent_tg.confluences.contains(nid))
                     .flat_map(|&nid| g.out_edges(nid))
-                    .filter(|seg| nid_pair_to_taggroupid.get(seg).unwrap() == &taggroupid)
+                    .filter(|seg| g.edge_property_unchecked(*seg).taggroupid == taggroupid)
                     .map(|seg| seg_to_distrib_json(&seg, seg.0, false))
                     .collect::<Vec<_>>();
                 assert!(!confluences.is_empty(), "Can't find confluence with a parent river main: {:?} & parent_river: {:?} taggroupid {} trib_tg_idx {}", tg, parent_tg, taggroupid, parent_tg_idx);

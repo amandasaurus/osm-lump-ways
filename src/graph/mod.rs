@@ -565,7 +565,7 @@ where
     }
 
     pub fn edge_property_mut(&mut self, edge: (i64, i64)) -> &mut E {
-        let vertex = self.edges.entry(edge.0).or_default();
+        let vertex = self.edges.get_mut(&edge.0).unwrap();
         let outs = &mut vertex.2;
         if !outs.iter().any(|(oid, _eprop)| *oid == edge.1) {
             outs.push((edge.1, E::default()));
@@ -604,6 +604,10 @@ where
                     .map(move |(nid2, eprop)| (from_vertex, *nid2, eprop))
             })
     }
+    pub fn in_edges_w_prop(&self, to_vertex: i64) -> impl Iterator<Item = (i64, i64, &E)> {
+        self.in_edges(to_vertex)
+            .map(|(nid1, nid2)| (nid1, nid2, self.edge_property_unchecked((nid1, nid2))))
+    }
 
     pub fn edges_iter_w_prop(&self) -> impl Iterator<Item = (i64, i64, &E)> {
         self.edges.iter().flat_map(|(nid1, (_vprop, _ins, outs))| {
@@ -615,6 +619,13 @@ where
             .iter_mut()
             .flat_map(|(nid1, (_vprop, _ins, outs))| {
                 outs.iter_mut().map(|(nid2, eprop)| (*nid1, *nid2, eprop))
+            })
+    }
+    pub fn edges_par_iter_w_prop(&self) -> impl ParallelIterator<Item = (i64, i64, &E)> {
+        self.edges
+            .par_iter()
+            .flat_map(|(nid1, (_vprop, _ins, outs))| {
+                outs.par_iter().map(|(nid2, eprop)| (*nid1, *nid2, eprop))
             })
     }
 
