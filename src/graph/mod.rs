@@ -467,16 +467,28 @@ pub trait DirectedGraphTrait<V, E>: Send + Sync + Sized {
     fn add_vertex_w_prop(&mut self, vertex: i64, vprop: V);
 
     /// Returns (from_vertex, b, E) where b is an out neighbour of from_vertex
-    fn out_edges_w_prop<'a>(&'a self, from_vertex: i64) -> impl Iterator<Item = (i64, i64, &'a E)> where E: 'a;
-    fn in_edges_w_prop<'a>(&'a self, to_vertex: i64) -> impl Iterator<Item = (i64, i64, &'a E)> where E: 'a;
+    fn out_edges_w_prop<'a>(&'a self, from_vertex: i64) -> impl Iterator<Item = (i64, i64, &'a E)>
+    where
+        E: 'a;
+    fn in_edges_w_prop<'a>(&'a self, to_vertex: i64) -> impl Iterator<Item = (i64, i64, &'a E)>
+    where
+        E: 'a;
 
-    fn edges_iter_w_prop<'a>(&'a self) -> impl Iterator<Item = (i64, i64, &'a E)> where E: 'a;
-    fn edges_iter_w_prop_mut<'a>(&'a mut self) -> impl Iterator<Item = (i64, i64, &'a mut E)> where E: 'a;
-    fn edges_par_iter_w_prop<'a>(&'a self) -> impl ParallelIterator<Item = (i64, i64, &'a E)> where E: 'a;
+    fn edges_iter_w_prop<'a>(&'a self) -> impl Iterator<Item = (i64, i64, &'a E)>
+    where
+        E: 'a;
+    fn edges_iter_w_prop_mut<'a>(&'a mut self) -> impl Iterator<Item = (i64, i64, &'a mut E)>
+    where
+        E: 'a;
+    fn edges_par_iter_w_prop<'a>(&'a self) -> impl ParallelIterator<Item = (i64, i64, &'a E)>
+    where
+        E: 'a;
 
     fn edges_par_iter_w_prop_mut<'a>(
         &'a mut self,
-    ) -> impl ParallelIterator<Item = (i64, i64, &'a mut E)> where E: 'a;
+    ) -> impl ParallelIterator<Item = (i64, i64, &'a mut E)>
+    where
+        E: 'a;
 
     fn assert_consistancy(&self);
 
@@ -486,10 +498,18 @@ pub trait DirectedGraphTrait<V, E>: Send + Sync + Sized {
 
     fn remove_edge(&mut self, vertex1: &i64, vertex2: &i64) -> Option<E>;
 
-    fn vertexes_w_prop<'a>(&'a self) -> impl Iterator<Item = (i64, &'a V)> where V: 'a;
-    fn vertexes_w_prop_par_mut<'a>(&'a mut self) -> impl ParallelIterator<Item = (i64, &'a mut V)> where V: 'a;
+    fn vertexes_w_prop<'a>(&'a self) -> impl Iterator<Item = (i64, &'a V)>
+    where
+        V: 'a;
+    fn vertexes_w_prop_par_mut<'a>(&'a mut self) -> impl ParallelIterator<Item = (i64, &'a mut V)>
+    where
+        V: 'a;
 
-    fn edges_w_prop_par_mut<'a>(&'a mut self) -> impl ParallelIterator<Item = ((i64, i64), &'a mut E)> where E: 'a;
+    fn edges_w_prop_par_mut<'a>(
+        &'a mut self,
+    ) -> impl ParallelIterator<Item = ((i64, i64), &'a mut E)>
+    where
+        E: 'a;
 }
 
 #[derive(Default, Debug, Clone)]
@@ -790,29 +810,44 @@ where
     }
 
     /// Returns (from_vertex, b, E) where b is an out neighbour of from_vertex
-    fn out_edges_w_prop<'a>(&'a self, from_vertex: i64) -> impl Iterator<Item = (i64, i64, &'a E)> where E: 'a {
+    fn out_edges_w_prop<'a>(&'a self, from_vertex: i64) -> impl Iterator<Item = (i64, i64, &'a E)>
+    where
+        E: 'a,
+    {
         self.edges.get(&from_vertex).into_iter().flat_map(move |v| {
             v.outs
                 .iter()
                 .map(move |(nid2, eprop)| (from_vertex, *nid2, eprop))
         })
     }
-    fn in_edges_w_prop<'a>(&'a self, to_vertex: i64) -> impl Iterator<Item = (i64, i64, &'a E)> where E: 'a {
+    fn in_edges_w_prop<'a>(&'a self, to_vertex: i64) -> impl Iterator<Item = (i64, i64, &'a E)>
+    where
+        E: 'a,
+    {
         self.in_edges(to_vertex)
             .map(|(nid1, nid2)| (nid1, nid2, self.edge_property_unchecked((nid1, nid2))))
     }
 
-    fn edges_iter_w_prop<'a>(&'a self) -> impl Iterator<Item = (i64, i64, &'a E)> where E: 'a {
+    fn edges_iter_w_prop<'a>(&'a self) -> impl Iterator<Item = (i64, i64, &'a E)>
+    where
+        E: 'a,
+    {
         self.edges
             .iter()
             .flat_map(|(nid1, v)| v.outs.iter().map(|(nid2, eprop)| (*nid1, *nid2, eprop)))
     }
-    fn edges_iter_w_prop_mut<'a>(&'a mut self) -> impl Iterator<Item = (i64, i64, &'a mut E)> where E: 'a {
+    fn edges_iter_w_prop_mut<'a>(&'a mut self) -> impl Iterator<Item = (i64, i64, &'a mut E)>
+    where
+        E: 'a,
+    {
         self.edges
             .iter_mut()
             .flat_map(|(nid1, v)| v.outs.iter_mut().map(|(nid2, eprop)| (*nid1, *nid2, eprop)))
     }
-    fn edges_par_iter_w_prop<'a>(&'a self) -> impl ParallelIterator<Item = (i64, i64, &'a E)> where E: 'a {
+    fn edges_par_iter_w_prop<'a>(&'a self) -> impl ParallelIterator<Item = (i64, i64, &'a E)>
+    where
+        E: 'a,
+    {
         self.edges
             .par_iter()
             .flat_map(|(nid1, v)| v.outs.par_iter().map(|(nid2, eprop)| (*nid1, *nid2, eprop)))
@@ -820,7 +855,10 @@ where
 
     fn edges_par_iter_w_prop_mut<'a>(
         &'a mut self,
-    ) -> impl ParallelIterator<Item = (i64, i64, &'a mut E)> where E: 'a {
+    ) -> impl ParallelIterator<Item = (i64, i64, &'a mut E)>
+    where
+        E: 'a,
+    {
         self.edges.par_iter_mut().flat_map(|(nid1, v)| {
             v.outs
                 .par_iter_mut()
@@ -906,17 +944,28 @@ where
         Some(eprop)
     }
 
-    fn vertexes_w_prop<'a>(&'a self) -> impl Iterator<Item = (i64, &'a V)> where V: 'a {
+    fn vertexes_w_prop<'a>(&'a self) -> impl Iterator<Item = (i64, &'a V)>
+    where
+        V: 'a,
+    {
         self.edges.iter().map(|(nid, v)| (*nid, &v.vprop))
     }
 
-    fn vertexes_w_prop_par_mut<'a>(&'a mut self) -> impl ParallelIterator<Item = (i64, &'a mut V)> where V: 'a {
+    fn vertexes_w_prop_par_mut<'a>(&'a mut self) -> impl ParallelIterator<Item = (i64, &'a mut V)>
+    where
+        V: 'a,
+    {
         self.edges
             .par_iter_mut()
             .map(|(nid, v)| (*nid, &mut v.vprop))
     }
 
-    fn edges_w_prop_par_mut<'a>(&'a mut self) -> impl ParallelIterator<Item = ((i64, i64), &'a mut E)> where E: 'a {
+    fn edges_w_prop_par_mut<'a>(
+        &'a mut self,
+    ) -> impl ParallelIterator<Item = ((i64, i64), &'a mut E)>
+    where
+        E: 'a,
+    {
         self.edges.par_iter_mut().flat_map(|(nid1, v)| {
             v.outs
                 .par_iter_mut()
