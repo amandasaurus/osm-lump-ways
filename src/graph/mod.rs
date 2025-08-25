@@ -14,7 +14,7 @@ use std::iter;
 
 type SmallVecIntermediates<V> = SmallVec<[V; 1]>;
 
-pub(crate) struct UndirectedAdjGraph<V, E> {
+pub struct UndirectedAdjGraph<V, E> {
     edges: BTreeMap<V, BTreeMap<V, (E, SmallVecIntermediates<V>)>>,
 }
 
@@ -29,14 +29,12 @@ where
         + std::cmp::PartialEq
         + Default,
 {
-    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             edges: Default::default(),
         }
     }
 
-    #[allow(dead_code)]
     pub fn set(&mut self, i: &V, j: &V, val: E) {
         self.edges
             .entry(*i)
@@ -48,7 +46,6 @@ where
             .insert(*i, (val, Default::default()));
     }
 
-    #[allow(dead_code)]
     pub fn remove_vertex(&mut self, v: &V) {
         while let Some((other_v, (_weight, _intermediaters))) =
             self.edges.get_mut(v).unwrap().pop_last()
@@ -59,25 +56,21 @@ where
         self.edges.remove(v);
     }
 
-    #[allow(unused)]
     pub fn get(&self, i: &V, j: &V) -> Option<&E> {
         self.edges
             .get(i)
             .and_then(|from_i| from_i.get(j).map(|(e, _intermediates)| e))
     }
 
-    #[allow(dead_code)]
     pub fn get_all(&self, i: &V, j: &V) -> Option<&(E, SmallVecIntermediates<V>)> {
         self.edges.get(i).and_then(|from_i| from_i.get(j))
     }
 
-    #[allow(dead_code)]
     pub fn get_intermediates(&self, i: &V, j: &V) -> Option<&[V]> {
         self.get_all(i, j)
             .map(|(_e, intermediates)| intermediates.as_slice())
     }
 
-    #[allow(unused)]
     /// Return iterator over all the “contracted” edges.
     /// Each element is 1: the edge weight for that “segment”, and 2: an iterator over the vertexes
     /// of this segment (in order)
@@ -99,13 +92,11 @@ where
             })
     }
 
-    #[allow(dead_code)]
     /// returns each vertex id and how many neighbours it has
     pub fn iter_vertexes_num_neighbours(&self) -> impl Iterator<Item = (&V, usize)> {
         self.edges.iter().map(|(vid, edges)| (vid, edges.len()))
     }
 
-    #[allow(dead_code)]
     pub fn contains_vertex(&self, v: &V) -> bool {
         self.edges.contains_key(v)
     }
@@ -117,7 +108,6 @@ where
             .map(|(j, (edge_weight, _intermediates))| (j, edge_weight))
     }
 
-    #[allow(dead_code)]
     /// Number of neighbours for this vertex.
     pub fn num_neighbors(&self, i: &V) -> usize {
         self.edges.get(i).map_or(0, |es| es.len())
@@ -131,7 +121,6 @@ where
             / 2
     }
 
-    #[allow(dead_code)]
     pub fn num_edges(&self) -> usize {
         self.edges
             .values()
@@ -140,7 +129,6 @@ where
             / 2
     }
 
-    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.edges.is_empty()
     }
@@ -148,12 +136,10 @@ where
         self.edges.len()
     }
 
-    #[allow(dead_code)]
     pub fn vertexes(&self) -> impl Iterator<Item = &V> {
         self.edges.keys()
     }
 
-    #[allow(dead_code)]
     pub fn remove_edge(&mut self, i: &V, j: &V) {
         if let Some(from_i) = self.edges.get_mut(i) {
             from_i.remove(j);
@@ -522,7 +508,6 @@ where
     edges: BTreeMap<i64, (V, SmallVec<[i64; 1]>, SmallVec<[(i64, E); 1]>)>,
 }
 
-#[allow(dead_code)]
 impl<V, E> DirectedGraph2<V, E>
 where
     V: Send + Default + Clone + Sync + Debug,
