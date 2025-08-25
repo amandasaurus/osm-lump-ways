@@ -800,10 +800,17 @@ where
     }
 
     fn contract_vertex(&mut self, vertex: &i64, replacement: &i64) {
+        self.assert_consistancy();
         if vertex == replacement {
             warn!("Trying to contract a vertex with itself: {}", vertex);
             return;
         }
+        if !self.contains_vertex(vertex) && !self.contains_vertex(replacement) {
+            warn!("Trying to replace the vertex {vertex} with {replacement}, but neither are in the graph");
+            return;
+        }
+        assert!(self.contains_vertex(vertex), "Vertex to replace {vertex} doesn't exist");
+        assert!(self.contains_vertex(replacement), "Replacement vertex {replacement} doesn't exist");
         let mut old = match self.edges.remove(vertex) {
             None => {
                 return;
