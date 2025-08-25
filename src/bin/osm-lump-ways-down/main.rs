@@ -96,7 +96,6 @@ impl Default for VertexProperty {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct EdgeProperty {
     length_m: f64,
@@ -753,16 +752,6 @@ fn main() -> Result<()> {
         vprop.upstream_m = 0.;
     });
 
-    // for an edge in the graph, what's the amount flowing down it. Keys are the from & to nid.
-    // Value is upstream_m just at the start of the from nid.
-    let mut upstream_per_edge: Vec<((i64, i64), f64)> =
-        Vec::with_capacity(topologically_sorted_nodes.len());
-    upstream_per_edge.extend(topologically_sorted_nodes.iter().flat_map(|&nid1| {
-        g.out_neighbours(nid1)
-            .map(move |nid2| ((nid1, nid2), f64::NAN))
-    }));
-    let mut upstream_per_edge = SortedSliceMap::from_vec(upstream_per_edge);
-
     let calc_all_upstreams = progress_bars.add(
         ProgressBar::new(topologically_sorted_nodes.len() as u64)
             .with_message("Calculating all upstream values")
@@ -789,7 +778,7 @@ fn main() -> Result<()> {
                 .sum::<f64>();
 
             *tmp_upstream_length.entry(other).or_default() += curr_upstream + outgoing_edge_len;
-            *upstream_per_edge.get_mut(&(nid, other)).unwrap() = curr_upstream;
+            g.edge_property_mut((nid, other)).upstream_m = curr_upstream;
         } else if outs.is_empty() {
             // nothing to do
         } else if outs.len() > 1 {
@@ -804,7 +793,8 @@ fn main() -> Result<()> {
                         .tuple_windows::<(_, _)>()
                         .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
                         .sum::<f64>();
-                    let edge_pre_upstream = *upstream_per_edge.get(&(prev_nid, this_nid)).unwrap();
+                    let edge_pre_upstream =
+                        g.edge_property_unchecked((prev_nid, this_nid)).upstream_m;
                     (group.copied(), edge_len + edge_pre_upstream)
                 })
                 .fold(SmallVec::new(), |mut map, (grp, inflow)| {
@@ -873,17 +863,16 @@ fn main() -> Result<()> {
                     .unwrap()
                     .1;
                 *tmp_upstream_length.entry(other).or_default() += outflow;
-                *upstream_per_edge.get_mut(&(nid, other)).unwrap() = outflow;
+                g.edge_property_mut((nid, other)).upstream_m = outflow;
             }
         }
 
         calc_all_upstreams.inc(1);
     }
     calc_all_upstreams.finish_and_clear();
-    let upstream_per_edge = upstream_per_edge;
     info!(
         "Have calculated the upstream values for {} different edges",
-        upstream_per_edge.len().to_formatted_string(&Locale::en)
+        g.num_edges().to_formatted_string(&Locale::en)
     );
 
     let calc_all_upstream_bar = progress_bars.add(
@@ -1171,7 +1160,6 @@ fn main() -> Result<()> {
             &nid_pair_to_tagid,
             &tag_group_value,
             &g,
-            &upstream_per_edge,
             new_progress_bar_func,
         ))
     } else {
@@ -1186,7 +1174,6 @@ fn main() -> Result<()> {
             &style,
             &end_points,
             &topologically_sorted_nodes,
-            &upstream_per_edge,
             &nodeid_pos,
             &end_point_tag_values,
             &args.ends_tag,
@@ -1205,7 +1192,6 @@ fn main() -> Result<()> {
             &progress_bars,
             &style,
             &topologically_sorted_nodes,
-            &upstream_per_edge,
             &inter_store,
             &nodeid_pos,
             &end_points,
@@ -1225,7 +1211,6 @@ fn main() -> Result<()> {
             &style,
             &end_points,
             &topologically_sorted_nodes,
-            &upstream_per_edge,
             &nodeid_pos,
             &end_point_tag_values,
             &args.ends_tag,
@@ -1422,7 +1407,6 @@ fn do_group_by_ends(
     style: &ProgressStyle,
     end_points: &[i64],
     topologically_sorted_nodes: &[i64],
-    upstream_per_edge: &SortedSliceMap<(i64, i64), f64>,
     nodeid_pos: &impl NodeIdPosition,
     end_point_tag_values: &[SmallVec<[Option<String>; 1]>],
     ends_tags: &[String],
@@ -1542,29 +1526,30 @@ fn do_group_by_ends(
             }
 
             if let Some(max_upstream_delta) = grouped_ends_max_upstream_delta {
-                while let Some(i) = lines_to_here
-                    .iter()
-                    .position(|(_end_idx, _prev_nid, path)| {
-                        if path.len() >= 3 {
-                            // NB: path is stored in reverse order
-                            upstream_per_edge.get(&(path[1], path[0])).unwrap()
-                                - upstream_per_edge
-                                    .get(&(path[path.len() - 1], path[path.len() - 2]))
-                                    .unwrap()
-                                > max_upstream_delta
-                        } else {
-                            false
-                        }
-                    })
-                {
-                    let (other_end_idx, _prev_nid, other_points) = lines_to_here.swap_remove(i);
-                    results_to_pop.push((other_end_idx, other_points));
+                todo!()
+                //while let Some(i) = lines_to_here
+                //    .iter()
+                //    .position(|(_end_idx, _prev_nid, path)| {
+                //        if path.len() >= 3 {
+                //            // NB: path is stored in reverse order
+                //            upstream_per_edge.get(&(path[1], path[0])).unwrap()
+                //                - upstream_per_edge
+                //                    .get(&(path[path.len() - 1], path[path.len() - 2]))
+                //                    .unwrap()
+                //                > max_upstream_delta
+                //        } else {
+                //            false
+                //        }
+                //    })
+                //{
+                //    let (other_end_idx, _prev_nid, other_points) = lines_to_here.swap_remove(i);
+                //    results_to_pop.push((other_end_idx, other_points));
 
-                    if lines_to_here.is_empty() {
-                        // we've ended this line, so start a new one
-                        lines_to_here.push((other_end_idx, nid, vec![nid]));
-                    }
-                }
+                //    if lines_to_here.is_empty() {
+                //        // we've ended this line, so start a new one
+                //        lines_to_here.push((other_end_idx, nid, vec![nid]));
+                //    }
+                //}
             }
 
             // if we have >1 lines_to_here, how do we decide which to continue onwards for this,
@@ -1576,9 +1561,9 @@ fn do_group_by_ends(
                 line_to_continue_idx = lines_to_here
                     .iter()
                     .map(|(_end_idx, prev_nid, _path)| prev_nid)
-                    .map(|&prev_nid| upstream_per_edge.get(&(nid, prev_nid)).unwrap())
+                    .map(|&prev_nid| g.edge_property_unchecked((nid, prev_nid)).upstream_m)
                     .enumerate()
-                    .max_by_key(|(_idx, total_upstream)| OrderedFloat(**total_upstream))
+                    .max_by_key(|(_idx, total_upstream)| OrderedFloat(*total_upstream))
                     .unwrap()
                     .0;
             }
@@ -1615,9 +1600,9 @@ fn do_group_by_ends(
             } else {
                 let line_to_continue_idx = possible_ins
                     .iter()
-                    .map(|&next_nid| upstream_per_edge.get(&(next_nid, nid)).unwrap())
+                    .map(|&next_nid| g.edge_property_unchecked((next_nid, nid)).upstream_m)
                     .enumerate()
-                    .max_by_key(|(_idx, total_upstream)| OrderedFloat(**total_upstream))
+                    .max_by_key(|(_idx, total_upstream)| OrderedFloat(*total_upstream))
                     .unwrap()
                     .0;
                 let possible_in = possible_ins.swap_remove(line_to_continue_idx);
@@ -1645,10 +1630,10 @@ fn do_group_by_ends(
         segments_spinner.inc(1);
         nodes_bar.inc(path.len().saturating_sub(1) as u64);
 
-        let from_upstream_m = *upstream_per_edge.get(&(path[0], path[1])).unwrap();
-        let to_upstream_m_init = upstream_per_edge
-            .get(&(path[path.len() - 2], path[path.len() - 1]))
-            .unwrap();
+        let from_upstream_m = g.edge_property_unchecked((path[0], path[1])).upstream_m;
+        let to_upstream_m_init = g
+            .edge_property_unchecked((path[path.len() - 2], path[path.len() - 1]))
+            .upstream_m;
         let to_upstream_m = to_upstream_m_init
             + inter_store
                 .expand_directed(path[path.len() - 2], path[path.len() - 1])
@@ -1717,7 +1702,6 @@ fn do_write_upstreams(
     progress_bars: &MultiProgress,
     style: &ProgressStyle,
     topologically_sorted_nodes: &[i64],
-    upstream_per_edge: &SortedSliceMap<(i64, i64), f64>,
     inter_store: &inter_store::InterStore,
     nodeid_pos: &impl NodeIdPosition,
     end_points: &[i64],
@@ -1728,7 +1712,7 @@ fn do_write_upstreams(
     tag_group_value: &[String],
 ) -> Result<()> {
     let writing_upstreams_bar = progress_bars.add(
-        ProgressBar::new(upstream_per_edge.len() as u64)
+        ProgressBar::new(g.num_edges() as u64)
             .with_message("Writing upstreams file")
             .with_style(style.clone()),
     );
@@ -1736,14 +1720,15 @@ fn do_write_upstreams(
     // we loop over all nodes in topologically_sorted_nodes (which is annotated in
     // upstream_length_iter with the upstream value) and flat_map that into each line segment
     // that goes out of that.
-    let lines = upstream_per_edge
-        .iter()
+    let lines = g
+        .edges_iter_w_prop()
         .progress_with(writing_upstreams_bar)
-        .map(|((from_nid, to_nid), initial_upstream_len)| {
+        .map(|(from_nid, to_nid, eprop)| {
+            let initial_upstream_len = eprop.upstream_m;
             let end_idx: usize = g.vertex_property_unchecked(&to_nid).assigned_end_idx as usize;
-            let flow_tag_group = nid_pair_to_tagid.get(&(*from_nid, *to_nid)).copied();
+            let flow_tag_group = nid_pair_to_tagid.get(&(from_nid, to_nid)).copied();
             let tag_group_info = nid_pair_to_taggroupid
-                .get(&(*from_nid, *to_nid))
+                .get(&(from_nid, to_nid))
                 .map(|idx| &tag_group_info[*idx as usize]);
             (
                 from_nid,
@@ -1759,11 +1744,11 @@ fn do_write_upstreams(
                 // Expand all the intermediate nodes between these 2, and increase the current
                 // total upsteam, and output all that for the next iteration
                 inter_store
-                    .expand_directed(*from_nid, *to_nid)
+                    .expand_directed(from_nid, to_nid)
                     .map(|nid| (nid, nodeid_pos.get(&nid).unwrap()))
                     .tuple_windows::<(_, _)>()
                     .scan(
-                        *initial_upstream_len,
+                        initial_upstream_len,
                         move |curr_upstream_len, ((nid1, p1), (nid2, p2))| {
                             let this_len = haversine::haversine_m_fpair(p1, p2);
                             let from_upstream_len = *curr_upstream_len;
@@ -1964,7 +1949,6 @@ fn calc_tag_group(
     nid_pair_to_tagid: &SortedSliceMap<(i64, i64), u32>,
     tag_group_value: &[String],
     g: &graph::DirectedGraph2<VertexProperty, EdgeProperty>,
-    upstream_per_edge: &SortedSliceMap<(i64, i64), f64>,
     new_progress_bar_func: impl Fn(u64, &str) -> ProgressBar,
 ) -> (SortedSliceMap<(i64, i64), u64>, Box<[TagGroupInfo]>) {
     let started_calc = Instant::now();
@@ -2108,10 +2092,10 @@ fn calc_tag_group(
     for seg in tag_group_ends.iter() {
         let group = nid_pair_to_taggroupid.get(seg).unwrap();
         // TODO need to include last segment?
-        if upstream_per_edge.get(seg).is_none() {
-            //warn!("No upstream for {:?}", seg);
+        if !g.contains_edge(seg.0, seg.1) {
+            warn!("No upstream for {:?}", seg);
         }
-        tag_group_info[*group as usize].upstream_m += upstream_per_edge.get(seg).unwrap_or(&0.);
+        tag_group_info[*group as usize].upstream_m += g.edge_property_unchecked(*seg).upstream_m;
     }
 
     // For every taggroup, calculate the tributaries, distributaries etc.
@@ -2428,7 +2412,6 @@ fn do_waterway_grouped(
     style: &ProgressStyle,
     end_points: &[i64],
     topologically_sorted_nodes: &[i64],
-    upstream_per_edge: &SortedSliceMap<(i64, i64), f64>,
     nodeid_pos: &impl NodeIdPosition,
     end_point_tag_values: &[SmallVec<[Option<String>; 1]>],
     ends_tags: &[String],
@@ -2459,7 +2442,7 @@ fn do_waterway_grouped(
         json!({
             "nid": nid,
             "lat": round(&pos.1, 7), "lon": round(&pos.0, 7),
-            "upstream_m": round(&(upstream_per_edge.get(seg).unwrap()+extra), 1),
+            "upstream_m": round(&(g.edge_property_unchecked(*seg).upstream_m+extra), 1),
         })
     };
 

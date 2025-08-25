@@ -553,6 +553,9 @@ where
                     .map(|(_vid, prop)| prop)
             })
     }
+    pub fn edge_property_unchecked(&self, edge: (i64, i64)) -> &E {
+        self.edge_property(edge).unwrap()
+    }
 
     pub fn set_edge_property(&mut self, edge: (i64, i64), property: E) {
         if edge.0 == edge.1 {
@@ -602,6 +605,11 @@ where
             })
     }
 
+    pub fn edges_iter_w_prop(&self) -> impl Iterator<Item = (i64, i64, &E)> {
+        self.edges.iter().flat_map(|(nid1, (_vprop, _ins, outs))| {
+            outs.iter().map(|(nid2, eprop)| (*nid1, *nid2, eprop))
+        })
+    }
     pub fn edges_iter_w_prop_mut(&mut self) -> impl Iterator<Item = (i64, i64, &mut E)> {
         self.edges
             .iter_mut()
