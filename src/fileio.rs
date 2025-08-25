@@ -4,7 +4,7 @@ use std::iter::once;
 use std::path::Path;
 
 /// Some sort of geometry type that can print out it's own coordinates
-pub trait Geometry {
+pub trait GeometryOutput {
     fn type_name(&self) -> &[u8];
     fn write_coords(&self, f: &mut impl Write) -> Result<()>;
     fn write_wkt(&self, buf: &mut Vec<u8>);
@@ -19,7 +19,8 @@ pub trait Geometry {
     }
 }
 
-impl Geometry for Vec<Vec<(f64, f64)>> {
+
+impl GeometryOutput for Vec<Vec<(f64, f64)>> {
     fn type_name(&self) -> &[u8] {
         b"MultiLineString"
     }
@@ -32,7 +33,7 @@ impl Geometry for Vec<Vec<(f64, f64)>> {
     }
 }
 
-impl Geometry for Vec<(f64, f64)> {
+impl GeometryOutput for Vec<(f64, f64)> {
     fn type_name(&self) -> &[u8] {
         b"LineString"
     }
@@ -45,7 +46,7 @@ impl Geometry for Vec<(f64, f64)> {
     }
 }
 
-impl Geometry for (f64, f64) {
+impl GeometryOutput for (f64, f64) {
     fn type_name(&self) -> &[u8] {
         b"Point"
     }
@@ -57,7 +58,7 @@ impl Geometry for (f64, f64) {
     }
 }
 
-impl Geometry for &(f64, f64) {
+impl GeometryOutput for &(f64, f64) {
     fn type_name(&self) -> &[u8] {
         b"Point"
     }
@@ -70,7 +71,7 @@ impl Geometry for &(f64, f64) {
     }
 }
 
-impl Geometry for ((f64, f64), (f64, f64)) {
+impl GeometryOutput for ((f64, f64), (f64, f64)) {
     fn type_name(&self) -> &[u8] {
         b"LineString"
     }
@@ -118,7 +119,7 @@ pub fn write_geojson_features_directly<G>(
     output_format: &OutputFormat,
 ) -> Result<usize>
 where
-    G: Geometry,
+    G: GeometryOutput,
 {
     let mut num_written = 0;
     let mut features = features.peekable();
@@ -149,7 +150,7 @@ pub fn write_geojson_feature_directly<G>(
     output_format: &OutputFormat,
 ) -> Result<usize>
 where
-    G: Geometry,
+    G: GeometryOutput,
 {
     let mut num_written = 0;
     if output_format == &OutputFormat::GeoJSONSeq {
@@ -218,7 +219,7 @@ pub fn write_csv_features_directly<G>(
     output_geom_format: impl Into<OutputGeometryFormat>,
 ) -> Result<usize>
 where
-    G: Geometry,
+    G: GeometryOutput,
 {
     let output_geom_format = output_geom_format.into();
     let mut headers: Vec<String> = Vec::with_capacity(10);
