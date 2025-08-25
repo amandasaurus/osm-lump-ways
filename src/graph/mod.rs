@@ -814,7 +814,7 @@ where
         assert!(self.contains_vertex(replacement), "Replacement vertex {replacement} doesn't exist");
 
         //let debug = *vertex == 187649412 || *replacement == 187649412;
-        let debug = true;
+        let debug = false;
         if debug { dbg!(vertex); dbg!(replacement); }
         let mut old = match self.edges.remove(vertex) {
             None => {
