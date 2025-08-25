@@ -410,8 +410,7 @@ fn main() -> Result<()> {
         let total_num_pairs = tagvalues_to_edges
             .par_iter()
             .map(|(_tagvalue, pairs)| pairs.len())
-            .sum();
-        nid_pair_to_tagid.reserve(total_num_pairs);
+            .sum::<usize>();
 
         info!(
             "Have following {} unique '{}' tags in {} node pairs",
