@@ -262,3 +262,8 @@ where
 
     Ok(num_written)
 }
+
+pub enum GenericGeometry {
+	Point((f64, f64)),
+	SimpleLineString(((f64, f64), (f64, f64))),
+}
