@@ -7,16 +7,16 @@ use indicatif::ProgressDrawTarget;
 
 use std::collections::{BTreeMap, HashSet};
 
-pub(crate) fn kosaraju(
-    g: &impl DirectedGraphTrait,
+pub(crate) fn kosaraju<V, E>(
+    g: &impl DirectedGraphTrait<V, E>,
     calc_components_bar: &ProgressBar,
 ) -> BTreeMap<i64, i64> {
     kosaraju_it(g, calc_components_bar)
 }
 
 /// Iterative Koaraju algorithm
-pub(crate) fn kosaraju_it(
-    g: &impl DirectedGraphTrait,
+pub(crate) fn kosaraju_it<V, E>(
+    g: &impl DirectedGraphTrait<V, E>,
     calc_components_bar: &ProgressBar,
 ) -> BTreeMap<i64, i64> {
     let mut visited_vertexes: HashSet<i64> = HashSet::new();
