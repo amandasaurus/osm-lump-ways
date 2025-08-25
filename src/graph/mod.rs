@@ -539,67 +539,6 @@ pub struct DirectedGraph2 {
     edge_properties: BTreeMap<(i64, i64), (bool, bool)>,
 }
 
-impl DirectedGraph2 {
-    /// Remove any vertexes which have incoming edges, or outgoing edges, but not both.
-    /// Vertexes like this cannot be part of a cycle. Removing them makes cycle detection faster.
-    pub fn remove_vertexes_with_in_xor_out(&mut self) {
-        let mut vertexes_to_remove = Vec::new();
-        let mut round = 0;
-        let (mut orig_num_vertexes, mut num_vertexes);
-
-        let mut more_vertexes_to_remove = Vec::new();
-
-        loop {
-            orig_num_vertexes = self.num_vertexes();
-            if orig_num_vertexes == 0 {
-                break;
-            }
-            vertexes_to_remove.truncate(0);
-            more_vertexes_to_remove.truncate(0);
-            // Trying to make this parallel or sensible doesn't speed things up a lot...
-            vertexes_to_remove.extend(self.edges.iter().filter_map(|(v, (ins, outs))| {
-                if !ins.is_empty() ^ !outs.is_empty() {
-                    Some(v)
-                } else {
-                    None
-                }
-            }));
-
-            while !vertexes_to_remove.is_empty() {
-                debug!(
-                    "remove_vertexes_with_in_xor_out: round {round}. vertexes_to_remove.len() = {} num_vertexes {}",
-                    vertexes_to_remove.len(),
-                    self.num_vertexes()
-                );
-                more_vertexes_to_remove.truncate(0);
-                for v in vertexes_to_remove.drain(..) {
-                    let ins_outs = self.remove_vertex(&v);
-                    //removing_vertexes_bar.inc(1);
-                    if let Some((ins, outs)) = ins_outs {
-                        more_vertexes_to_remove
-                            .extend(ins.into_iter().filter(|v| self.neighbors_in_xor_out(v)));
-                        more_vertexes_to_remove
-                            .extend(outs.into_iter().filter(|v| self.neighbors_in_xor_out(v)));
-                    }
-                }
-                round += 1;
-                std::mem::swap(&mut vertexes_to_remove, &mut more_vertexes_to_remove);
-            }
-            num_vertexes = self.num_vertexes();
-            trace!(
-                "remove_vertexes_with_in_xor_out: round {}. Now {} vertexes. {} have been removed",
-                round,
-                num_vertexes,
-                orig_num_vertexes - num_vertexes
-            );
-            if num_vertexes == orig_num_vertexes {
-                break;
-            }
-            round += 1;
-        }
-    }
-}
-
 impl DirectedGraphTrait for DirectedGraph2 {
     fn new() -> Self {
         Default::default()
