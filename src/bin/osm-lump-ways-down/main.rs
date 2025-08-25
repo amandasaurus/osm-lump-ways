@@ -80,7 +80,7 @@ macro_rules! sort_dedup {
     };
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 struct VertexProperty {
     upstream_m: f64,
     assigned_end_idx: i32,
@@ -95,7 +95,7 @@ impl Default for VertexProperty {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 struct EdgeProperty {
     length_m: f64,
     /// the from value
