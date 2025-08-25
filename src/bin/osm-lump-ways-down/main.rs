@@ -425,13 +425,6 @@ fn main() -> Result<()> {
             }
             tag_group_value.push(tagvalue);
         }
-        info!(
-            "Total size of the '{}' lookup: {} bytes",
-            flow_follows_tag,
-            nid_pair_to_tagid
-                .get_size()
-                .to_formatted_string(&Locale::en)
-        );
     }
 
     let calc_components_bar = progress_bars.add(
