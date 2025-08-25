@@ -28,7 +28,7 @@ where
         + std::ops::Add<Output = E>
         + std::cmp::PartialEq
         + Default,
- {
+{
     fn default() -> Self {
         Self::new()
     }
@@ -548,7 +548,8 @@ where
             .get(&edge.0)
             .map(|(_, _, outs)| outs)
             .and_then(|outs| {
-                outs.iter().find(|(vid, _p)| *vid == edge.1)
+                outs.iter()
+                    .find(|(vid, _p)| *vid == edge.1)
                     .map(|(_vid, prop)| prop)
             })
     }

@@ -748,7 +748,7 @@ fn main() -> Result<()> {
     // Calculate the upstream for every node and edge.
 
     // Upstream m value for each node in topologically_sorted_nodes
-    g.vertexes_w_prop_par_mut().for_each(|(v, vprop)| {
+    g.vertexes_w_prop_par_mut().for_each(|(_v, vprop)| {
         vprop.upstream_m = 0.;
     });
 
@@ -1103,7 +1103,7 @@ fn main() -> Result<()> {
     let mut tmp_biggest_end: HashMap<i64, i32> = HashMap::new();
 
     // Doing topologically_sorted_nodes in reverse, means we are “walking upstream”.
-    for (nid_idx, &nid) in topologically_sorted_nodes.iter().enumerate().rev() {
+    for &nid in topologically_sorted_nodes.iter().rev() {
         // if this node is an end point then save that
         // otherwise, use the value from the cache
         let this_end_idx = end_points.binary_search(&nid).ok().map(|i| i as i32);
@@ -1133,7 +1133,7 @@ fn main() -> Result<()> {
     }
     assert!(
         g.vertexes_w_prop_par_mut()
-            .all(|(v, vprop)| vprop.assigned_end_idx >= 0)
+            .all(|(_v, vprop)| vprop.assigned_end_idx >= 0)
     );
 
     let new_progress_bar_func = |total: u64, message: &str| {
@@ -1145,12 +1145,7 @@ fn main() -> Result<()> {
     };
 
     let tag_group_data_opt = if args.upstreams.is_some() || args.grouped_waterways.is_some() {
-        Some(calc_tag_group(
-            &topologically_sorted_nodes,
-            &tag_group_value,
-            &mut g,
-            new_progress_bar_func,
-        ))
+        Some(calc_tag_group(&mut g, new_progress_bar_func))
     } else {
         None
     };
@@ -1180,7 +1175,6 @@ fn main() -> Result<()> {
             upstream_filename,
             &progress_bars,
             &style,
-            &topologically_sorted_nodes,
             &inter_store,
             &nodeid_pos,
             &end_points,
@@ -1196,11 +1190,7 @@ fn main() -> Result<()> {
             &g,
             &progress_bars,
             &style,
-            &end_points,
-            &topologically_sorted_nodes,
             &nodeid_pos,
-            &end_point_tag_values,
-            &args.ends_tag,
             &inter_store,
             tag_group_info,
             &tag_group_value,
@@ -1687,7 +1677,6 @@ fn do_write_upstreams(
     upstream_filename: &Path,
     progress_bars: &MultiProgress,
     style: &ProgressStyle,
-    topologically_sorted_nodes: &[i64],
     inter_store: &inter_store::InterStore,
     nodeid_pos: &impl NodeIdPosition,
     end_points: &[i64],
@@ -1929,8 +1918,6 @@ impl Default for TagGroupInfo {
 }
 
 fn calc_tag_group(
-    topologically_sorted_nodes: &[i64],
-    tag_group_value: &[String],
     g: &mut graph::DirectedGraph2<VertexProperty, EdgeProperty>,
     new_progress_bar_func: impl Fn(u64, &str) -> ProgressBar,
 ) -> Box<[TagGroupInfo]> {
@@ -1951,7 +1938,7 @@ fn calc_tag_group(
         outgoing_groups.truncate(0);
         outgoing_groups.extend(
             g.out_edges_w_prop(nid2)
-                .map(|(_nid, out, eprop)| eprop.tagid),
+                .map(|(_nid, _out, eprop)| eprop.tagid),
         );
         outgoing_groups.dedup();
         this_group = eprop.tagid;
@@ -1975,7 +1962,6 @@ fn calc_tag_group(
     // Step 2: Group all the segments based on topological connectivness
     // (yes this is like osm-lump-ways)
     // for each segment, assign it to a group id
-    let curr_group_id = 0;
     let mut frontier: VecDeque<_> = VecDeque::new();
     let assign_to_group =
         new_progress_bar_func(g.num_edges() as u64, "Assigning each segment to an end");
@@ -2094,14 +2080,14 @@ fn calc_tag_group(
             tg.sinks.push(nid2);
         }
 
-        for (_nid2, nid3, eprop2) in g
+        for (_nid2, _nid3, eprop2) in g
             .out_edges_w_prop(nid2)
             .filter(|(_, _, eprop2)| eprop2.taggroupid != group_id)
         {
             tg.confluences.push(nid2);
             tg.unallocated_other_groups.push(eprop2.taggroupid);
         }
-        for (nid0, _nid2, eprop0) in g
+        for (_nid0, _nid2, eprop0) in g
             .in_edges_w_prop(nid1)
             .filter(|(_, _, eprop0)| eprop0.taggroupid != group_id)
         {
@@ -2138,7 +2124,7 @@ fn calc_tag_group(
     };
 
     let flows_out = |nid: i64, group_id: u64| -> bool { flow_type(nid, group_id) == FlowType::Out };
-    let flows_out_or_through = |nid: i64, group_id: u64| -> bool {
+    let _flows_out_or_through = |nid: i64, group_id: u64| -> bool {
         match flow_type(nid, group_id) {
             FlowType::Out | FlowType::Through => true,
             FlowType::In | FlowType::No => false,
@@ -2304,7 +2290,7 @@ fn calc_tag_group(
                 .confluences
                 .iter()
                 .flat_map(|&nid| g.in_edges_w_prop(nid))
-                .map(|(nid1, nid2, eprop)| eprop.taggroupid)
+                .map(|(_nid1, _nid2, eprop)| eprop.taggroupid)
                 .filter(|other_tgid| *other_tgid != tgid as u64)
                 .filter(|other_tgid| !tag_group_info[*other_tgid as usize].has_stream_level())
                 .dedup(),
@@ -2395,11 +2381,7 @@ fn do_waterway_grouped(
     g: &graph::DirectedGraph2<VertexProperty, EdgeProperty>,
     progress_bars: &MultiProgress,
     style: &ProgressStyle,
-    end_points: &[i64],
-    topologically_sorted_nodes: &[i64],
     nodeid_pos: &impl NodeIdPosition,
-    end_point_tag_values: &[SmallVec<[Option<String>; 1]>],
-    ends_tags: &[String],
     inter_store: &inter_store::InterStore,
     tag_group_info: &[TagGroupInfo],
     tag_group_value: &[String],
