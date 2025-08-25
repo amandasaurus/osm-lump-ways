@@ -2697,3 +2697,41 @@ fn calc_through_path_length(
 
     *longest_path_len
 }
+
+fn write_debug_geojson<V, E>(
+    g: &impl DirectedGraphTrait<V, E>,
+    nodeid_pos: &impl NodeIdPosition,
+    w: &mut impl std::io::Write,
+) -> Result<()>
+where
+    V: serde::Serialize,
+    E: serde::Serialize,
+{
+    fileio::write_geojson_features_directly(
+        g.vertexes_w_prop()
+            .map(|(nid, vprop)| {
+                let mut vprop: serde_json::Value = json!(vprop);
+                vprop["nid"] = nid.into();
+                (
+                    vprop,
+                    fileio::GenericGeometry::Point(nodeid_pos.get(&nid).unwrap()),
+                )
+            })
+            .chain(g.edges_iter_w_prop().map(|(nid1, nid2, eprop)| {
+                let mut prop: serde_json::Value = json!(eprop);
+                prop["nid1"] = nid1.into();
+                prop["nid2"] = nid2.into();
+                (
+                    prop,
+                    fileio::GenericGeometry::SimpleLineString((
+                        nodeid_pos.get(&nid1).unwrap(),
+                        nodeid_pos.get(&nid2).unwrap(),
+                    )),
+                )
+            })),
+        w,
+        &fileio::OutputFormat::GeoJSONSeq,
+    )?;
+
+    Ok(())
+}
