@@ -547,9 +547,7 @@ where
             .get(&edge.0)
             .map(|(_, _, outs)| outs)
             .and_then(|outs| {
-                outs.iter()
-                    .filter(|(vid, _p)| *vid == edge.1)
-                    .next()
+                outs.iter().find(|(vid, _p)| *vid == edge.1)
                     .map(|(_vid, prop)| prop)
             })
     }
