@@ -518,6 +518,7 @@ struct Vertex<V, E> {
 }
 
 impl<V, E> Vertex<V, E> {
+    #[allow(clippy::type_complexity)]
     fn into_parts(self) -> (V, SmallVec<[i64; 1]>, SmallVec<[(i64, E); 1]>) {
         (self.vprop, self.ins, self.outs)
     }
