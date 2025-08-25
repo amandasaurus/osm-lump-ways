@@ -88,11 +88,11 @@ struct VertexProperty {
 }
 
 impl Default for VertexProperty {
-	fn default() -> Self {
-		VertexProperty {
-			upstream_m: f64::NAN,
-		}
-	}
+    fn default() -> Self {
+        VertexProperty {
+            upstream_m: f64::NAN,
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -105,13 +105,13 @@ struct EdgeProperty {
 }
 
 impl Default for EdgeProperty {
-	fn default() -> Self {
-		EdgeProperty {
-			length_m: f64::NAN,
-			upstream_m: f64::NAN,
-			tagid: u32::MAX,
-		}
-	}
+    fn default() -> Self {
+        EdgeProperty {
+            length_m: f64::NAN,
+            upstream_m: f64::NAN,
+            tagid: u32::MAX,
+        }
+    }
 }
 
 fn main() -> Result<()> {
@@ -633,11 +633,11 @@ fn main() -> Result<()> {
         node_id_replaces.len().to_formatted_string(&Locale::en)
     );
 
-	g.assert_consistancy();
+    g.assert_consistancy();
     info_memory_used!();
     info!("Contracting the graph");
     for (vertex, replacement) in node_id_replaces.iter() {
-		assert!(vertex != replacement);
+        assert!(vertex != replacement);
         g.contract_vertex(vertex, replacement);
 
         // If this segment is part of a cycle, then just delete it from the tag groups and move
@@ -645,7 +645,7 @@ fn main() -> Result<()> {
         //nid_pair_to_tagid.remove(&(*vertex, *replacement));
         //nid_pair_to_tagid.remove(&(*replacement, *vertex));
     }
-	g.assert_consistancy();
+    g.assert_consistancy();
 
     // convert to memory effecient sorted vec.
     let nid_pair_to_tagid = SortedSliceMap::from_iter(nid_pair_to_tagid.into_iter());
@@ -736,17 +736,16 @@ fn main() -> Result<()> {
         );
     }
 
-	// Calculate the length of each edge:
-	g.edges_par_iter_w_prop_mut()
-		.for_each(|(nid1, nid2, eprop)| {
-			eprop.length_m = 
-				inter_store
-				.expand_directed(nid1, nid2)
-				.map(|nid| nodeid_pos.get(&nid).unwrap())
-				.tuple_windows::<(_, _)>()
-				.map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
-				.sum::<f64>()
-			});
+    // Calculate the length of each edge:
+    g.edges_par_iter_w_prop_mut()
+        .for_each(|(nid1, nid2, eprop)| {
+            eprop.length_m = inter_store
+                .expand_directed(nid1, nid2)
+                .map(|nid| nodeid_pos.get(&nid).unwrap())
+                .tuple_windows::<(_, _)>()
+                .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
+                .sum::<f64>()
+        });
 
     // Calculate the upstream for every node and edge.
 
