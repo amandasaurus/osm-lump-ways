@@ -18,6 +18,22 @@ pub struct UndirectedAdjGraph<V, E> {
     edges: BTreeMap<V, BTreeMap<V, (E, SmallVecIntermediates<V>)>>,
 }
 
+impl<V, E> Default for UndirectedAdjGraph<V, E>
+where
+    V: std::hash::Hash + Eq + Copy + Ord + Send + std::fmt::Debug + Default,
+    E: Copy
+        + PartialOrd
+        + Clone
+        + std::fmt::Debug
+        + std::ops::Add<Output = E>
+        + std::cmp::PartialEq
+        + Default,
+ {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<V, E> UndirectedAdjGraph<V, E>
 where
     V: std::hash::Hash + Eq + Copy + Ord + Send + std::fmt::Debug + Default,
