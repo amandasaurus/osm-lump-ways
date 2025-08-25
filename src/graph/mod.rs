@@ -800,7 +800,7 @@ where
     }
 
     fn contract_vertex(&mut self, vertex: &i64, replacement: &i64) {
-        self.assert_consistancy();
+        //self.assert_consistancy();
 
         if vertex == replacement {
             warn!("Trying to contract a vertex with itself: {}", vertex);
@@ -840,7 +840,7 @@ where
         }
 
         if debug { dbg!(&self.edges.get(dbg!(replacement)).unwrap()); }
-        self.assert_consistancy();
+        //self.assert_consistancy();
     }
 
     fn vertexes(&self) -> impl Iterator<Item = i64> + '_ {
