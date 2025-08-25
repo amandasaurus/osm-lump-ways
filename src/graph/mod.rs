@@ -526,7 +526,9 @@ pub trait ContractableDirectedGraph: DirectedGraphTrait {
 
 /// A graph which stores a list of all incoming and outgoing edges
 #[derive(Default, Debug, Clone)]
-pub struct DirectedGraph2<V, E> {
+pub struct DirectedGraph2<V, E>
+    where V: Send+Default+Clone+Sync, E: Send+Default+Clone+Sync
+{
     // key is vertex id
     // value.0 is list of incoming vertexes  (ie there's an edge from something → key)
     // value.1 is list of outgoing vertexes (ie there's an edge from key → something)
@@ -537,7 +539,7 @@ pub struct DirectedGraph2<V, E> {
 }
 
 impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
-    where V: Send+Default, E: Send+Default
+    where V: Send+Default+Clone+Sync, E: Send+Default+Clone+Sync
 {
     fn new() -> Self {
         Default::default()
