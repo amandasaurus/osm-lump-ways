@@ -1144,6 +1144,10 @@ fn main() -> Result<()> {
         )
     };
 
+    let mut f = std::io::BufWriter::new(std::fs::File::create("graph.geojsons")?);
+    write_debug_geojson(&g, &nodeid_pos, &mut f)?;
+    drop(f);
+
     let tag_group_data_opt = if args.upstreams.is_some() || args.grouped_waterways.is_some() {
         Some(calc_tag_group(&mut g, new_progress_bar_func))
     } else {
