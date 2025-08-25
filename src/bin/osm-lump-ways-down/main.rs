@@ -81,16 +81,35 @@ macro_rules! sort_dedup {
     };
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 struct VertexProperty {
     upstream_m: f64,
 }
-#[derive(Debug, Default, Clone)]
+
+impl Default for VertexProperty {
+	fn default() -> Self {
+		VertexProperty {
+			upstream_m: f64::NAN,
+		}
+	}
+}
+
+#[derive(Debug, Clone)]
 struct EdgeProperty {
     length_m: f64,
     /// the from value
     upstream_m: f64,
     tagid: u32,
+}
+
+impl Default for EdgeProperty {
+	fn default() -> Self {
+		EdgeProperty {
+			length_m: f64::NAN,
+			upstream_m: f64::NAN,
+			tagid: u32::MAX,
+		}
+	}
 }
 
 fn main() -> Result<()> {
