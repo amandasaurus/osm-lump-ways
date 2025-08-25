@@ -253,11 +253,6 @@ pub trait DirectedGraphTrait: Send + Sized {
     /// no more incoming
     fn num_ins_zero(&self, vid: &i64) -> bool {
         self.num_in_neighbours(*vid) == 0
-        //fn num_ins_zero(&self, vid: &i64) -> bool {
-        //    self.edges
-        //        .get(vid)
-        //        .map_or(true, |(ins, _outs)| ins.is_empty())
-        //}
     }
 
     /// returns each vertex and the number of in & out edges
@@ -362,7 +357,6 @@ pub trait DirectedGraphTrait: Send + Sized {
     fn into_vertexes_topologically_sorted(self, sorting_nodes_bar: &ProgressBar) -> Vec<i64> {
         let mut g = self;
         let mut result = Vec::with_capacity(g.num_vertexes());
-        //dbg!(g.num_vertexes());
         let mut frontier: Vec<i64> = Vec::new();
 
         let mut others = SmallNidVec::new();
@@ -372,7 +366,6 @@ pub trait DirectedGraphTrait: Send + Sized {
                     |(v, num_ins, _num_outs)| if num_ins == 0 { Some(v) } else { None },
                 ),
             );
-            //dbg!(result.len(), frontier.len());
             if frontier.is_empty() {
                 break;
             }
@@ -469,7 +462,6 @@ pub trait ContractableDirectedGraph: DirectedGraphTrait {
         can_contract_vertex: &impl Fn(&i64) -> bool,
     ) {
         // add the chain starting from the end, so the contracting can work during adding.
-        //dbg!(self.edges.len());
         for (a, b) in rwindows2(vertexes) {
             self.add_edge_contractable(*a, *b, can_contract_vertex);
         }
@@ -538,6 +530,9 @@ where
 {
     pub fn vertex_property(&self, vertex: &i64) -> Option<&V> {
         self.edges.get(vertex).map(|v| &v.0)
+    }
+    pub fn vertex_property_unchecked(&self, vertex: &i64) -> &V {
+        self.vertex_property(vertex).unwrap()
     }
 
     pub fn set_vertex_property(&mut self, vertex: &i64, property: V) {
@@ -705,15 +700,23 @@ where
     }
 
     pub fn vertexes_w_prop(&self) -> impl Iterator<Item = (i64, &V)> + '_ {
-        self.edges.iter().map(|(v, (vprop, _ins, _outs))| (*v, vprop))
+        self.edges
+            .iter()
+            .map(|(v, (vprop, _ins, _outs))| (*v, vprop))
     }
 
     pub fn vertexes_w_prop_par_mut(&mut self) -> impl ParallelIterator<Item = (i64, &mut V)> {
-        self.edges.par_iter_mut().map(|(v, (vprop, _ins, _outs))| (*v, vprop))
+        self.edges
+            .par_iter_mut()
+            .map(|(v, (vprop, _ins, _outs))| (*v, vprop))
     }
 
     pub fn edges_w_prop_par_mut(&mut self) -> impl ParallelIterator<Item = ((i64, i64), &mut E)> {
-        self.edges.par_iter_mut().flat_map(|(v1, (_vprop, _ins, outs))| outs.par_iter_mut().map(|(v2, eprop)| ((*v1, *v2), eprop)))
+        self.edges
+            .par_iter_mut()
+            .flat_map(|(v1, (_vprop, _ins, outs))| {
+                outs.par_iter_mut().map(|(v2, eprop)| ((*v1, *v2), eprop))
+            })
     }
 }
 
@@ -1073,7 +1076,6 @@ impl Graph2 {
         progress_bar: impl Into<Option<ProgressBar>>,
     ) -> impl Iterator<Item = Self> {
         let mut frontier = Vec::new();
-        //let mut frontier: SmallVec<[_; 3]> = smallvec![];
         let progress_bar: Option<ProgressBar> = progress_bar.into();
 
         std::iter::from_fn(move || {
@@ -1164,7 +1166,6 @@ impl Graph2 {
             let mut graph = graphs.pop().unwrap();
             assert!(!graph.is_empty());
 
-            //dbg!(graph.edges.len());
             let target_pair = graph
                 .edges
                 .keys()
@@ -1180,8 +1181,6 @@ impl Graph2 {
                 })
                 .max_by_key(|((_n1, p1), (_n2, p2))| haversine_m_fpair_ord(*p1, *p2));
             let target_pair = target_pair.unwrap();
-            //dbg!(target_pair);
-            //dbg!((haversine_m_fpair(target_pair.0 .1, target_pair.1 .1) / 1000.).round());
 
             let src = target_pair.0;
             let dest = target_pair.1;

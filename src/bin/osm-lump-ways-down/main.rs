@@ -84,12 +84,14 @@ macro_rules! sort_dedup {
 #[derive(Debug, Clone)]
 struct VertexProperty {
     upstream_m: f64,
+    assigned_end_idx: i32,
 }
 
 impl Default for VertexProperty {
     fn default() -> Self {
         VertexProperty {
             upstream_m: f64::NAN,
+            assigned_end_idx: -1,
         }
     }
 }
@@ -642,11 +644,6 @@ fn main() -> Result<()> {
     for (vertex, replacement) in node_id_replaces.iter() {
         assert!(vertex != replacement);
         g.contract_vertex(vertex, replacement);
-
-        // If this segment is part of a cycle, then just delete it from the tag groups and move
-        // on.
-        //nid_pair_to_tagid.remove(&(*vertex, *replacement));
-        //nid_pair_to_tagid.remove(&(*replacement, *vertex));
     }
     g.assert_consistancy();
 
@@ -717,7 +714,6 @@ fn main() -> Result<()> {
     let mut end_point_memberships: Vec<smallvec::SmallVec<[bool; 2]>> = Vec::new();
 
     // Upstream value for every end point
-    let mut end_point_upstreams: Vec<f64> = vec![0.; end_points.len()];
 
     let mut ends_membership_filters: SmallVec<[tagfilter::TagFilter; 3]> =
         args.ends_membership.clone().into();
@@ -753,11 +749,9 @@ fn main() -> Result<()> {
     // Calculate the upstream for every node and edge.
 
     // Upstream m value for each node in topologically_sorted_nodes
-    //let upstream_length: Vec<f64> = vec![0.; topologically_sorted_nodes.len()];
-    //let mut upstream_length = upstream_length.into_boxed_slice();
-	g.vertexes_w_prop_par_mut().for_each(|(v, vprop)| {
-		vprop.upstream_m = 0.;
-	});
+    g.vertexes_w_prop_par_mut().for_each(|(v, vprop)| {
+        vprop.upstream_m = 0.;
+    });
 
     // for an edge in the graph, what's the amount flowing down it. Keys are the from & to nid.
     // Value is upstream_m just at the start of the from nid.
@@ -768,9 +762,6 @@ fn main() -> Result<()> {
             .map(move |nid2| ((nid1, nid2), f64::NAN))
     }));
     let mut upstream_per_edge = SortedSliceMap::from_vec(upstream_per_edge);
-	//g.edges_w_prop_par_mut().for_each(|((v1, v2), eprop)| {
-	//	eprop.upstream_m = f64::NAN;
-	//});
 
     let calc_all_upstreams = progress_bars.add(
         ProgressBar::new(topologically_sorted_nodes.len() as u64)
@@ -781,13 +772,9 @@ fn main() -> Result<()> {
     // we “push” values onto this from upstream HashMap::new() as HashMap<i64, f64>,
     let mut tmp_upstream_length = HashMap::new() as HashMap<i64, f64>;
 
-    for nid in topologically_sorted_nodes
-        .iter()
-        .copied()
-    {
+    for nid in topologically_sorted_nodes.iter().copied() {
         let curr_upstream = tmp_upstream_length.remove(&nid).unwrap_or(0.);
-		g.vertex_property_mut(&nid).upstream_m = curr_upstream;
-        //*upstream_value = curr_upstream;
+        g.vertex_property_mut(&nid).upstream_m = curr_upstream;
 
         let outs = g.out_neighbours(nid).collect::<SmallVec<[_; 2]>>();
 
@@ -906,18 +893,6 @@ fn main() -> Result<()> {
     );
     calc_all_upstream_bar.set_length(topologically_sorted_nodes.len() as u64);
 
-    // Calculate all the upstream value for all the end points.
-    for nid in calc_all_upstream_bar.wrap_iter(
-        topologically_sorted_nodes
-            .iter()
-    ) {
-        if let Ok(idx) = end_points.binary_search(nid) {
-            end_point_upstreams[idx] = g.vertex_property(nid).unwrap().upstream_m;
-            calc_all_upstream_bar.inc(1);
-        }
-    }
-    calc_all_upstream_bar.finish_and_clear();
-    let end_point_upstreams = end_point_upstreams.into_boxed_slice();
     info!(
         "Calculated the upstream value for {} nodes",
         topologically_sorted_nodes
@@ -1067,21 +1042,27 @@ fn main() -> Result<()> {
                     .iter()
                     .chain(std::iter::repeat(&empty_smallvec_str)),
             )
-            .zip(end_point_upstreams.iter())
-            .map(|(((nid, mbms), end_tags), len)| (nid, mbms, end_tags, len))
+            .map(|((nid, mbms), end_tags)| {
+                (
+                    nid,
+                    mbms,
+                    end_tags,
+                    g.vertex_property_unchecked(nid).upstream_m,
+                )
+            })
     };
 
     if let Some(ref ends_filename) = args.ends {
         let end_points_output = end_points_w_meta()
             .filter(|(_nid, _mbms, _end_tgs, len)| {
-                args.min_upstream_m.is_none_or(|min| *len >= &min)
+                args.min_upstream_m.is_none_or(|min| *len >= min)
             })
             .map(|(nid, mbms, end_tags, len)| {
                 (nid, mbms, end_tags, len, nodeid_pos.get(nid).unwrap())
             })
             .map(|(nid, mbms, end_tags, len, pos)| {
                 // Round the upstream to only output 1 decimal place
-                let mut props = serde_json::json!({"upstream_m": round(len, 1), "nid": nid});
+                let mut props = serde_json::json!({"upstream_m": round(&len, 1), "nid": nid});
                 if !ends_membership_filters.is_empty() {
                     for (end_attr_filter, res) in ends_membership_filters.iter().zip(mbms.iter()) {
                         props[format!("is_in:{}", end_attr_filter)] = (*res).into();
@@ -1134,22 +1115,25 @@ fn main() -> Result<()> {
     // end point that this node flows into.
     // We store the index as a i32 to save space. We assume we will have <2³² end points
     // -1 = no known end point (yet).
+    // Default is already -1
+    //
     // (biggest end point = end point with the largest upstream value)
     // TODO replace this with nonzerou32
-    let mut upstream_assigned_end: Vec<i32> = Vec::new();
-
-    upstream_assigned_end.resize(topologically_sorted_nodes.len(), -1);
 
     // this is a cache of values as we walk upstream
     let mut tmp_biggest_end: HashMap<i64, i32> = HashMap::new();
 
-    // Doing topologically_sorted_nodes in reverse, means we are “walking upstream”. We will
+    // Doing topologically_sorted_nodes in reverse, means we are “walking upstream”.
     for (nid_idx, &nid) in topologically_sorted_nodes.iter().enumerate().rev() {
         // if this node is an end point then save that
         // otherwise, use the value from the cache
         let this_end_idx = end_points.binary_search(&nid).ok().map(|i| i as i32);
+
         let curr_biggest = tmp_biggest_end.remove(&nid).or(this_end_idx).unwrap();
-        upstream_assigned_end[nid_idx] = curr_biggest;
+        let curr_biggest_upstream: f64 = g
+            .vertex_property_unchecked(&end_points[curr_biggest as usize])
+            .upstream_m;
+        g.vertex_property_mut(&nid).assigned_end_idx = curr_biggest;
 
         for upper in g.in_neighbours(nid) {
             tmp_biggest_end
@@ -1157,8 +1141,9 @@ fn main() -> Result<()> {
                 .and_modify(|prev_biggest_end_idx| {
                     // for all nodes which are one step upstream of this node, check the
                     // previously calcualted best and update if needed.
-                    if end_point_upstreams[*prev_biggest_end_idx as usize]
-                        < end_point_upstreams[curr_biggest as usize]
+                    if g.vertex_property_unchecked(&end_points[*prev_biggest_end_idx as usize])
+                        .upstream_m
+                        < curr_biggest_upstream
                     {
                         *prev_biggest_end_idx = curr_biggest;
                     }
@@ -1167,8 +1152,10 @@ fn main() -> Result<()> {
                 .or_insert(curr_biggest);
         }
     }
-    assert!(upstream_assigned_end.par_iter().all(|end| *end >= 0));
-    let upstream_assigned_end = upstream_assigned_end.into_boxed_slice();
+    assert!(
+        g.vertexes_w_prop_par_mut()
+            .all(|(v, vprop)| vprop.assigned_end_idx >= 0)
+    );
 
     let new_progress_bar_func = |total: u64, message: &str| {
         progress_bars.add(
@@ -1199,8 +1186,6 @@ fn main() -> Result<()> {
             &style,
             &end_points,
             &topologically_sorted_nodes,
-            &end_point_upstreams,
-            &upstream_assigned_end,
             &upstream_per_edge,
             &nodeid_pos,
             &end_point_tag_values,
@@ -1219,13 +1204,11 @@ fn main() -> Result<()> {
             upstream_filename,
             &progress_bars,
             &style,
-            &upstream_assigned_end,
             &topologically_sorted_nodes,
             &upstream_per_edge,
             &inter_store,
             &nodeid_pos,
             &end_points,
-            &end_point_upstreams,
             &end_point_tag_values,
             &nid_pair_to_tagid,
             nid_pair_to_taggroupid,
@@ -1242,8 +1225,6 @@ fn main() -> Result<()> {
             &style,
             &end_points,
             &topologically_sorted_nodes,
-            &end_point_upstreams,
-            &upstream_assigned_end,
             &upstream_per_edge,
             &nodeid_pos,
             &end_point_tag_values,
@@ -1441,8 +1422,6 @@ fn do_group_by_ends(
     style: &ProgressStyle,
     end_points: &[i64],
     topologically_sorted_nodes: &[i64],
-    end_point_upstreams: &[f64],
-    upstream_assigned_end: &[i32],
     upstream_per_edge: &SortedSliceMap<(i64, i64), f64>,
     nodeid_pos: &impl NodeIdPosition,
     end_point_tag_values: &[SmallVec<[Option<String>; 1]>],
@@ -1462,20 +1441,6 @@ fn do_group_by_ends(
             ProgressStyle::with_template("       {human_pos} segments output").unwrap(),
         ));
 
-    anyhow::ensure!(
-        !upstream_assigned_end.is_empty(),
-        "The upstream_biggest_ends is empty. Has this not been calculated?"
-    );
-
-    anyhow::ensure!(
-        !upstream_assigned_end.is_empty(),
-        "The upstream_biggest_ends is empty. Has this not been calculated?"
-    );
-    anyhow::ensure!(
-        upstream_assigned_end.len() == topologically_sorted_nodes.len(),
-        "Lengths not equal, something will be lost"
-    );
-
     // Lines we are drawing
     // key: i64: the last point in the line
     // value: Vec of:
@@ -1485,10 +1450,7 @@ fn do_group_by_ends(
     #[allow(clippy::type_complexity)]
     let mut in_progress_lines: HashMap<i64, SmallVec<[(i32, i64, Vec<i64>); 2]>> = HashMap::new();
     // walks upstream
-    let mut nid_end_iter = topologically_sorted_nodes
-        .iter()
-        .rev()
-        .zip(upstream_assigned_end.iter().rev());
+    let mut nid_iter = topologically_sorted_nodes.iter().rev();
 
     // just a little buffer we might need later
     let mut possible_ins: SmallVec<[i64; 5]> = smallvec::smallvec![];
@@ -1515,13 +1477,14 @@ fn do_group_by_ends(
                 result.1.reverse();
                 return Some(result);
             }
-            let (&nid, &this_end_idx) = match nid_end_iter.next() {
+            let &nid = match nid_iter.next() {
                 None => {
                     // finished all the nodes
                     return None;
                 }
                 Some(x) => x,
             };
+            let this_end_idx = g.vertex_property_unchecked(&nid).assigned_end_idx;
 
             // which in progress lines are there for this node
             let mut lines_to_here = in_progress_lines.remove(&nid).unwrap_or_default();
@@ -1700,7 +1663,7 @@ fn do_group_by_ends(
             .collect::<Vec<_>>();
         let mut props = serde_json::json!({
             "end_nid": end_points[end_idx as usize],
-            "end_upstream_m": round(&end_point_upstreams[end_idx as usize], 1),
+            //"end_upstream_m": round(&end_point_upstreams[end_idx as usize], 1),
             "from_upstream_m": round(&from_upstream_m, 1),
             "to_upstream_m": round(&to_upstream_m, 1),
             "avg_upstream_m": round(&((to_upstream_m+from_upstream_m)/2.), 1),
@@ -1753,35 +1716,17 @@ fn do_write_upstreams(
     upstream_filename: &Path,
     progress_bars: &MultiProgress,
     style: &ProgressStyle,
-    upstream_assigned_end: &[i32],
     topologically_sorted_nodes: &[i64],
     upstream_per_edge: &SortedSliceMap<(i64, i64), f64>,
     inter_store: &inter_store::InterStore,
     nodeid_pos: &impl NodeIdPosition,
     end_points: &[i64],
-    end_point_upstreams: &[f64],
     end_point_tag_values: &[SmallVec<[Option<String>; 1]>],
     nid_pair_to_tagid: &SortedSliceMap<(i64, i64), u32>,
     nid_pair_to_taggroupid: &SortedSliceMap<(i64, i64), u64>,
     tag_group_info: &[TagGroupInfo],
     tag_group_value: &[String],
 ) -> Result<()> {
-    assert!(
-        !upstream_assigned_end.is_empty(),
-        "When doing upstreams, we should have assigned each point to an end. Why was this not done?"
-    );
-    assert_eq!(
-        topologically_sorted_nodes.len(),
-        upstream_assigned_end.len()
-    );
-
-    let upstream_assigned_end_map: SortedSliceMap<i64, i32> = SortedSliceMap::from_iter(
-        topologically_sorted_nodes
-            .iter()
-            .copied()
-            .zip(upstream_assigned_end.iter().copied()),
-    );
-
     let writing_upstreams_bar = progress_bars.add(
         ProgressBar::new(upstream_per_edge.len() as u64)
             .with_message("Writing upstreams file")
@@ -1795,7 +1740,7 @@ fn do_write_upstreams(
         .iter()
         .progress_with(writing_upstreams_bar)
         .map(|((from_nid, to_nid), initial_upstream_len)| {
-            let end_idx: usize = *upstream_assigned_end_map.get(to_nid).unwrap() as usize;
+            let end_idx: usize = g.vertex_property_unchecked(&to_nid).assigned_end_idx as usize;
             let flow_tag_group = nid_pair_to_tagid.get(&(*from_nid, *to_nid)).copied();
             let tag_group_info = nid_pair_to_taggroupid
                 .get(&(*from_nid, *to_nid))
@@ -1889,7 +1834,7 @@ fn do_write_upstreams(
                     props[format!("from_upstream_m_{}", mult)] =
                         round_mult(&from_upstream_len, *mult).into();
                 }
-                props["end_upstream_m"] = round(&end_point_upstreams[end_idx], 1).into();
+                //props["end_upstream_m"] = round(&end_point_upstreams[end_idx], 1).into();
                 props["end_nid"] = end_points[end_idx].into();
 
                 if !args.ends_tag.is_empty() {
@@ -2483,8 +2428,6 @@ fn do_waterway_grouped(
     style: &ProgressStyle,
     end_points: &[i64],
     topologically_sorted_nodes: &[i64],
-    end_point_upstreams: &[f64],
-    upstream_assigned_end: &[i32],
     upstream_per_edge: &SortedSliceMap<(i64, i64), f64>,
     nodeid_pos: &impl NodeIdPosition,
     end_point_tag_values: &[SmallVec<[Option<String>; 1]>],

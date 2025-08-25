@@ -57,7 +57,7 @@ pub(crate) fn write_ends<'a>(
             &'a i64,
             &'a SmallVec<[bool; 2]>,
             &'a SmallVec<[Option<std::string::String>; 1]>,
-            &'a f64,
+            f64,
         ),
     >,
     args: &cli_args::Args,
@@ -70,10 +70,10 @@ pub(crate) fn write_ends<'a>(
         .filter(|(_nid, end_tags, _len)| {
             !args.ends_csv_only_tagged || end_tags.iter().any(|t| t.is_some())
         })
-        .filter(|&(_nid, _end_tags, &len)| args.ends_csv_min_length_m.is_none_or(|min| len >= min))
-        .filter(|&(_nid, _end_tags, &len)| len > 1.)
+        .filter(|&(_nid, _end_tags, len)| args.ends_csv_min_length_m.is_none_or(|min| len >= min))
+        .filter(|&(_nid, _end_tags, len)| len > 1.)
         .collect::<Vec<_>>();
-    end_points_w_meta.sort_by_key(|(_nid, _end_tags, len)| -OrderedFloat(**len));
+    end_points_w_meta.sort_by_key(|(_nid, _end_tags, len)| -OrderedFloat(*len));
 
     if let Some(only_largest_n) = args.ends_csv_only_largest_n {
         end_points_w_meta.truncate(only_largest_n);
@@ -84,7 +84,7 @@ pub(crate) fn write_ends<'a>(
         let pos = nodeid_pos.get(nid).unwrap();
         csv.write_field(latest_timestamp.to_string())?;
         csv.write_field(latest_timestamp_iso)?;
-        csv.write_field(round(len, 1).to_string())?;
+        csv.write_field(round(&len, 1).to_string())?;
         csv.write_field((uptream_rank + 1).to_string())?;
         csv.write_field(nid.to_string())?;
         csv.write_field(round(&pos.1, 7).to_string())?;
