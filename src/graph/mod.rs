@@ -566,6 +566,11 @@ impl<V, E> DirectedGraph2<V, E>
         self.edges.entry(vertex).and_modify(|o| o.0 = vprop.clone()).or_insert((vprop, Default::default(), Default::default()));
     }
 
+    /// Returns (from_vertex, b, E) where b is an out neighbour of from_vertex
+    pub fn out_edges_w_prop(&self, from_vertex: i64) -> impl Iterator<Item = (i64, i64, &E)> {
+        self.edges.get(&from_vertex).into_iter().flat_map(move |(_vprop, _ins, outs)| outs.iter().map(move |(nid2, eprop)| (from_vertex, *nid2, eprop)))
+    }
+
 }
 
 impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
