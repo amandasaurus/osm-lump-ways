@@ -81,6 +81,18 @@ macro_rules! sort_dedup {
     };
 }
 
+#[derive(Debug, Default, Clone)]
+struct VertexProperty {
+	upstream_m: f64,
+}
+#[derive(Debug, Default, Clone)]
+struct EdgeProperty {
+	length_m: f64,
+	/// the from value
+	upstream_m: f64,
+	tagid: u32,
+}
+
 fn main() -> Result<()> {
     let args = cli_args::Args::parse();
 
