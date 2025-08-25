@@ -554,14 +554,11 @@ where
     }
 
     pub fn edge_property(&self, edge: (i64, i64)) -> Option<&E> {
-        self.edges
-            .get(&edge.0)
-            .map(|v| &v.outs)
-            .and_then(|outs| {
-                outs.iter()
-                    .find(|(vid, _p)| *vid == edge.1)
-                    .map(|(_vid, prop)| prop)
-            })
+        self.edges.get(&edge.0).map(|v| &v.outs).and_then(|outs| {
+            outs.iter()
+                .find(|(vid, _p)| *vid == edge.1)
+                .map(|(_vid, prop)| prop)
+        })
     }
     pub fn edge_property_unchecked(&self, edge: (i64, i64)) -> &E {
         self.edge_property(edge).unwrap()
@@ -601,18 +598,19 @@ where
         self.edges
             .entry(vertex)
             .and_modify(|o| o.vprop = vprop.clone())
-            .or_insert(Vertex { vprop, ..Default::default() });
+            .or_insert(Vertex {
+                vprop,
+                ..Default::default()
+            });
     }
 
     /// Returns (from_vertex, b, E) where b is an out neighbour of from_vertex
     pub fn out_edges_w_prop(&self, from_vertex: i64) -> impl Iterator<Item = (i64, i64, &E)> {
-        self.edges
-            .get(&from_vertex)
-            .into_iter()
-            .flat_map(move |v| {
-                v.outs.iter()
-                    .map(move |(nid2, eprop)| (from_vertex, *nid2, eprop))
-            })
+        self.edges.get(&from_vertex).into_iter().flat_map(move |v| {
+            v.outs
+                .iter()
+                .map(move |(nid2, eprop)| (from_vertex, *nid2, eprop))
+        })
     }
     pub fn in_edges_w_prop(&self, to_vertex: i64) -> impl Iterator<Item = (i64, i64, &E)> {
         self.in_edges(to_vertex)
@@ -620,34 +618,29 @@ where
     }
 
     pub fn edges_iter_w_prop(&self) -> impl Iterator<Item = (i64, i64, &E)> {
-        self.edges.iter().flat_map(|(nid1, v)| {
-            v.outs.iter().map(|(nid2, eprop)| (*nid1, *nid2, eprop))
-        })
+        self.edges
+            .iter()
+            .flat_map(|(nid1, v)| v.outs.iter().map(|(nid2, eprop)| (*nid1, *nid2, eprop)))
     }
     pub fn edges_iter_w_prop_mut(&mut self) -> impl Iterator<Item = (i64, i64, &mut E)> {
         self.edges
             .iter_mut()
-            .flat_map(|(nid1, v)| {
-                v.outs.iter_mut().map(|(nid2, eprop)| (*nid1, *nid2, eprop))
-            })
+            .flat_map(|(nid1, v)| v.outs.iter_mut().map(|(nid2, eprop)| (*nid1, *nid2, eprop)))
     }
     pub fn edges_par_iter_w_prop(&self) -> impl ParallelIterator<Item = (i64, i64, &E)> {
         self.edges
             .par_iter()
-            .flat_map(|(nid1, v)| {
-                v.outs.par_iter().map(|(nid2, eprop)| (*nid1, *nid2, eprop))
-            })
+            .flat_map(|(nid1, v)| v.outs.par_iter().map(|(nid2, eprop)| (*nid1, *nid2, eprop)))
     }
 
     pub fn edges_par_iter_w_prop_mut(
         &mut self,
     ) -> impl ParallelIterator<Item = (i64, i64, &mut E)> {
-        self.edges
-            .par_iter_mut()
-            .flat_map(|(nid1, v)| {
-                v.outs.par_iter_mut()
-                    .map(|(nid2, eprop)| (*nid1, *nid2, eprop))
-            })
+        self.edges.par_iter_mut().flat_map(|(nid1, v)| {
+            v.outs
+                .par_iter_mut()
+                .map(|(nid2, eprop)| (*nid1, *nid2, eprop))
+        })
     }
 
     pub fn assert_consistancy(&self) {
@@ -670,7 +663,8 @@ where
                 assert!(
                     self.edges
                         .get(in_v)
-                        .unwrap().outs
+                        .unwrap()
+                        .outs
                         .iter()
                         .any(|(otherv, _eprop)| otherv == nid1),
                     "Graph Data inconsistancy. {nid1} has {in_v} as one of it's in edges, but there is no corresponding out edge from {in_v} to {nid1}"
@@ -728,9 +722,7 @@ where
     }
 
     pub fn vertexes_w_prop(&self) -> impl Iterator<Item = (i64, &V)> + '_ {
-        self.edges
-            .iter()
-            .map(|(nid, v)| (*nid, &v.vprop))
+        self.edges.iter().map(|(nid, v)| (*nid, &v.vprop))
     }
 
     pub fn vertexes_w_prop_par_mut(&mut self) -> impl ParallelIterator<Item = (i64, &mut V)> {
@@ -740,11 +732,11 @@ where
     }
 
     pub fn edges_w_prop_par_mut(&mut self) -> impl ParallelIterator<Item = ((i64, i64), &mut E)> {
-        self.edges
-            .par_iter_mut()
-            .flat_map(|(nid1, v)| {
-                v.outs.par_iter_mut().map(|(nid2, eprop)| ((*nid1, *nid2), eprop))
-            })
+        self.edges.par_iter_mut().flat_map(|(nid1, v)| {
+            v.outs
+                .par_iter_mut()
+                .map(|(nid2, eprop)| ((*nid1, *nid2), eprop))
+        })
     }
 }
 
@@ -776,10 +768,7 @@ where
         self.edges.len()
     }
     fn num_edges(&self) -> usize {
-        self.edges
-            .iter()
-            .map(|(_vertexid, v)| v.outs.len())
-            .sum()
+        self.edges.iter().map(|(_vertexid, v)| v.outs.len()).sum()
     }
     /// True iff this vertex is in this graph
     fn contains_vertex(&self, vid: &i64) -> bool {
@@ -798,15 +787,11 @@ where
 
     /// returns each vertex and the number of out edges
     fn vertexes_and_num_outs(&self) -> impl Iterator<Item = (i64, usize)> {
-        self.edges
-            .iter()
-            .map(|(nid1, v)| (*nid1, v.outs.len()))
+        self.edges.iter().map(|(nid1, v)| (*nid1, v.outs.len()))
     }
 
     fn vertex_has_outgoing(&self, vid: &i64) -> bool {
-        self.edges
-            .get(vid)
-            .is_some_and(|v| !v.outs.is_empty())
+        self.edges.get(vid).is_some_and(|v| !v.outs.is_empty())
     }
 
     fn detailed_size(&self) -> String {
@@ -827,9 +812,7 @@ where
     }
 
     fn num_ins_zero(&self, vid: &i64) -> bool {
-        self.edges
-            .get(vid)
-            .is_none_or(|v| v.ins.is_empty())
+        self.edges.get(vid).is_none_or(|v| v.ins.is_empty())
     }
 
     fn is_empty(&self) -> bool {
