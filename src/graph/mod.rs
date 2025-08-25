@@ -829,6 +829,7 @@ where
                 self.add_edge_w_prop(*in_v, *replacement, eprop);
             }
         }
+        self.assert_consistancy();
     }
 
     fn vertexes(&self) -> impl Iterator<Item = i64> + '_ {
