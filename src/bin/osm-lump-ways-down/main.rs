@@ -2435,7 +2435,7 @@ fn calc_tag_group(
 #[allow(clippy::too_many_arguments)]
 fn do_waterway_grouped(
     output_filename: &Path,
-    g: &graph::DirectedGraph2<(), ()>,
+    g: &graph::DirectedGraph2<VertexProperty, EdgeProperty>,
     progress_bars: &MultiProgress,
     style: &ProgressStyle,
     end_points: &[i64],
