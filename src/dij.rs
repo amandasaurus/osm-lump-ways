@@ -1,6 +1,6 @@
 #![allow(clippy::type_complexity, dead_code)]
 use super::*;
-use graph::{DirectedGraph2, DirectedGraphTrait, Graph2, UndirectedAdjGraph};
+use graph::{DirectedGraph, DirectedGraphTrait, Graph2, UndirectedAdjGraph};
 use haversine::haversine_m_fpair;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
@@ -235,7 +235,7 @@ pub fn a_star_directed_single<'a>(
     target_idx: i64,
     nodeid_pos: &'a impl NodeIdPosition,
     inter_store: &inter_store::InterStore,
-    edges: &'a DirectedGraph2<(), ()>,
+    edges: &'a DirectedGraph<(), ()>,
 ) -> Option<f64> {
     assert!(edges.contains_vertex(&start_idx));
     assert!(edges.contains_vertex(&target_idx));
@@ -346,7 +346,7 @@ pub fn a_star_directed_single<'a>(
 }
 
 ///// Return the first cycle we find, starting at this vertex
-//pub fn look_for_loop(start_vertex: i64, g: &DirectedGraph2) -> Option<Vec<i64>> {
+//pub fn look_for_loop(start_vertex: i64, g: &DirectedGraph) -> Option<Vec<i64>> {
 //    trace!(
 //        "dij_single started. start_vertex {} g.len() {:?}",
 //        start_vertex,

@@ -2,7 +2,7 @@
 //! Kosaraju Algorithm to find Strongly Connected Components
 //! https://en.wikipedia.org/wiki/Kosaraju%27s_algorithm
 use super::*;
-use crate::graph::{DirectedGraph2, DirectedGraphTrait};
+use crate::graph::{DirectedGraph, DirectedGraphTrait};
 use indicatif::ProgressDrawTarget;
 
 use std::collections::{BTreeMap, HashSet};
@@ -93,8 +93,8 @@ pub(crate) fn kosaraju_it(
 mod tests {
     use super::*;
 
-    fn setup() -> (DirectedGraph2<(), ()>, ProgressBar) {
-        let g = DirectedGraph2::new();
+    fn setup() -> (DirectedGraph<(), ()>, ProgressBar) {
+        let g = DirectedGraph::new();
         let bar = ProgressBar::new(1000);
         bar.set_draw_target(ProgressDrawTarget::hidden());
 

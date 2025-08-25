@@ -33,7 +33,7 @@ use ordered_float::OrderedFloat;
 
 mod cli_args;
 
-use graph::{DirectedGraph2, DirectedGraphTrait};
+use graph::{DirectedGraph, DirectedGraphTrait};
 use haversine::haversine_m;
 use nodeid_position::NodeIdPosition;
 use osm_lump_ways::dij;
@@ -284,7 +284,7 @@ fn main() -> Result<()> {
         &relation_tags,
     )?;
 
-    let g: DirectedGraph2<VertexProperty, EdgeProperty> = DirectedGraph2::new();
+    let g: DirectedGraph<VertexProperty, EdgeProperty> = DirectedGraph::new();
     let g = Arc::new(Mutex::new(g));
 
     // first step, get all the cycles
@@ -1378,7 +1378,7 @@ where
 #[allow(clippy::too_many_arguments)]
 fn do_group_by_ends(
     output_filename: &Path,
-    g: &graph::DirectedGraph2<VertexProperty, EdgeProperty>,
+    g: &graph::DirectedGraph<VertexProperty, EdgeProperty>,
     progress_bars: &MultiProgress,
     style: &ProgressStyle,
     end_points: &[i64],
@@ -1673,7 +1673,7 @@ fn do_group_by_ends(
 #[allow(clippy::too_many_arguments)]
 fn do_write_upstreams(
     args: &cli_args::Args,
-    g: &graph::DirectedGraph2<VertexProperty, EdgeProperty>,
+    g: &graph::DirectedGraph<VertexProperty, EdgeProperty>,
     upstream_filename: &Path,
     progress_bars: &MultiProgress,
     style: &ProgressStyle,
@@ -1918,7 +1918,7 @@ impl Default for TagGroupInfo {
 }
 
 fn calc_tag_group(
-    g: &mut graph::DirectedGraph2<VertexProperty, EdgeProperty>,
+    g: &mut graph::DirectedGraph<VertexProperty, EdgeProperty>,
     new_progress_bar_func: impl Fn(u64, &str) -> ProgressBar,
 ) -> Box<[TagGroupInfo]> {
     let started_calc = Instant::now();
@@ -2378,7 +2378,7 @@ fn calc_tag_group(
 #[allow(clippy::too_many_arguments)]
 fn do_waterway_grouped(
     output_filename: &Path,
-    g: &graph::DirectedGraph2<VertexProperty, EdgeProperty>,
+    g: &graph::DirectedGraph<VertexProperty, EdgeProperty>,
     progress_bars: &MultiProgress,
     style: &ProgressStyle,
     nodeid_pos: &impl NodeIdPosition,
@@ -2671,7 +2671,7 @@ fn calc_through_path_length(
     src_nids: &[i64],
     sink_nids: &[i64],
 ) -> f64 {
-    let mut g = graph::DirectedGraph2::new();
+    let mut g = graph::DirectedGraph::new();
     for line in lines.iter() {
         for seg in line.windows(2) {
             g.add_edge(seg[0], seg[1]);

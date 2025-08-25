@@ -450,7 +450,6 @@ pub trait DirectedGraphTrait: Send + Sized {
     }
 }
 
-
 #[derive(Default, Debug, Clone)]
 struct Vertex<V, E> {
     vprop: V,
@@ -467,7 +466,7 @@ impl<V, E> Vertex<V, E> {
 
 /// A graph which stores a list of all incoming and outgoing edges
 #[derive(Default, Debug, Clone)]
-pub struct DirectedGraph2<V, E>
+pub struct DirectedGraph<V, E>
 where
     V: Send + Default + Clone + Sync + Debug,
     E: Send + Default + Clone + Sync + Debug,
@@ -476,7 +475,7 @@ where
     edges: BTreeMap<i64, Vertex<V, E>>,
 }
 
-impl<V, E> DirectedGraph2<V, E>
+impl<V, E> DirectedGraph<V, E>
 where
     V: Send + Default + Clone + Sync + Debug,
     E: Send + Default + Clone + Sync + Debug,
@@ -682,7 +681,7 @@ where
     }
 }
 
-impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
+impl<V, E> DirectedGraphTrait for DirectedGraph<V, E>
 where
     V: Send + Default + Clone + Sync + Debug,
     E: Send + Default + Clone + Sync + Debug,
@@ -738,7 +737,7 @@ where
 
     fn detailed_size(&self) -> String {
         let s = format!(
-            "DirectedGraph2: num_vertexes {} num_edges {}",
+            "DirectedGraph: num_vertexes {} num_edges {}",
             self.num_vertexes(),
             self.num_edges(),
         );
@@ -856,7 +855,7 @@ where
             if g.is_empty() {
                 return None;
             }
-            let mut new_graph: DirectedGraph2<V, E> = DirectedGraph2::new();
+            let mut new_graph: DirectedGraph<V, E> = DirectedGraph::new();
             vertexes_to_look_at.truncate(0);
             vertexes_to_look_at.push(g.vertexes().next().unwrap());
             let mut num_vertexes = 0;
