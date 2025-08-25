@@ -534,6 +534,9 @@ pub struct DirectedGraph2 {
     // value.0 is list of incoming vertexes  (ie there's an edge from something → key)
     // value.1 is list of outgoing vertexes (ie there's an edge from key → something)
     edges: BTreeMap<i64, (SmallNidVec, SmallNidVec)>,
+
+    vertex_properties: BTreeMap<i64, (bool, bool)>,
+    edge_properties: BTreeMap<(i64, i64), (bool, bool)>,
 }
 
 impl DirectedGraph2 {
@@ -599,9 +602,7 @@ impl DirectedGraph2 {
 
 impl DirectedGraphTrait for DirectedGraph2 {
     fn new() -> Self {
-        Self {
-            edges: Default::default(),
-        }
+        Default::default()
     }
 
     fn out_neighbours(&self, from_vertex: i64) -> impl Iterator<Item = i64> {
