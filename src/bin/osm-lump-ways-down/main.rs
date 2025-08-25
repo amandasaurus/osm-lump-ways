@@ -1764,8 +1764,8 @@ fn do_write_upstreams(
         )
         .map(
             |(
-                _from_nid,
-                _to_nid,
+                from_nid,
+                to_nid,
                 p1,
                 p2,
                 from_upstream_len,
@@ -1776,7 +1776,7 @@ fn do_write_upstreams(
             )| {
                 // Round the upstream to only output 1 decimal place
                 let mut props = serde_json::json!({});
-                props["nids"] = format!("{},{}", _from_nid, _to_nid).into();
+                props["nids"] = format!("{},{}", from_nid, to_nid).into();
                 props["from_upstream_m"] = round(&from_upstream_len, 1).into();
                 props["to_upstream_m"] = round(&to_upstream_len, 1).into();
                 props["flow_tag_group"] = flow_tag_group.into();
