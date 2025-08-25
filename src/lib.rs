@@ -1,5 +1,5 @@
 use get_size::GetSize;
-use log::{debug, info, trace, warn};
+use log::{debug, info, trace};
 use rayon::prelude::*;
 
 use std::cmp::Ordering;

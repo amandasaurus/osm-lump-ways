@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use super::*;
 use haversine::haversine_m_fpair_ord;
 use ordered_float::OrderedFloat;
@@ -17,7 +16,6 @@ pub(crate) struct UndirectedAdjGraph<V, E> {
     edges: BTreeMap<V, BTreeMap<V, (E, SmallVecIntermediates<V>)>>,
 }
 
-#[allow(dead_code)]
 impl<V, E> UndirectedAdjGraph<V, E>
 where
     V: std::hash::Hash + Eq + Copy + Ord + Send + std::fmt::Debug + Default,
@@ -29,12 +27,14 @@ where
         + std::cmp::PartialEq
         + Default,
 {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             edges: Default::default(),
         }
     }
 
+    #[allow(dead_code)]
     pub fn set(&mut self, i: &V, j: &V, val: E) {
         self.edges
             .entry(*i)
@@ -46,6 +46,7 @@ where
             .insert(*i, (val, Default::default()));
     }
 
+    #[allow(dead_code)]
     pub fn remove_vertex(&mut self, v: &V) {
         while let Some((other_v, (_weight, _intermediaters))) =
             self.edges.get_mut(v).unwrap().pop_last()
@@ -63,10 +64,12 @@ where
             .and_then(|from_i| from_i.get(j).map(|(e, _intermediates)| e))
     }
 
+    #[allow(dead_code)]
     pub fn get_all(&self, i: &V, j: &V) -> Option<&(E, SmallVecIntermediates<V>)> {
         self.edges.get(i).and_then(|from_i| from_i.get(j))
     }
 
+    #[allow(dead_code)]
     pub fn get_intermediates(&self, i: &V, j: &V) -> Option<&[V]> {
         self.get_all(i, j)
             .map(|(_e, intermediates)| intermediates.as_slice())
@@ -94,11 +97,13 @@ where
             })
     }
 
+    #[allow(dead_code)]
     /// returns each vertex id and how many neighbours it has
     pub fn iter_vertexes_num_neighbours(&self) -> impl Iterator<Item = (&V, usize)> {
         self.edges.iter().map(|(vid, edges)| (vid, edges.len()))
     }
 
+    #[allow(dead_code)]
     pub fn contains_vertex(&self, v: &V) -> bool {
         self.edges.contains_key(v)
     }
@@ -109,6 +114,8 @@ where
             .iter()
             .map(|(j, (edge_weight, _intermediates))| (j, edge_weight))
     }
+
+    #[allow(dead_code)]
     /// Number of neighbours for this vertex.
     pub fn num_neighbors(&self, i: &V) -> usize {
         self.edges.get(i).map_or(0, |es| es.len())
@@ -121,6 +128,8 @@ where
             .sum::<usize>()
             / 2
     }
+
+    #[allow(dead_code)]
     pub fn num_edges(&self) -> usize {
         self.edges
             .values()
@@ -129,20 +138,20 @@ where
             / 2
     }
 
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.edges.is_empty()
     }
     pub fn num_vertexes(&self) -> usize {
         self.edges.len()
     }
-    pub fn pretty_print(&self, _fmt: &dyn Fn(&E) -> String, _col_join: &str) -> String {
-        String::new()
-    }
 
+    #[allow(dead_code)]
     pub fn vertexes(&self) -> impl Iterator<Item = &V> {
         self.edges.keys()
     }
 
+    #[allow(dead_code)]
     pub fn remove_edge(&mut self, i: &V, j: &V) {
         if let Some(from_i) = self.edges.get_mut(i) {
             from_i.remove(j);
@@ -158,186 +167,6 @@ where
         }
     }
 
-    /// Contract this vertex, returnign true iff this graph was modified
-    pub fn contract_vertex(&mut self, v: &V) -> bool {
-        if !self.contains_vertex(v) {
-            warn!("Called contract_vertex on v: {:?} which doesn't exist", v);
-            return false;
-        }
-        if self.num_neighbors(v) != 2 {
-            trace!(
-                "Called contract_vertex on v: {:?} and it has {} ≠ 2 neighbours",
-                v,
-                self.num_neighbors(v)
-            );
-            return false;
-        }
-        // a - v - b
-        let a = *self.edges[v].keys().nth(0).unwrap();
-        let b = *self.edges[v].keys().nth(1).unwrap();
-        assert!(a != b);
-        if let Some(weight_a_b) = self.get(&a, &b) {
-            // there already is an edge from a↔b
-            if *weight_a_b <= *self.get(&a, v).unwrap() + *self.get(v, &b).unwrap() {
-                // this route via v is longer, so delete v & don't create any new edges
-                self.remove_vertex(v);
-                return true;
-            } else {
-                // this route via v is shorter, so remove the a-b route and let the rest of th
-                // TODO rather than delete and go onwards, just update the a-b vertex instead
-                // (which should save allocations etc)
-                self.remove_edge(&a, &b);
-            }
-        }
-        assert!(self.edges[&a].contains_key(v));
-        assert!(self.edges[&b].contains_key(v));
-        assert!(
-            self.edges[&a][v].0 + self.edges[v][&b].0 == self.edges[&b][v].0 + self.edges[v][&a].0
-        );
-        let edge_a_v = self.edges.get_mut(&a).unwrap().remove(v).unwrap();
-        let _edge_b_v = self.edges.get_mut(&b).unwrap().remove(v).unwrap();
-        let _edge_v_a = self.edges.get_mut(v).unwrap().remove(&a).unwrap();
-        let mut edge_v_b = self.edges.get_mut(v).unwrap().remove(&b).unwrap();
-        assert!(self.edges[v].is_empty());
-        self.edges.remove(v);
-        let new_weight = edge_a_v.0 + edge_v_b.0;
-
-        // We need 2 new Vecs for the a→b & b→a intermediates. Rather than create new Vec, here we
-        // reuse the vecs from a→v & v→b (which we have already `.remove`'ed above). This reduces
-        // allocations, and might speed up the code.
-        let (_weight_a_v, mut new_a_b_intermediates) = edge_a_v;
-        new_a_b_intermediates.reserve(1 + edge_v_b.1.len());
-        new_a_b_intermediates.push(*v);
-        new_a_b_intermediates.append(&mut edge_v_b.1);
-
-        let (_weight_v_b, mut new_b_a_intermediates) = edge_v_b;
-        // New b_a Vec needs to be as big as a_b. Resize with default value of v for now (it'll be
-        // overwritten later)
-        new_b_a_intermediates.resize(new_a_b_intermediates.len(), *v);
-        new_b_a_intermediates.copy_from_slice(&new_a_b_intermediates);
-        new_b_a_intermediates.reverse();
-
-        let new_edge_a_b = (new_weight, new_a_b_intermediates);
-        let new_edge_b_a = (new_weight, new_b_a_intermediates);
-
-        self.edges.get_mut(&a).unwrap().insert(b, new_edge_a_b);
-        self.edges.get_mut(&b).unwrap().insert(a, new_edge_b_a);
-
-        true
-    }
-
-    /// Returns true iff the graph was modified
-    pub fn contract_edges(&mut self) -> bool {
-        self.contract_edges_some(|_| true)
-    }
-
-    /// Contract the edges, but only contract (remove) vertexes that return true.
-    /// Returns true iff the graph was modified
-    pub fn contract_edges_some(&mut self, can_contract_vertex: impl Fn(&V) -> bool) -> bool {
-        let mut graph_has_been_modified = false;
-        let initial_num_edges = self.num_edges();
-        let initial_num_vertexes = self.num_vertexes();
-        trace!(
-            "Starting contract_edges with {} edges and {} vertexes",
-            initial_num_edges, initial_num_vertexes
-        );
-        if initial_num_edges == 1 {
-            return false;
-        }
-
-        let mut graph_has_been_modified_this_iteration;
-        let mut candidate_vertexes = Vec::new();
-        let mut contraction_round = 0;
-        let mut this_vertex_contracted;
-        loop {
-            trace!(
-                "Contraction round {}. There are {} vertexes and {} edges",
-                contraction_round,
-                self.num_vertexes(),
-                self.num_edges()
-            );
-            contraction_round += 1;
-            candidate_vertexes.extend(
-                self.iter_vertexes_num_neighbours()
-                    .filter_map(|(v, nn)| if nn == 2 { Some(v) } else { None })
-                    .filter(|v| can_contract_vertex(v))
-                    .cloned(),
-            );
-            if candidate_vertexes.is_empty() {
-                trace!("No more candidate vertexes");
-                break;
-            }
-            trace!("There are {} candidate vertexes", candidate_vertexes.len());
-            graph_has_been_modified_this_iteration = false;
-            for v in candidate_vertexes.drain(..) {
-                this_vertex_contracted = self.contract_vertex(&v);
-                if this_vertex_contracted {
-                    //trace!("Vertex {:?} was contracted", v);
-                    graph_has_been_modified_this_iteration = true;
-                    graph_has_been_modified = true;
-                } else {
-                    //trace!("Vertex {:?} was not contracted", v);
-                }
-            }
-
-            if !graph_has_been_modified_this_iteration {
-                trace!("End of loop, and no changes made → break out");
-                break;
-            }
-        }
-
-        debug!(
-            "End of contract_edges there are now {} edges and {} vertexes. Removed {} edges and {} vertexes in {} rounds",
-            self.num_edges(),
-            self.num_vertexes(),
-            initial_num_edges - self.num_edges(),
-            initial_num_vertexes - self.num_vertexes(),
-            contraction_round
-        );
-        graph_has_been_modified
-    }
-
-    /// Spike = vertex with just one neighbour.
-    /// Returns true iff graph has been modifed
-    pub fn remove_spikes(&mut self, can_contract_vertex: impl Fn(&V) -> bool) -> bool {
-        let initial_num_edges = self.num_edges();
-        //let initial_num_vertexes = self.num_vertexes();
-        if initial_num_edges == 1 {
-            return false;
-        }
-
-        let mut graph_has_been_modified = false;
-        let mut graph_has_been_modified_this_iteration;
-        let mut candidate_vertexes = Vec::new();
-        //let mut contraction_round = 0;
-        loop {
-            //contraction_round += 1;
-            candidate_vertexes.extend(
-                self.iter_vertexes_num_neighbours()
-                    .filter_map(|(v, nn)| if nn == 1 { Some(v) } else { None })
-                    .filter(|v| can_contract_vertex(v))
-                    .cloned(),
-            );
-            if candidate_vertexes.is_empty() {
-                trace!("No more candidate vertexes");
-                break;
-            }
-            trace!("There are {} candidate vertexes", candidate_vertexes.len());
-            graph_has_been_modified_this_iteration = false;
-            for v in candidate_vertexes.drain(..) {
-                self.remove_vertex(&v);
-                graph_has_been_modified = true;
-                graph_has_been_modified_this_iteration = true;
-            }
-
-            if !graph_has_been_modified_this_iteration {
-                trace!("End of loop, and no changes made → break out");
-                break;
-            }
-        }
-
-        graph_has_been_modified
-    }
 }
 
 pub trait DirectedGraphTrait: Send + Sized {
@@ -967,10 +796,6 @@ impl DirectedGraphTrait for DirectedGraph2 {
     }
 }
 
-fn bin_search_key<V: Ord, T>(v: &V, arr: &[(V, T)]) -> Option<usize> {
-    arr.binary_search_by(|(v2, _)| v2.cmp(v)).ok()
-}
-
 #[derive(Default, Debug)]
 pub struct Graph2 {
     // key is vertex id
@@ -1257,8 +1082,3 @@ pub fn rwindows2<T>(slice: &[T]) -> impl Iterator<Item = (&T, &T)> {
     (1..slice.len()).rev().map(|i| (&slice[i - 1], &slice[i]))
 }
 
-fn ext<T: Clone>(v: &[T], new: T) -> Vec<T> {
-    let mut result: Vec<T> = v.to_vec();
-    result.push(new);
-    result
-}
