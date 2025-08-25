@@ -256,7 +256,7 @@ fn main() -> Result<()> {
         &relation_tags,
     )?;
 
-    let g = graph::DirectedGraph2::new();
+    let g: DirectedGraph2<VertexProperty, EdgeProperty> = DirectedGraph2::new();
     let g = Arc::new(Mutex::new(g));
 
     // Stores the tagvalue group for each segment.
