@@ -470,6 +470,12 @@ pub trait DirectedGraphTrait<V, E>: Send + Sync + Sized {
     fn out_edges_w_prop<'a>(&'a self, from_vertex: i64) -> impl Iterator<Item = (i64, i64, &'a E)>
     where
         E: 'a;
+    fn out_edges_w_prop_mut<'a>(
+        &'a mut self,
+        from_vertex: i64,
+    ) -> impl Iterator<Item = (i64, i64, &'a mut E)>
+    where
+        E: 'a;
     fn in_edges_w_prop<'a>(&'a self, to_vertex: i64) -> impl Iterator<Item = (i64, i64, &'a E)>
     where
         E: 'a;
@@ -819,6 +825,23 @@ where
                 .iter()
                 .map(move |(nid2, eprop)| (from_vertex, *nid2, eprop))
         })
+    }
+    /// Returns (from_vertex, b, E) where b is an out neighbour of from_vertex
+    fn out_edges_w_prop_mut<'a>(
+        &'a mut self,
+        from_vertex: i64,
+    ) -> impl Iterator<Item = (i64, i64, &'a mut E)>
+    where
+        E: 'a,
+    {
+        self.edges
+            .get_mut(&from_vertex)
+            .into_iter()
+            .flat_map(move |v| {
+                v.outs
+                    .iter_mut()
+                    .map(move |(nid2, eprop)| (from_vertex, *nid2, eprop))
+            })
     }
     fn in_edges_w_prop<'a>(&'a self, to_vertex: i64) -> impl Iterator<Item = (i64, i64, &'a E)>
     where

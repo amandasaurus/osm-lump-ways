@@ -121,6 +121,12 @@ impl Default for EdgeProperty {
     }
 }
 
+impl EdgeProperty {
+    fn to_upstream_m(&self) -> f64 {
+        self.upstream_m + self.length_m
+    }
+}
+
 fn main() -> Result<()> {
     let args = cli_args::Args::parse();
 
@@ -765,43 +771,24 @@ fn main() -> Result<()> {
         let curr_upstream = tmp_upstream_length.remove(&nid).unwrap_or(0.);
         g.vertex_property_mut(&nid).upstream_m = curr_upstream;
 
-        let outs = g.out_neighbours(nid).collect::<SmallVec<[_; 2]>>();
+        let mut out_edges = g
+            .out_edges_w_prop(nid)
+            .map(|(_nid1, nid2, eprop)| (nid2, eprop.tagid, eprop.length_m))
+            .collect::<SmallVec<[_; 2]>>();
 
-        if outs.len() == 1 {
-            // simple case, only 1 out → send it all down there
-            let other = outs[0];
-            let outgoing_edge_len = inter_store
-                .expand_directed(nid, other)
-                .map(|nid| nodeid_pos.get(&nid).unwrap())
-                .tuple_windows::<(_, _)>()
-                .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
-                .sum::<f64>();
-
-            *tmp_upstream_length.entry(other).or_default() += curr_upstream + outgoing_edge_len;
-            g.edge_property_mut((nid, other)).upstream_m = curr_upstream;
-        } else if outs.is_empty() {
+        if out_edges.is_empty() {
             // nothing to do
-        } else if outs.len() > 1 {
+        } else if out_edges.len() == 1 {
+            // simple case, only 1 out → send it all down there
+            let (other_nid, _tagid, outgoing_edge_length_m) = out_edges.swap_remove(0);
+            *tmp_upstream_length.entry(other_nid).or_default() +=
+                curr_upstream + outgoing_edge_length_m;
+            g.edge_property_mut((nid, other_nid)).upstream_m = curr_upstream;
+        } else if out_edges.len() > 1 {
             // For all the incoming edges, calculate how much goes in from each group
             let inflow_per_group: SmallVec<[(Option<u32>, f64); 2]> = g
-                .in_neighbours(nid)
-                .map(|in_nid| {
-                    (
-                        g.edge_property_unchecked((in_nid, nid)).tagid,
-                        (in_nid, nid),
-                    )
-                })
-                .map(|(group, (prev_nid, this_nid))| {
-                    let edge_len = inter_store
-                        .expand_directed(prev_nid, this_nid)
-                        .map(|nid| nodeid_pos.get(&nid).unwrap())
-                        .tuple_windows::<(_, _)>()
-                        .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
-                        .sum::<f64>();
-                    let edge_pre_upstream =
-                        g.edge_property_unchecked((prev_nid, this_nid)).upstream_m;
-                    (group, edge_len + edge_pre_upstream)
-                })
+                .in_edges_w_prop(nid)
+                .map(|(_nid0, _nid1, eprop)| (eprop.tagid, eprop.to_upstream_m()))
                 .fold(SmallVec::new(), |mut map, (grp, inflow)| {
                     match map.iter_mut().find(|(g, _)| *g == grp) {
                         None => map.push((grp, inflow)),
@@ -810,22 +797,16 @@ fn main() -> Result<()> {
                     map
                 });
 
-            #[allow(clippy::type_complexity)]
-            let outs: SmallVec<[(Option<u32>, (i64, i64)); 2]> = outs
-                .iter()
-                .map(|&nid2| (g.edge_property_unchecked((nid, nid2)).tagid, (nid, nid2)))
-                .collect();
-
-            let num_outs_per_group: SmallVec<[(Option<u32>, usize); 2]> = outs
-                .iter()
-                .map(|(group, _nids)| group)
-                .fold(SmallVec::new(), |mut map, grp| {
-                    match map.iter().position(|(g, _)| g == grp) {
-                        None => map.push((*grp, 1)),
-                        Some(i) => map[i].1 += 1,
-                    }
-                    map
-                });
+            let num_outs_per_group: SmallVec<[(Option<u32>, usize); 2]> =
+                out_edges
+                    .iter()
+                    .fold(SmallVec::new(), |mut map, (_nid2, tagid, _length_m)| {
+                        match map.iter().position(|(g, _)| g == tagid) {
+                            None => map.push((*tagid, 1)),
+                            Some(i) => map[i].1 += 1,
+                        }
+                        map
+                    });
 
             // now update num_outs_per_group with the total
             // Allocate inflow that goes to the same group
@@ -846,7 +827,7 @@ fn main() -> Result<()> {
                     .any(|(out_group, _)| out_group == in_group)
                 {
                     for (_out_group, outflow) in outflow_per_group.iter_mut() {
-                        *outflow += inflow / (outs.len() as f64);
+                        *outflow += inflow / (out_edges.len() as f64);
                     }
                 }
             }
@@ -861,14 +842,14 @@ fn main() -> Result<()> {
                 debug!("upstream ≠ incomign");
             }
 
-            for (out_group, (_this_nid, other)) in outs.into_iter() {
+            for (nid2, tagid, _length_m) in out_edges.into_iter() {
                 let outflow = outflow_per_group
                     .iter()
-                    .find(|(g, _)| *g == out_group)
+                    .find(|(g, _)| *g == tagid)
                     .unwrap()
                     .1;
-                *tmp_upstream_length.entry(other).or_default() += outflow;
-                g.edge_property_mut((nid, other)).upstream_m = outflow;
+                *tmp_upstream_length.entry(nid2).or_default() += outflow;
+                g.edge_property_mut((nid, nid2)).upstream_m = outflow;
             }
         }
 
