@@ -335,26 +335,10 @@ pub trait DirectedGraphTrait: Send + Sized {
         iter::once(vertex1).chain(iter::once(vertex2))
     }
 
-    /// Removes this vertex (& associated edges) from this graph, and return the list of in- &
-    /// out-edges that it was part of
-    fn remove_vertex(&mut self, vertex: &i64) -> Option<(SmallNidVec, SmallNidVec)>;
+    /// Removes this vertex (& associated edges) from this graph
+    fn remove_vertex(&mut self, vertex: &i64);
 
-    fn contract_vertex(&mut self, vertex: &i64, replacement: &i64) {
-        let old = match self.remove_vertex(vertex) {
-            None => {
-                return;
-            }
-            Some(old) => old,
-        };
-
-        for in_v in old.0.iter() {
-            self.add_edge(*in_v, *replacement);
-        }
-        for out_v in old.1.iter() {
-            self.add_edge(*replacement, *out_v);
-        }
-    }
-
+    fn contract_vertex(&mut self, vertex: &i64, replacement: &i64);
     /// Iterator over all vertexes
     fn vertexes(&self) -> impl Iterator<Item = i64> + '_;
 
@@ -530,12 +514,58 @@ pub struct DirectedGraph2<V, E>
     where V: Send+Default+Clone+Sync, E: Send+Default+Clone+Sync
 {
     // key is vertex id
-    // value.0 is list of incoming vertexes  (ie there's an edge from something → key)
-    // value.1 is list of outgoing vertexes (ie there's an edge from key → something)
-    edges: BTreeMap<i64, (SmallNidVec, SmallNidVec)>,
+    // value is ( Vertex properties,
+    //            list of vertex idx that come in here, so you can look them up quick
+    //            list of outgoing vertexes and the edge property for that edge
 
-    vertex_properties: BTreeMap<i64, V>,
-    edge_properties: BTreeMap<(i64, i64), E>,
+    edges: BTreeMap<i64, (V, SmallVec<[i64; 1]>, SmallVec<[(i64, E); 1]>)>
+
+}
+
+#[allow(dead_code)]
+impl<V, E> DirectedGraph2<V, E>
+    where V: Send+Default+Clone+Sync, E: Send+Default+Clone+Sync
+{
+
+    pub fn vertex_property(&self, vertex: &i64) -> Option<&V> {
+        self.edges.get(vertex).map(|v| &v.0)
+    }
+
+    pub fn set_vertex_property(&mut self, vertex: &i64, property: V) {
+        self.edges.entry(*vertex).or_default().0 = property;
+    }
+    pub fn vertex_property_mut(&mut self, vertex: &i64) -> &mut V {
+        &mut self.edges.entry(*vertex).or_default().0
+    }
+
+    pub fn edge_property(&self, edge: (i64, i64)) -> Option<&E> {
+        self.edges.get(&edge.0).map(|(_, _, outs)| outs).and_then(|outs| outs.iter().filter(|(vid, _p)| *vid == edge.1).next().map(|(_vid, prop)| prop))
+    }
+    
+    pub fn set_edge_property(&mut self, edge: (i64, i64), property: E) {
+        *self.edge_property_mut(edge) = property;
+    }
+
+    pub fn edge_property_mut(&mut self, edge: (i64, i64)) -> &mut E {
+        let vertex = self.edges.entry(edge.0).or_default();
+        let outs = &mut vertex.2;
+        if !outs.iter().any(|(oid, _eprop)| *oid == edge.1) {
+            outs.push((edge.1, E::default()));
+        }
+
+        outs.iter_mut().filter(|(oid, _)| *oid == edge.1).map(|(_, eprop)| eprop).next().unwrap()
+    }
+
+    pub fn add_edge_w_prop(&mut self, vertex1: i64, vertex2: i64, eprop: E) {
+        self.add_edge(vertex1, vertex2);
+        self.set_edge_property((vertex1, vertex2), eprop);
+    }
+
+    pub fn add_vertex_w_prop(&mut self, vertex: i64, vprop: V) {
+        // TODO remove all clones
+        self.edges.entry(vertex).and_modify(|o| o.0 = vprop.clone()).or_insert((vprop, Default::default(), Default::default()));
+    }
+
 }
 
 impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
@@ -549,14 +579,14 @@ impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
         self.edges
             .get(&from_vertex)
             .into_iter()
-            .flat_map(|(_ins, outs)| outs.iter())
+            .flat_map(|(_vprop, _ins, outs)| outs.iter().map(|(vid, _eprop)| vid))
             .copied()
     }
     fn in_neighbours(&self, from_vertex: i64) -> impl Iterator<Item = i64> {
         self.edges
             .get(&from_vertex)
             .into_iter()
-            .flat_map(|(ins, _outs)| ins.iter())
+            .flat_map(|(_vprop, ins, _outs)| ins.iter())
             .copied()
     }
 
@@ -566,7 +596,7 @@ impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
     fn num_edges(&self) -> usize {
         self.edges
             .iter()
-            .map(|(_vertex, (_in_edges, out_edges))| out_edges.len())
+            .map(|(_vertexid, (_vprop, _in_edges, out_edges))| out_edges.len())
             .sum()
     }
     /// True iff this vertex is in this graph
@@ -578,24 +608,21 @@ impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
     fn edges_iter(&self) -> impl Iterator<Item = (i64, i64)> {
         self.edges
             .iter()
-            .flat_map(move |(v, (_ins, outs))| outs.iter().map(move |o| (*v, *o)))
+            .flat_map(move |(v, (_vprop, _ins, outs))| outs.iter().map(move |(o, _eprop)| (*v, *o)))
     }
     fn edges_par_iter(&self) -> impl ParallelIterator<Item = (i64, i64)> {
-        self.edges
-            .iter()
-            .par_bridge()
-            .flat_map(move |(v, (_ins, outs))| outs.par_iter().map(move |o| (*v, *o)))
+        self.edges_iter().par_bridge()
     }
 
     /// returns each vertex and the number of out edges
     fn vertexes_and_num_outs(&self) -> impl Iterator<Item = (i64, usize)> {
-        self.edges.iter().map(|(v, (_ins, outs))| (*v, outs.len()))
+        self.edges.iter().map(|(v, (_vprop, _ins, outs))| (*v, outs.len()))
     }
 
     fn vertex_has_outgoing(&self, vid: &i64) -> bool {
         self.edges
             .get(vid)
-            .is_some_and(|(_ins, outs)| !outs.is_empty())
+            .is_some_and(|(_vprop, _ins, outs)| !outs.is_empty())
     }
 
     fn detailed_size(&self) -> String {
@@ -618,7 +645,7 @@ impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
     fn num_ins_zero(&self, vid: &i64) -> bool {
         self.edges
             .get(vid)
-            .is_none_or(|(ins, _outs)| ins.is_empty())
+            .is_none_or(|(_vprop, ins, _outs)| ins.is_empty())
     }
 
     fn is_empty(&self) -> bool {
@@ -628,58 +655,69 @@ impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
     fn vertexes_and_num_ins_outs(&self) -> impl Iterator<Item = (i64, usize, usize)> + '_ {
         self.edges
             .iter()
-            .map(|(v, (ins, outs))| (*v, ins.len(), outs.len()))
+            .map(|(v, (_vprop, ins, outs))| (*v, ins.len(), outs.len()))
     }
 
     fn neighbors_in_xor_out(&mut self, v: &i64) -> bool {
         self.edges
             .get(v)
-            .is_some_and(|(ins, outs)| !ins.is_empty() ^ !outs.is_empty())
+            .is_some_and(|(_vprop, ins, outs)| !ins.is_empty() ^ !outs.is_empty())
     }
     fn remove_edge(&mut self, vertex1: &i64, vertex2: &i64) {
-        if let Some(from_v1) = &mut self.edges.get_mut(vertex1).map(|(_to, from)| from) {
-            from_v1.retain(|other| other != vertex2);
+        if let Some(from_v1) = &mut self.edges.get_mut(vertex1).map(|(_vprop, _to, from)| from) {
+            from_v1.retain(|other| other.0 != *vertex2);
         }
         if self
             .edges
             .get(vertex1)
-            .is_some_and(|(from, to)| from.is_empty() && to.is_empty())
+            .is_some_and(|(_vprop, from, to)| from.is_empty() && to.is_empty())
         {
             self.edges.remove(vertex1);
         }
-        if let Some(to_v2) = &mut self.edges.get_mut(vertex2).map(|(to, _from)| to) {
+        if let Some(to_v2) = &mut self.edges.get_mut(vertex2).map(|(_vprop, to, _from)| to) {
             to_v2.retain(|other| other != vertex1);
         }
         if self
             .edges
             .get(vertex2)
-            .is_some_and(|(from, to)| from.is_empty() && to.is_empty())
+            .is_some_and(|(_vprop, from, to)| from.is_empty() && to.is_empty())
         {
             self.edges.remove(vertex2);
         }
-
-        self.edge_properties.remove(&(*vertex1, *vertex2));
     }
 
-    fn remove_vertex(&mut self, vertex: &i64) -> Option<(SmallNidVec, SmallNidVec)> {
-        let (ins, outs) = match self.edges.remove(vertex) {
+    fn remove_vertex(&mut self, vertex: &i64) {
+        let mut buf: SmallVec<[i64; 2]> = smallvec![];
+        buf.extend(self.in_neighbours(*vertex));
+        for other in buf.drain(..) {
+            self.remove_edge(&other, vertex);
+        }
+        buf.extend(self.out_neighbours(*vertex));
+        for other in buf.drain(..) {
+            self.remove_edge(vertex, &other);
+        }
+        self.edges.remove(vertex);
+    }
+
+    fn contract_vertex(&mut self, vertex: &i64, replacement: &i64) {
+        let mut old = match self.edges.remove(vertex) {
             None => {
-                return None;
+                return;
             }
-            Some((ins, outs)) => (ins, outs),
+            Some(old) => old,
         };
 
-        // this could definitly be done more effeciently
-        for other_src in ins.iter() {
-            self.remove_edge(other_src, vertex);
-        }
-        for other_dest in outs.iter() {
-            self.remove_edge(vertex, other_dest);
-        }
-        self.vertex_properties.remove(vertex);
+        self.set_vertex_property(replacement, old.0);
 
-        Some((ins, outs))
+        for in_v in old.1.iter() {
+            let eprop = self.edge_property((*in_v, *vertex)).unwrap().clone();
+            self.add_edge_w_prop(*in_v, *replacement, eprop);
+        }
+        for (out_v, eprop) in old.2.drain(..) {
+            self.add_edge_w_prop(*replacement, out_v, eprop);
+        }
     }
+
 
     fn vertexes(&self) -> impl Iterator<Item = i64> + '_ {
         self.edges.keys().copied()
@@ -690,18 +728,17 @@ impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
         if vertex1 == vertex2 {
             return false;
         }
-        let from_v1 = &mut self.edges.entry(vertex1).or_default().1;
-        if from_v1.contains(&vertex2) {
+        let from_v1 = &mut self.edges.entry(vertex1).or_default().2;
+        if from_v1.iter().any(|(vid, _eprop)| vid == &vertex2) {
             return true;
         } else {
-            from_v1.push(vertex2);
-            from_v1.sort();
+            from_v1.push((vertex2, E::default()));
         }
 
         // assume we never get inconsistant
         let other = self.edges.entry(vertex2).or_default();
-        other.0.push(vertex1);
-        other.0.sort();
+        other.1.push(vertex1);
+        other.1.sort();
         false
     }
 
@@ -714,23 +751,23 @@ impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
             if g.is_empty() {
                 return None;
             }
-            let mut new_graph = DirectedGraph2::new();
+            let mut new_graph: DirectedGraph2<V, E> = DirectedGraph2::new();
             vertexes_to_look_at.truncate(0);
             vertexes_to_look_at.push(g.vertexes().next().unwrap());
             let mut num_vertexes = 0;
 
             while let Some(vertex) = vertexes_to_look_at.pop() {
                 num_vertexes += 1;
-                if let Some((ins, outs)) = g.remove_vertex(&vertex) {
-                    for in_vertex in ins.into_iter() {
-                        new_graph.add_edge(in_vertex, vertex);
-                        vertexes_to_look_at.push(in_vertex);
-                    }
-                    for out_vertex in outs.into_iter() {
-                        new_graph.add_edge(vertex, out_vertex);
-                        vertexes_to_look_at.push(out_vertex);
-                    }
+                if !g.contains_vertex(&vertex) { continue; }
+
+                let (vprop, ins, outs) = g.edges.remove(&vertex).unwrap();
+                new_graph.add_vertex_w_prop(vertex, vprop);
+
+                for (out_v, eprop) in outs.into_iter() {
+                    new_graph.add_edge_w_prop(vertex, out_v, eprop);
+                    vertexes_to_look_at.push(out_v);
                 }
+                vertexes_to_look_at.extend(ins.into_iter());
             }
 
             progress_bar.inc(num_vertexes as u64);
