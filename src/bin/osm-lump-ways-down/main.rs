@@ -1,4 +1,3 @@
-#![allow(unused_variables)]
 use anyhow::Result;
 use clap::Parser;
 use get_size::GetSize;
