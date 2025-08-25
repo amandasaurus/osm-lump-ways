@@ -460,20 +460,16 @@ fn main() -> Result<()> {
     let cycles: Vec<Vec<[i64; 2]>> = cycles_orig
         .iter()
         .map(|segs| {
-			let mut new_segs = Vec::with_capacity(segs.len());
-			new_segs.extend(
-				segs.iter()
-                .flat_map(|seg| {
-                    inter_store
-                        .expand_directed(seg[0], seg[1])
-                        .tuple_windows()
-                        .map(|(a, b)| [a, b])
-                })
-			);
-			new_segs
+            let mut new_segs = Vec::with_capacity(segs.len());
+            new_segs.extend(segs.iter().flat_map(|seg| {
+                inter_store
+                    .expand_directed(seg[0], seg[1])
+                    .tuple_windows()
+                    .map(|(a, b)| [a, b])
+            }));
+            new_segs
         })
-		.collect::<Vec<_>>()
-	;
+        .collect::<Vec<_>>();
 
     info!(
         "Found {} cycles, comprised of {} nodes",
@@ -627,7 +623,10 @@ fn main() -> Result<()> {
     for cycle in cycles_orig {
         min_nodeid = *cycle.iter().flat_map(|seg| seg.iter()).min().unwrap();
         for nid in cycle.iter().flat_map(|seg| seg.iter()) {
-			assert!(g.contains_vertex(nid), "{nid} not in graph: {cycle:?}. min_nodeid: {min_nodeid}");
+            assert!(
+                g.contains_vertex(nid),
+                "{nid} not in graph: {cycle:?}. min_nodeid: {min_nodeid}"
+            );
             if *nid != min_nodeid {
                 node_id_replaces.insert(*nid, min_nodeid);
             }

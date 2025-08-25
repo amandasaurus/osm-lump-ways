@@ -639,12 +639,26 @@ where
 
             // if there's an in, there's an out
             for in_v in ins.iter() {
-                assert!(self.edges.contains_key(in_v), "Node {nid1} has an in edge from {in_v}, but there is no data for that vertex {in_v}");
-                assert!(self.edges.get(in_v).unwrap().2.iter().any(|(otherv, _eprop)| otherv == nid1), "Graph Data inconsistancy. {nid1} has {in_v} as one of it's in edges, but there is no corresponding out edge from {in_v} to {nid1}");
+                assert!(
+                    self.edges.contains_key(in_v),
+                    "Node {nid1} has an in edge from {in_v}, but there is no data for that vertex {in_v}"
+                );
+                assert!(
+                    self.edges
+                        .get(in_v)
+                        .unwrap()
+                        .2
+                        .iter()
+                        .any(|(otherv, _eprop)| otherv == nid1),
+                    "Graph Data inconsistancy. {nid1} has {in_v} as one of it's in edges, but there is no corresponding out edge from {in_v} to {nid1}"
+                );
             }
             // if there's an out, there's an in
             for (out_v, _eprop) in outs.iter() {
-                assert!(self.edges.contains_key(out_v), "Node {nid1} has an out edge to {out_v}, but there is no data for that vertex {out_v}");
+                assert!(
+                    self.edges.contains_key(out_v),
+                    "Node {nid1} has an out edge to {out_v}, but there is no data for that vertex {out_v}"
+                );
                 assert!(self.edges.get(out_v).unwrap().1.contains(nid1));
             }
         }
@@ -689,7 +703,6 @@ where
 
         Some(eprop)
     }
-
 }
 
 impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
@@ -805,11 +818,19 @@ where
             return;
         }
         if !self.contains_vertex(vertex) && !self.contains_vertex(replacement) {
-            warn!("Trying to replace the vertex {vertex} with {replacement}, but neither are in the graph");
+            warn!(
+                "Trying to replace the vertex {vertex} with {replacement}, but neither are in the graph"
+            );
             return;
         }
-        assert!(self.contains_vertex(vertex), "Vertex to replace {vertex} doesn't exist");
-        assert!(self.contains_vertex(replacement), "Replacement vertex {replacement} doesn't exist");
+        assert!(
+            self.contains_vertex(vertex),
+            "Vertex to replace {vertex} doesn't exist"
+        );
+        assert!(
+            self.contains_vertex(replacement),
+            "Replacement vertex {replacement} doesn't exist"
+        );
 
         let mut old = match self.edges.remove(vertex) {
             None => {
@@ -821,7 +842,11 @@ where
         self.set_vertex_property(replacement, old.0);
 
         for (out_v, eprop) in old.2.drain(..) {
-            self.edges.get_mut(&out_v).unwrap().1.retain(|in_v| in_v != vertex);
+            self.edges
+                .get_mut(&out_v)
+                .unwrap()
+                .1
+                .retain(|in_v| in_v != vertex);
             self.add_edge_w_prop(*replacement, out_v, eprop);
         }
         for in_v in old.1.iter() {
