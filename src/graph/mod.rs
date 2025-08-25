@@ -628,6 +628,7 @@ where
 
     pub fn assert_consistancy(&self) {
         for (nid1, (_vprop, ins, outs)) in self.edges.iter() {
+            // no self loops
             assert!(!ins.contains(nid1));
             assert!(
                 !outs.iter().any(|(nid2, _)| nid1 == nid2),
@@ -635,6 +636,17 @@ where
                 nid1,
                 outs
             );
+
+            // if there's an in, there's an out
+            for in_v in ins.iter() {
+                assert!(self.edges.contains_key(in_v), "Node {nid1} has an in edge from {in_v}, but there is no data for that vertex {in_v}");
+                assert!(self.edges.get(in_v).unwrap().2.iter().any(|(otherv, _eprop)| otherv == nid1), "Graph Data inconsistancy. {nid1} has {in_v} as one of it's in edges, but there is no corresponding out edge from {in_v} to {nid1}");
+            }
+            // if there's an out, there's an in
+            for (out_v, _eprop) in outs.iter() {
+                assert!(self.edges.contains_key(out_v), "Node {nid1} has an out edge to {out_v}, but there is no data for that vertex {out_v}");
+                assert!(self.edges.get(out_v).unwrap().1.contains(nid1));
+            }
         }
 
         assert_eq!(
