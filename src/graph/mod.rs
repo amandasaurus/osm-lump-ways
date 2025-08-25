@@ -11,12 +11,6 @@ use itertools::Itertools;
 use smallvec::smallvec;
 use std::iter;
 
-//#[cfg(test)]
-//mod tests;
-
-//mod directed_graph_contractable;
-//pub use directed_graph_contractable::DirectedGraphContractable;
-
 pub(crate) struct DirectedGraph<T>
 where
     T: Clone,
