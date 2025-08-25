@@ -166,7 +166,6 @@ where
             }
         }
     }
-
 }
 
 pub trait DirectedGraphTrait: Send + Sized {
@@ -1081,4 +1080,3 @@ impl Graph2 {
 pub fn rwindows2<T>(slice: &[T]) -> impl Iterator<Item = (&T, &T)> {
     (1..slice.len()).rev().map(|i| (&slice[i - 1], &slice[i]))
 }
-
