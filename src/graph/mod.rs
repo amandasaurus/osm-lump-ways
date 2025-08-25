@@ -820,13 +820,14 @@ where
 
         self.set_vertex_property(replacement, old.0);
 
+        for (out_v, eprop) in old.2.drain(..) {
+            self.edges.get_mut(&out_v).unwrap().1.retain(|in_v| in_v != vertex);
+            self.add_edge_w_prop(*replacement, out_v, eprop);
+        }
         for in_v in old.1.iter() {
             if let Some(eprop) = self.remove_edge(in_v, vertex) {
                 self.add_edge_w_prop(*in_v, *replacement, eprop);
             }
-        }
-        for (out_v, eprop) in old.2.drain(..) {
-            self.add_edge_w_prop(*replacement, out_v, eprop);
         }
     }
 
