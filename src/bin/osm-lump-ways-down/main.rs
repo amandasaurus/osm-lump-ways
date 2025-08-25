@@ -81,7 +81,6 @@ macro_rules! sort_dedup {
     };
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct VertexProperty {
     upstream_m: f64,
@@ -754,8 +753,11 @@ fn main() -> Result<()> {
     // Calculate the upstream for every node and edge.
 
     // Upstream m value for each node in topologically_sorted_nodes
-    let upstream_length: Vec<f64> = vec![0.; topologically_sorted_nodes.len()];
-    let mut upstream_length = upstream_length.into_boxed_slice();
+    //let upstream_length: Vec<f64> = vec![0.; topologically_sorted_nodes.len()];
+    //let mut upstream_length = upstream_length.into_boxed_slice();
+	g.vertexes_w_prop_par_mut().for_each(|(v, vprop)| {
+		vprop.upstream_m = 0.;
+	});
 
     // for an edge in the graph, what's the amount flowing down it. Keys are the from & to nid.
     // Value is upstream_m just at the start of the from nid.
@@ -766,6 +768,9 @@ fn main() -> Result<()> {
             .map(move |nid2| ((nid1, nid2), f64::NAN))
     }));
     let mut upstream_per_edge = SortedSliceMap::from_vec(upstream_per_edge);
+	//g.edges_w_prop_par_mut().for_each(|((v1, v2), eprop)| {
+	//	eprop.upstream_m = f64::NAN;
+	//});
 
     let calc_all_upstreams = progress_bars.add(
         ProgressBar::new(topologically_sorted_nodes.len() as u64)
@@ -776,13 +781,13 @@ fn main() -> Result<()> {
     // we “push” values onto this from upstream HashMap::new() as HashMap<i64, f64>,
     let mut tmp_upstream_length = HashMap::new() as HashMap<i64, f64>;
 
-    for (nid, upstream_value) in topologically_sorted_nodes
+    for nid in topologically_sorted_nodes
         .iter()
         .copied()
-        .zip(upstream_length.iter_mut())
     {
         let curr_upstream = tmp_upstream_length.remove(&nid).unwrap_or(0.);
-        *upstream_value = curr_upstream;
+		g.vertex_property_mut(&nid).upstream_m = curr_upstream;
+        //*upstream_value = curr_upstream;
 
         let outs = g.out_neighbours(nid).collect::<SmallVec<[_; 2]>>();
 
@@ -864,7 +869,7 @@ fn main() -> Result<()> {
                 }
             }
 
-            if *upstream_value
+            if curr_upstream
                 != inflow_per_group
                     .iter()
                     .map(|(_group, len)| len)
@@ -902,13 +907,12 @@ fn main() -> Result<()> {
     calc_all_upstream_bar.set_length(topologically_sorted_nodes.len() as u64);
 
     // Calculate all the upstream value for all the end points.
-    for (nid, upstream_length) in calc_all_upstream_bar.wrap_iter(
+    for nid in calc_all_upstream_bar.wrap_iter(
         topologically_sorted_nodes
             .iter()
-            .zip(upstream_length.iter()),
     ) {
         if let Ok(idx) = end_points.binary_search(nid) {
-            end_point_upstreams[idx] = *upstream_length;
+            end_point_upstreams[idx] = g.vertex_property(nid).unwrap().upstream_m;
             calc_all_upstream_bar.inc(1);
         }
     }

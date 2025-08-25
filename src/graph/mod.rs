@@ -703,6 +703,18 @@ where
 
         Some(eprop)
     }
+
+    pub fn vertexes_w_prop(&self) -> impl Iterator<Item = (i64, &V)> + '_ {
+        self.edges.iter().map(|(v, (vprop, _ins, _outs))| (*v, vprop))
+    }
+
+    pub fn vertexes_w_prop_par_mut(&mut self) -> impl ParallelIterator<Item = (i64, &mut V)> {
+        self.edges.par_iter_mut().map(|(v, (vprop, _ins, _outs))| (*v, vprop))
+    }
+
+    pub fn edges_w_prop_par_mut(&mut self) -> impl ParallelIterator<Item = ((i64, i64), &mut E)> {
+        self.edges.par_iter_mut().flat_map(|(v1, (_vprop, _ins, outs))| outs.par_iter_mut().map(|(v2, eprop)| ((*v1, *v2), eprop)))
+    }
 }
 
 impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
