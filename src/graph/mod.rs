@@ -450,65 +450,6 @@ pub trait DirectedGraphTrait: Send + Sized {
     }
 }
 
-pub trait ContractableDirectedGraph: DirectedGraphTrait {
-    fn add_edge_contractable(
-        &mut self,
-        vertex1: i64,
-        vertex2: i64,
-        can_contract_vertex: &impl Fn(&i64) -> bool,
-    ) -> bool;
-    /// Add a sequence of vertexes to this graph, attempting to contract on the go.
-    fn add_edge_chain_contractable(
-        &mut self,
-        vertexes: &[i64],
-        can_contract_vertex: &impl Fn(&i64) -> bool,
-    ) {
-        // add the chain starting from the end, so the contracting can work during adding.
-        for (a, b) in rwindows2(vertexes) {
-            self.add_edge_contractable(*a, *b, can_contract_vertex);
-        }
-    }
-
-    fn attempt_contract_vertex(&mut self, vertex: &i64) -> bool;
-    fn attempt_contract_all(&mut self, can_contract_vertex: &impl Fn(&i64) -> bool) -> bool;
-
-    fn strongly_connected_components(
-        &self,
-        calc_components_bar: &ProgressBar,
-    ) -> Vec<Vec<[i64; 2]>> {
-        if self.is_empty() {
-            return vec![];
-        }
-        let component_for_vertex = kosaraju::kosaraju(self, calc_components_bar);
-
-        debug!(
-            "kosaraju alg finished. Have {} maps of root vertexes, for {} vertexes",
-            component_for_vertex.len(),
-            self.num_vertexes(),
-        );
-        let mut components: HashMap<i64, HashSet<i64>> = HashMap::new();
-        for (v, root_v) in component_for_vertex.iter() {
-            components
-                .entry(*root_v)
-                .or_insert_with(|| std::iter::once(*root_v).collect())
-                .insert(*v);
-        }
-
-        // Convert list of vertexes into linestrings
-        components
-            .into_values()
-            .map(|cycle| {
-                cycle
-                    .iter()
-                    .flat_map(|nid| self.out_neighbours(*nid).map(move |other| [*nid, other]))
-                    // Don't include a line segment to an outneighbour which isn't in the cycle. we
-                    // alrady know nids[0] is in the cycle
-                    .filter(|nids| cycle.contains(&nids[1]))
-                    .collect()
-            })
-            .collect()
-    }
-}
 
 #[derive(Default, Debug, Clone)]
 struct Vertex<V, E> {
