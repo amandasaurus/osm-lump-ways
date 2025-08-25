@@ -800,8 +800,6 @@ where
     }
 
     fn contract_vertex(&mut self, vertex: &i64, replacement: &i64) {
-        //self.assert_consistancy();
-
         if vertex == replacement {
             warn!("Trying to contract a vertex with itself: {}", vertex);
             return;
@@ -813,17 +811,12 @@ where
         assert!(self.contains_vertex(vertex), "Vertex to replace {vertex} doesn't exist");
         assert!(self.contains_vertex(replacement), "Replacement vertex {replacement} doesn't exist");
 
-        //let debug = *vertex == 187649412 || *replacement == 187649412;
-        let debug = false;
-        if debug { dbg!(vertex); dbg!(replacement); }
         let mut old = match self.edges.remove(vertex) {
             None => {
                 return;
             }
             Some(old) => old,
         };
-        if debug { dbg!(&self.edges.get(replacement).unwrap()); }
-        if debug { dbg!(&old); }
 
         self.set_vertex_property(replacement, old.0);
 
@@ -832,15 +825,10 @@ where
             self.add_edge_w_prop(*replacement, out_v, eprop);
         }
         for in_v in old.1.iter() {
-            //if debug { dbg!(in_v); }
             if let Some(eprop) = self.remove_edge(in_v, vertex) {
-                //if debug { dbg!(&eprop); }
                 self.add_edge_w_prop(*in_v, *replacement, eprop);
             }
         }
-
-        if debug { dbg!(&self.edges.get(dbg!(replacement)).unwrap()); }
-        //self.assert_consistancy();
     }
 
     fn vertexes(&self) -> impl Iterator<Item = i64> + '_ {
