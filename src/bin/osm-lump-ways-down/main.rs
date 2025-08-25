@@ -1172,6 +1172,7 @@ fn main() -> Result<()> {
         let (nid_pair_to_taggroupid, tag_group_info) = tag_group_data_opt.as_ref().unwrap();
         do_write_upstreams(
             &args,
+			&g,
             upstream_filename,
             &progress_bars,
             &style,
@@ -1392,7 +1393,7 @@ where
 #[allow(clippy::too_many_arguments)]
 fn do_group_by_ends(
     output_filename: &Path,
-    g: &graph::DirectedGraph2<(), ()>,
+    g: &graph::DirectedGraph2<VertexProperty, EdgeProperty>,
     progress_bars: &MultiProgress,
     style: &ProgressStyle,
     end_points: &[i64],
@@ -1705,6 +1706,7 @@ fn do_group_by_ends(
 #[allow(clippy::too_many_arguments)]
 fn do_write_upstreams(
     args: &cli_args::Args,
+	g: &graph::DirectedGraph2<VertexProperty, EdgeProperty>,
     upstream_filename: &Path,
     progress_bars: &MultiProgress,
     style: &ProgressStyle,
