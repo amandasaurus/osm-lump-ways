@@ -455,21 +455,25 @@ fn main() -> Result<()> {
     );
     info_memory_used!();
 
-    let cycles: Vec<Vec<[i64; 2]>> = g.strongly_connected_components(&calc_components_bar);
+    let cycles_orig: Vec<Vec<[i64; 2]>> = g.strongly_connected_components(&calc_components_bar);
     // expand the intermediate values
-    let cycles = cycles
-        .into_iter()
+    let cycles: Vec<Vec<[i64; 2]>> = cycles_orig
+        .iter()
         .map(|segs| {
-            segs.into_iter()
+			let mut new_segs = Vec::with_capacity(segs.len());
+			new_segs.extend(
+				segs.iter()
                 .flat_map(|seg| {
                     inter_store
                         .expand_directed(seg[0], seg[1])
                         .tuple_windows()
                         .map(|(a, b)| [a, b])
                 })
-                .collect::<Vec<_>>()
+			);
+			new_segs
         })
-        .collect::<Vec<_>>();
+		.collect::<Vec<_>>()
+	;
 
     info!(
         "Found {} cycles, comprised of {} nodes",
@@ -620,7 +624,7 @@ fn main() -> Result<()> {
         HashMap::with_capacity(cycles.par_iter().map(|c| c.len() - 1).sum());
 
     let mut min_nodeid;
-    for cycle in cycles {
+    for cycle in cycles_orig {
         min_nodeid = *cycle.iter().flat_map(|seg| seg.iter()).min().unwrap();
         for nid in cycle.iter().flat_map(|seg| seg.iter()) {
 			assert!(g.contains_vertex(nid), "{nid} not in graph: {cycle:?}. min_nodeid: {min_nodeid}");
