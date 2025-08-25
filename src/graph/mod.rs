@@ -447,6 +447,12 @@ pub trait DirectedGraphTrait: Send + Sized {
             })
             .collect()
     }
+
+    fn delete_vertex_if_unconnected(&mut self, vertex: &i64) {
+        if self.num_in_neighbours(*vertex) == 0 && self.num_out_neighbours(*vertex) == 0 {
+            self.delete_vertex(vertex);
+        }
+    }
 }
 
 pub trait ContractableDirectedGraph: DirectedGraphTrait {
@@ -642,6 +648,36 @@ where
                 .sum::<usize>()
         );
     }
+
+    /// Remove this vertex, returning the
+    /// Any & all edges connected to this vertex are deleted.
+    pub fn remove_vertex(&mut self, vertex: &i64) -> Option<V> {
+        let (vprop, ins, outs) = self.edges.remove(vertex)?;
+        for in_v in ins.iter() {
+            self.delete_edge(in_v, vertex);
+        }
+        for (out_v, _eprop) in outs.iter() {
+            self.delete_edge(vertex, out_v);
+        }
+        Some(vprop)
+    }
+
+    pub fn remove_edge(&mut self, vertex1: &i64, vertex2: &i64) -> Option<E> {
+        let outs = &mut self.edges.get_mut(vertex1)?.2;
+        let idx = outs.iter().position(|(v, _eprop)| v == vertex2)?;
+        let (_v2, eprop) = outs.remove(idx);
+
+        // remove the corresponding in edge
+        if let Some(x) = self.edges.get_mut(vertex2) {
+            x.1.retain(|v1| v1 != vertex1);
+        }
+
+        self.delete_vertex_if_unconnected(vertex1);
+        self.delete_vertex_if_unconnected(vertex2);
+
+        Some(eprop)
+    }
+
 }
 
 impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
@@ -744,39 +780,11 @@ where
             .is_some_and(|(_vprop, ins, outs)| !ins.is_empty() ^ !outs.is_empty())
     }
     fn delete_edge(&mut self, vertex1: &i64, vertex2: &i64) {
-        if let Some(from_v1) = &mut self.edges.get_mut(vertex1).map(|(_vprop, _to, from)| from) {
-            from_v1.retain(|other| other.0 != *vertex2);
-        }
-        if self
-            .edges
-            .get(vertex1)
-            .is_some_and(|(_vprop, from, to)| from.is_empty() && to.is_empty())
-        {
-            self.edges.remove(vertex1);
-        }
-        if let Some(to_v2) = &mut self.edges.get_mut(vertex2).map(|(_vprop, to, _from)| to) {
-            to_v2.retain(|other| other != vertex1);
-        }
-        if self
-            .edges
-            .get(vertex2)
-            .is_some_and(|(_vprop, from, to)| from.is_empty() && to.is_empty())
-        {
-            self.edges.remove(vertex2);
-        }
+        self.remove_edge(vertex1, vertex2);
     }
 
     fn delete_vertex(&mut self, vertex: &i64) {
-        let mut buf: SmallVec<[i64; 2]> = smallvec![];
-        buf.extend(self.in_neighbours(*vertex));
-        for other in buf.drain(..) {
-            self.delete_edge(&other, vertex);
-        }
-        buf.extend(self.out_neighbours(*vertex));
-        for other in buf.drain(..) {
-            self.delete_edge(vertex, &other);
-        }
-        self.edges.remove(vertex);
+        self.remove_vertex(vertex);
     }
 
     fn contract_vertex(&mut self, vertex: &i64, replacement: &i64) {
@@ -794,10 +802,8 @@ where
         self.set_vertex_property(replacement, old.0);
 
         for in_v in old.1.iter() {
-            if let Some(eprop) = self.edge_property((*in_v, *vertex)).cloned() {
+            if let Some(eprop) = self.remove_edge(in_v, vertex) {
                 self.add_edge_w_prop(*in_v, *replacement, eprop);
-            } else {
-                // this in edge has already been removed.
             }
         }
         for (out_v, eprop) in old.2.drain(..) {
