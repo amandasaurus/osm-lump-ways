@@ -4,6 +4,7 @@ use ordered_float::OrderedFloat;
 use rayon::prelude::ParallelIterator;
 use smallvec::SmallVec;
 use std::collections::{BTreeMap, HashSet};
+use std::fmt::Debug;
 
 use crate::kosaraju;
 use itertools::Itertools;
@@ -512,8 +513,8 @@ pub trait ContractableDirectedGraph: DirectedGraphTrait {
 #[derive(Default, Debug, Clone)]
 pub struct DirectedGraph2<V, E>
 where
-    V: Send + Default + Clone + Sync,
-    E: Send + Default + Clone + Sync,
+    V: Send + Default + Clone + Sync+Debug,
+    E: Send + Default + Clone + Sync+Debug,
 {
     // key is vertex id
     // value is ( Vertex properties,
@@ -525,8 +526,8 @@ where
 #[allow(dead_code)]
 impl<V, E> DirectedGraph2<V, E>
 where
-    V: Send + Default + Clone + Sync,
-    E: Send + Default + Clone + Sync,
+    V: Send + Default + Clone + Sync+Debug,
+    E: Send + Default + Clone + Sync+Debug,
 {
     pub fn vertex_property(&self, vertex: &i64) -> Option<&V> {
         self.edges.get(vertex).map(|v| &v.0)
@@ -592,12 +593,35 @@ where
                     .map(move |(nid2, eprop)| (from_vertex, *nid2, eprop))
             })
     }
+
+    pub fn edges_iter_w_prop_mut(&mut self) -> impl Iterator<Item = (i64, i64, &mut E)> {
+        self.edges.iter_mut().flat_map(|(nid1, (_vprop, _ins, outs))| outs.iter_mut().map(|(nid2, eprop)| (*nid1, *nid2, eprop)))
+    }
+
+    pub fn edges_par_iter_w_prop_mut(&mut self) -> impl ParallelIterator<Item = (i64, i64, &mut E)> {
+        self.edges.par_iter_mut().flat_map(|(nid1, (_vprop, _ins, outs))| outs.par_iter_mut().map(|(nid2, eprop)| (*nid1, *nid2, eprop)))
+    }
+
+    pub fn assert_consistancy(&self) {
+        for (nid1, (_vprop, ins, outs)) in self.edges.iter() {
+            assert!(!ins.contains(nid1));
+            assert!(!outs.iter().any(|(nid2, _)| nid1 == nid2), "{:?} {:?}", nid1, outs);
+
+
+        }
+
+        assert_eq!(
+            self.edges.par_iter().map(|(_nid2, (_vprop, ins, _outs))| ins.len()).sum::<usize>(),
+            self.edges.par_iter().map(|(_nid2, (_vprop, _ins, outs))| outs.len()).sum::<usize>()
+        );
+
+    }
 }
 
 impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
 where
-    V: Send + Default + Clone + Sync,
-    E: Send + Default + Clone + Sync,
+    V: Send + Default + Clone + Sync+Debug,
+    E: Send + Default + Clone + Sync+Debug,
 {
     fn new() -> Self {
         Default::default()
@@ -740,8 +764,11 @@ where
         self.set_vertex_property(replacement, old.0);
 
         for in_v in old.1.iter() {
-            let eprop = self.edge_property((*in_v, *vertex)).unwrap().clone();
-            self.add_edge_w_prop(*in_v, *replacement, eprop);
+            if let Some(eprop) = self.edge_property((*in_v, *vertex)).cloned() {
+                self.add_edge_w_prop(*in_v, *replacement, eprop);
+            } else {
+                // this in edge has already been removed.
+            }
         }
         for (out_v, eprop) in old.2.drain(..) {
             self.add_edge_w_prop(*replacement, out_v, eprop);

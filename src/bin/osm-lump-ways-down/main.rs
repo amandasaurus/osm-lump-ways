@@ -81,6 +81,7 @@ macro_rules! sort_dedup {
     };
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct VertexProperty {
     upstream_m: f64,
@@ -94,6 +95,7 @@ impl Default for VertexProperty {
 	}
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct EdgeProperty {
     length_m: f64,
@@ -631,16 +633,19 @@ fn main() -> Result<()> {
         node_id_replaces.len().to_formatted_string(&Locale::en)
     );
 
+	g.assert_consistancy();
     info_memory_used!();
     info!("Contracting the graph");
     for (vertex, replacement) in node_id_replaces.iter() {
+		assert!(vertex != replacement);
         g.contract_vertex(vertex, replacement);
 
         // If this segment is part of a cycle, then just delete it from the tag groups and move
         // on.
-        nid_pair_to_tagid.remove(&(*vertex, *replacement));
-        nid_pair_to_tagid.remove(&(*replacement, *vertex));
+        //nid_pair_to_tagid.remove(&(*vertex, *replacement));
+        //nid_pair_to_tagid.remove(&(*replacement, *vertex));
     }
+	g.assert_consistancy();
 
     // convert to memory effecient sorted vec.
     let nid_pair_to_tagid = SortedSliceMap::from_iter(nid_pair_to_tagid.into_iter());
@@ -730,6 +735,18 @@ fn main() -> Result<()> {
             smallvec::smallvec![None; args.ends_tag.len()],
         );
     }
+
+	// Calculate the length of each edge:
+	g.edges_par_iter_w_prop_mut()
+		.for_each(|(nid1, nid2, eprop)| {
+			eprop.length_m = 
+				inter_store
+				.expand_directed(nid1, nid2)
+				.map(|nid| nodeid_pos.get(&nid).unwrap())
+				.tuple_windows::<(_, _)>()
+				.map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
+				.sum::<f64>()
+			});
 
     // Calculate the upstream for every node and edge.
 
