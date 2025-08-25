@@ -524,9 +524,6 @@ pub trait ContractableDirectedGraph: DirectedGraphTrait {
     }
 }
 
-pub type SmallNidVec = SmallVec<[i64; 1]>;
-pub type SmallI32Vec = SmallVec<[i32; 1]>;
-
 /// A graph which stores a list of all incoming and outgoing edges
 #[derive(Default, Debug, Clone)]
 pub struct DirectedGraph2<V, E> {
@@ -739,6 +736,9 @@ impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
         })
     }
 }
+
+pub type SmallNidVec = SmallVec<[i64; 1]>;
+pub type SmallI32Vec = SmallVec<[i32; 1]>;
 
 #[derive(Default, Debug)]
 pub struct Graph2 {
