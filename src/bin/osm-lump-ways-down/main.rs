@@ -623,6 +623,7 @@ fn main() -> Result<()> {
     for cycle in cycles {
         min_nodeid = *cycle.iter().flat_map(|seg| seg.iter()).min().unwrap();
         for nid in cycle.iter().flat_map(|seg| seg.iter()) {
+			assert!(g.contains_vertex(nid), "{nid} not in graph: {cycle:?}. min_nodeid: {min_nodeid}");
             if *nid != min_nodeid {
                 node_id_replaces.insert(*nid, min_nodeid);
             }
