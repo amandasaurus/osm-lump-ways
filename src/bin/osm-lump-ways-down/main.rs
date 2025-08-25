@@ -1797,7 +1797,11 @@ fn do_write_upstreams(
                     props[format!("from_upstream_m_{}", mult)] =
                         round_mult(&from_upstream_len, *mult).into();
                 }
-                //props["end_upstream_m"] = round(&end_point_upstreams[end_idx], 1).into();
+                props["end_upstream_m"] = round(
+                    &g.vertex_property_unchecked(&end_points[end_idx]).upstream_m,
+                    1,
+                )
+                .into();
                 props["end_nid"] = end_points[end_idx].into();
 
                 if !args.ends_tag.is_empty() {
