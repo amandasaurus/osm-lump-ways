@@ -529,17 +529,19 @@ pub type SmallI32Vec = SmallVec<[i32; 1]>;
 
 /// A graph which stores a list of all incoming and outgoing edges
 #[derive(Default, Debug, Clone)]
-pub struct DirectedGraph2 {
+pub struct DirectedGraph2<V, E> {
     // key is vertex id
     // value.0 is list of incoming vertexes  (ie there's an edge from something → key)
     // value.1 is list of outgoing vertexes (ie there's an edge from key → something)
     edges: BTreeMap<i64, (SmallNidVec, SmallNidVec)>,
 
-    vertex_properties: BTreeMap<i64, (bool, bool)>,
-    edge_properties: BTreeMap<(i64, i64), (bool, bool)>,
+    vertex_properties: BTreeMap<i64, V>,
+    edge_properties: BTreeMap<(i64, i64), E>,
 }
 
-impl DirectedGraphTrait for DirectedGraph2 {
+impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
+    where V: Send+Default, E: Send+Default
+{
     fn new() -> Self {
         Default::default()
     }

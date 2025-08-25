@@ -235,7 +235,7 @@ pub fn a_star_directed_single<'a>(
     target_idx: i64,
     nodeid_pos: &'a impl NodeIdPosition,
     inter_store: &inter_store::InterStore,
-    edges: &'a DirectedGraph2,
+    edges: &'a DirectedGraph2<(), ()>,
 ) -> Option<f64> {
     assert!(edges.contains_vertex(&start_idx));
     assert!(edges.contains_vertex(&target_idx));

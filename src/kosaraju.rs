@@ -93,7 +93,7 @@ pub(crate) fn kosaraju_it(
 mod tests {
     use super::*;
 
-    fn setup() -> (DirectedGraph2, ProgressBar) {
+    fn setup() -> (DirectedGraph2<(), ()>, ProgressBar) {
         let g = DirectedGraph2::new();
         let bar = ProgressBar::new(1000);
         bar.set_draw_target(ProgressDrawTarget::hidden());
