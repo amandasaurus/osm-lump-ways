@@ -1501,7 +1501,7 @@ fn do_group_by_ends(
                 }
             }
 
-            if let Some(max_upstream_delta) = grouped_ends_max_upstream_delta {
+            if let Some(_max_upstream_delta) = grouped_ends_max_upstream_delta {
                 todo!()
                 //while let Some(i) = lines_to_here
                 //    .iter()
@@ -2047,7 +2047,7 @@ fn calc_tag_group(
         g.num_edges().to_formatted_string(&Locale::en)
     );
 
-    let groups_that_flow_into_nothing = segments_into_nothing
+    let _groups_that_flow_into_nothing = segments_into_nothing
         .into_iter()
         .map(|seg| g.edge_property_unchecked(seg).taggroupid)
         .collect::<HashSet<u64>>();
