@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Large internal refactoring to make code clearer
+
 ## v3.3.0 (2025-06-25)
 
 * osm-lump-ways-down can now read the relations, and overwrite the tags from a
