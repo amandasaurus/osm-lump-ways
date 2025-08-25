@@ -554,6 +554,9 @@ where
     }
 
     pub fn set_edge_property(&mut self, edge: (i64, i64), property: E) {
+        if edge.0 == edge.1 {
+            return;
+        }
         *self.edge_property_mut(edge) = property;
     }
 
@@ -572,6 +575,9 @@ where
     }
 
     pub fn add_edge_w_prop(&mut self, vertex1: i64, vertex2: i64, eprop: E) {
+        if vertex1 == vertex2 {
+            return;
+        }
         self.add_edge(vertex1, vertex2);
         self.set_edge_property((vertex1, vertex2), eprop);
     }
