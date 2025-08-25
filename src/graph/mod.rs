@@ -511,22 +511,23 @@ pub trait ContractableDirectedGraph: DirectedGraphTrait {
 /// A graph which stores a list of all incoming and outgoing edges
 #[derive(Default, Debug, Clone)]
 pub struct DirectedGraph2<V, E>
-    where V: Send+Default+Clone+Sync, E: Send+Default+Clone+Sync
+where
+    V: Send + Default + Clone + Sync,
+    E: Send + Default + Clone + Sync,
 {
     // key is vertex id
     // value is ( Vertex properties,
     //            list of vertex idx that come in here, so you can look them up quick
     //            list of outgoing vertexes and the edge property for that edge
-
-    edges: BTreeMap<i64, (V, SmallVec<[i64; 1]>, SmallVec<[(i64, E); 1]>)>
-
+    edges: BTreeMap<i64, (V, SmallVec<[i64; 1]>, SmallVec<[(i64, E); 1]>)>,
 }
 
 #[allow(dead_code)]
 impl<V, E> DirectedGraph2<V, E>
-    where V: Send+Default+Clone+Sync, E: Send+Default+Clone+Sync
+where
+    V: Send + Default + Clone + Sync,
+    E: Send + Default + Clone + Sync,
 {
-
     pub fn vertex_property(&self, vertex: &i64) -> Option<&V> {
         self.edges.get(vertex).map(|v| &v.0)
     }
@@ -539,9 +540,17 @@ impl<V, E> DirectedGraph2<V, E>
     }
 
     pub fn edge_property(&self, edge: (i64, i64)) -> Option<&E> {
-        self.edges.get(&edge.0).map(|(_, _, outs)| outs).and_then(|outs| outs.iter().filter(|(vid, _p)| *vid == edge.1).next().map(|(_vid, prop)| prop))
+        self.edges
+            .get(&edge.0)
+            .map(|(_, _, outs)| outs)
+            .and_then(|outs| {
+                outs.iter()
+                    .filter(|(vid, _p)| *vid == edge.1)
+                    .next()
+                    .map(|(_vid, prop)| prop)
+            })
     }
-    
+
     pub fn set_edge_property(&mut self, edge: (i64, i64), property: E) {
         *self.edge_property_mut(edge) = property;
     }
@@ -553,7 +562,11 @@ impl<V, E> DirectedGraph2<V, E>
             outs.push((edge.1, E::default()));
         }
 
-        outs.iter_mut().filter(|(oid, _)| *oid == edge.1).map(|(_, eprop)| eprop).next().unwrap()
+        outs.iter_mut()
+            .filter(|(oid, _)| *oid == edge.1)
+            .map(|(_, eprop)| eprop)
+            .next()
+            .unwrap()
     }
 
     pub fn add_edge_w_prop(&mut self, vertex1: i64, vertex2: i64, eprop: E) {
@@ -563,18 +576,28 @@ impl<V, E> DirectedGraph2<V, E>
 
     pub fn add_vertex_w_prop(&mut self, vertex: i64, vprop: V) {
         // TODO remove all clones
-        self.edges.entry(vertex).and_modify(|o| o.0 = vprop.clone()).or_insert((vprop, Default::default(), Default::default()));
+        self.edges
+            .entry(vertex)
+            .and_modify(|o| o.0 = vprop.clone())
+            .or_insert((vprop, Default::default(), Default::default()));
     }
 
     /// Returns (from_vertex, b, E) where b is an out neighbour of from_vertex
     pub fn out_edges_w_prop(&self, from_vertex: i64) -> impl Iterator<Item = (i64, i64, &E)> {
-        self.edges.get(&from_vertex).into_iter().flat_map(move |(_vprop, _ins, outs)| outs.iter().map(move |(nid2, eprop)| (from_vertex, *nid2, eprop)))
+        self.edges
+            .get(&from_vertex)
+            .into_iter()
+            .flat_map(move |(_vprop, _ins, outs)| {
+                outs.iter()
+                    .map(move |(nid2, eprop)| (from_vertex, *nid2, eprop))
+            })
     }
-
 }
 
 impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
-    where V: Send+Default+Clone+Sync, E: Send+Default+Clone+Sync
+where
+    V: Send + Default + Clone + Sync,
+    E: Send + Default + Clone + Sync,
 {
     fn new() -> Self {
         Default::default()
@@ -621,7 +644,9 @@ impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
 
     /// returns each vertex and the number of out edges
     fn vertexes_and_num_outs(&self) -> impl Iterator<Item = (i64, usize)> {
-        self.edges.iter().map(|(v, (_vprop, _ins, outs))| (*v, outs.len()))
+        self.edges
+            .iter()
+            .map(|(v, (_vprop, _ins, outs))| (*v, outs.len()))
     }
 
     fn vertex_has_outgoing(&self, vid: &i64) -> bool {
@@ -723,7 +748,6 @@ impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
         }
     }
 
-
     fn vertexes(&self) -> impl Iterator<Item = i64> + '_ {
         self.edges.keys().copied()
     }
@@ -763,7 +787,9 @@ impl<V, E> DirectedGraphTrait for DirectedGraph2<V, E>
 
             while let Some(vertex) = vertexes_to_look_at.pop() {
                 num_vertexes += 1;
-                if !g.contains_vertex(&vertex) { continue; }
+                if !g.contains_vertex(&vertex) {
+                    continue;
+                }
 
                 let (vprop, ins, outs) = g.edges.remove(&vertex).unwrap();
                 new_graph.add_vertex_w_prop(vertex, vprop);

@@ -34,7 +34,7 @@ use ordered_float::OrderedFloat;
 
 mod cli_args;
 
-use graph::{DirectedGraphTrait, DirectedGraph2};
+use graph::{DirectedGraph2, DirectedGraphTrait};
 use haversine::haversine_m;
 use nodeid_position::NodeIdPosition;
 use osm_lump_ways::dij;
@@ -83,14 +83,14 @@ macro_rules! sort_dedup {
 
 #[derive(Debug, Default, Clone)]
 struct VertexProperty {
-	upstream_m: f64,
+    upstream_m: f64,
 }
 #[derive(Debug, Default, Clone)]
 struct EdgeProperty {
-	length_m: f64,
-	/// the from value
-	upstream_m: f64,
-	tagid: u32,
+    length_m: f64,
+    /// the from value
+    upstream_m: f64,
+    tagid: u32,
 }
 
 fn main() -> Result<()> {
@@ -1172,7 +1172,7 @@ fn main() -> Result<()> {
         let (nid_pair_to_taggroupid, tag_group_info) = tag_group_data_opt.as_ref().unwrap();
         do_write_upstreams(
             &args,
-			&g,
+            &g,
             upstream_filename,
             &progress_bars,
             &style,
@@ -1706,7 +1706,7 @@ fn do_group_by_ends(
 #[allow(clippy::too_many_arguments)]
 fn do_write_upstreams(
     args: &cli_args::Args,
-	g: &graph::DirectedGraph2<VertexProperty, EdgeProperty>,
+    g: &graph::DirectedGraph2<VertexProperty, EdgeProperty>,
     upstream_filename: &Path,
     progress_bars: &MultiProgress,
     style: &ProgressStyle,
