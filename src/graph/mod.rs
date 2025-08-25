@@ -656,6 +656,8 @@ impl DirectedGraphTrait for DirectedGraph2 {
         {
             self.edges.remove(vertex2);
         }
+
+        self.edge_properties.remove(&(*vertex1, *vertex2));
     }
 
     fn remove_vertex(&mut self, vertex: &i64) -> Option<(SmallNidVec, SmallNidVec)> {
@@ -673,6 +675,7 @@ impl DirectedGraphTrait for DirectedGraph2 {
         for other_dest in outs.iter() {
             self.remove_edge(vertex, other_dest);
         }
+        self.vertex_properties.remove(vertex);
 
         Some((ins, outs))
     }
