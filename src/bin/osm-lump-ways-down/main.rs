@@ -1378,7 +1378,7 @@ where
 #[allow(clippy::too_many_arguments)]
 fn do_group_by_ends(
     output_filename: &Path,
-    g: &graph::DirectedGraph<VertexProperty, EdgeProperty>,
+    g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
     progress_bars: &MultiProgress,
     style: &ProgressStyle,
     end_points: &[i64],
@@ -1673,7 +1673,7 @@ fn do_group_by_ends(
 #[allow(clippy::too_many_arguments)]
 fn do_write_upstreams(
     args: &cli_args::Args,
-    g: &graph::DirectedGraph<VertexProperty, EdgeProperty>,
+    g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
     upstream_filename: &Path,
     progress_bars: &MultiProgress,
     style: &ProgressStyle,
@@ -1918,7 +1918,7 @@ impl Default for TagGroupInfo {
 }
 
 fn calc_tag_group(
-    g: &mut graph::DirectedGraph<VertexProperty, EdgeProperty>,
+    g: &mut impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
     new_progress_bar_func: impl Fn(u64, &str) -> ProgressBar,
 ) -> Box<[TagGroupInfo]> {
     let started_calc = Instant::now();
