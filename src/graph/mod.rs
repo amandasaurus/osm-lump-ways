@@ -331,14 +331,14 @@ pub trait DirectedGraphTrait: Send + Sized {
     fn neighbors_in_xor_out(&mut self, v: &i64) -> bool {
         (self.num_in_neighbours(*v) == 0) ^ (self.num_out_neighbours(*v) == 0)
     }
-    fn remove_edge(&mut self, vertex1: &i64, vertex2: &i64);
+    fn delete_edge(&mut self, vertex1: &i64, vertex2: &i64);
 
     fn expand_edge(&self, vertex1: i64, vertex2: i64) -> impl Iterator<Item = i64> + '_ {
         iter::once(vertex1).chain(iter::once(vertex2))
     }
 
     /// Removes this vertex (& associated edges) from this graph
-    fn remove_vertex(&mut self, vertex: &i64);
+    fn delete_vertex(&mut self, vertex: &i64);
 
     fn contract_vertex(&mut self, vertex: &i64, replacement: &i64);
     /// Iterator over all vertexes
@@ -385,7 +385,7 @@ pub trait DirectedGraphTrait: Send + Sized {
                 others.truncate(0);
                 others.extend(g.out_neighbours(v));
                 for other in others.drain(..) {
-                    g.remove_edge(&v, &other);
+                    g.delete_edge(&v, &other);
                     if g.num_ins_zero(&other) {
                         frontier.push(other);
                     }
@@ -743,7 +743,7 @@ where
             .get(v)
             .is_some_and(|(_vprop, ins, outs)| !ins.is_empty() ^ !outs.is_empty())
     }
-    fn remove_edge(&mut self, vertex1: &i64, vertex2: &i64) {
+    fn delete_edge(&mut self, vertex1: &i64, vertex2: &i64) {
         if let Some(from_v1) = &mut self.edges.get_mut(vertex1).map(|(_vprop, _to, from)| from) {
             from_v1.retain(|other| other.0 != *vertex2);
         }
@@ -766,15 +766,15 @@ where
         }
     }
 
-    fn remove_vertex(&mut self, vertex: &i64) {
+    fn delete_vertex(&mut self, vertex: &i64) {
         let mut buf: SmallVec<[i64; 2]> = smallvec![];
         buf.extend(self.in_neighbours(*vertex));
         for other in buf.drain(..) {
-            self.remove_edge(&other, vertex);
+            self.delete_edge(&other, vertex);
         }
         buf.extend(self.out_neighbours(*vertex));
         for other in buf.drain(..) {
-            self.remove_edge(vertex, &other);
+            self.delete_edge(vertex, &other);
         }
         self.edges.remove(vertex);
     }
