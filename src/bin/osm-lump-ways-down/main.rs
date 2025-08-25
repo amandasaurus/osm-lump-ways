@@ -1626,7 +1626,7 @@ fn do_group_by_ends(
             .expand_line_directed(&path)
             .map(|nid| nodeid_pos.get(&nid).expect("Cannot find position for node"))
             .collect::<Vec<_>>();
-		let end_nid = end_points[end_idx as usize];
+        let end_nid = end_points[end_idx as usize];
         let mut props = serde_json::json!({
             "end_nid": end_nid,
             "end_upstream_m": round(&g.vertex_property_unchecked(&end_nid).upstream_m, 1),
