@@ -267,3 +267,25 @@ pub enum GenericGeometry {
 	Point((f64, f64)),
 	SimpleLineString(((f64, f64), (f64, f64))),
 }
+
+impl GeometryOutput for GenericGeometry {
+    fn type_name(&self) -> &[u8] {
+		match self {
+			GenericGeometry::Point(p) => p.type_name(),
+			GenericGeometry::SimpleLineString(ls) => ls.type_name(),
+		}
+    }
+    fn write_coords(&self, f: &mut impl Write) -> Result<()> {
+		match self {
+			GenericGeometry::Point(p) => p.write_coords(f),
+			GenericGeometry::SimpleLineString(ls) => ls.write_coords(f),
+		}
+    }
+
+    fn write_wkt(&self, buf: &mut Vec<u8>) {
+		match self {
+			GenericGeometry::Point(p) => p.write_wkt(buf),
+			GenericGeometry::SimpleLineString(ls) => ls.write_wkt(buf),
+		}
+    }
+}
