@@ -1975,7 +1975,7 @@ fn calc_tag_group(
     topologically_sorted_nodes: &[i64],
     nid_pair_to_tagid: &SortedSliceMap<(i64, i64), u32>,
     tag_group_value: &[String],
-    g: &graph::DirectedGraph2<(), ()>,
+    g: &graph::DirectedGraph2<VertexProperty, EdgeProperty>,
     upstream_per_edge: &SortedSliceMap<(i64, i64), f64>,
     new_progress_bar_func: impl Fn(u64, &str) -> ProgressBar,
 ) -> (SortedSliceMap<(i64, i64), u64>, Box<[TagGroupInfo]>) {
