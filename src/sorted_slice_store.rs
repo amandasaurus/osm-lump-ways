@@ -12,6 +12,7 @@ where
     K: Ord + Send,
     V: Send,
 {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_iter(src: impl Iterator<Item = (K, V)>) -> Self {
         let data: Vec<(K, V)> = src.collect();
         Self::from_vec(data)
@@ -112,6 +113,7 @@ impl<T: Ord + Send> SortedSliceSet<T> {
             data: data.into_boxed_slice(),
         }
     }
+    #[allow(clippy::should_implement_trait)]
     pub fn from_iter(src: impl Iterator<Item = T>) -> Self {
         let data: Vec<T> = src.collect();
         Self::from_vec(data)
