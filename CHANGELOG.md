@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v3.4.0 (2025-08-27)
 
 * Large internal refactoring to make code clearer
 
