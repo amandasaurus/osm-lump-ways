@@ -578,7 +578,7 @@ where
         self.edges.len()
     }
     fn num_edges(&self) -> usize {
-        self.edges.iter().map(|(_vertexid, v)| v.outs.len()).sum()
+        self.edges.values().map(|v| v.outs.len()).sum()
     }
     /// True iff this vertex is in this graph
     fn contains_vertex(&self, vid: &i64) -> bool {
