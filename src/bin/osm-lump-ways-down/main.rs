@@ -201,7 +201,10 @@ fn main() -> Result<()> {
     if args.tag_filter.is_empty() {
         match args.tag_filter_func {
             Some(ref tff) => {
-                info!("Tag filter function in operation: {:?}", tff);
+                info!(
+                    "Tag filter function in operation: {:?}..",
+                    &tff.to_string()[0..80]
+                );
             }
             _ => {
                 info!("No tag filtering in operation. All ways in the file will be used.");
