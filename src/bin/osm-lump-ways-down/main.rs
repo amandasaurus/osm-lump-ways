@@ -17,6 +17,7 @@ use std::cmp::min;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::fs::File;
 use std::io::BufWriter;
+use std::io::Write;
 use std::path::Path;
 use std::time::Instant;
 
@@ -132,6 +133,7 @@ fn main() -> Result<()> {
 
     let logger = env_logger::Builder::new()
         .filter_level(args.verbose.log_level_filter())
+        .format(|buf, record| writeln!(buf, "{}", record.args()))
         .build();
     let progress_bars = indicatif::MultiProgress::new();
     LogWrapper::new(progress_bars.clone(), logger)
