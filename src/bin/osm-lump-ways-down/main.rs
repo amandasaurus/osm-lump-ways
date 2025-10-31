@@ -202,7 +202,7 @@ fn main() -> Result<()> {
         match args.tag_filter_func {
             Some(ref tff) => {
                 info!(
-                    "Tag filter function in operation: {:?}..",
+                    "Tag filter function in operation: \"{}...\"",
                     &tff.to_string()[0..80]
                 );
             }
