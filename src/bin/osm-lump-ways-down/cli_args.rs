@@ -1,9 +1,26 @@
 use clap::Parser;
 use clap_verbosity_flag::Verbosity;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use osm_lump_ways::dij::SplitPathsMethod;
 use osm_lump_ways::tagfilter;
+
+fn parse_int_human(input: &str) -> Result<usize, String> {
+    if let Ok(res) = usize::from_str(input) {
+        Ok(res)
+    } else if let Some(res) = input.to_lowercase().strip_suffix("k")
+        && let Ok(res) = usize::from_str(res)
+    {
+        Ok(res * 1_000)
+    } else if let Some(res) = input.to_lowercase().strip_suffix("m")
+        && let Ok(res) = usize::from_str(res)
+    {
+        Ok(res * 1_000_000)
+    } else {
+        Err(format!("Unable to parse {:?}", input))
+    }
+}
 
 /// Group OSM ways based on shared tags into GeoJSON MultiLineStrings
 ///
@@ -102,12 +119,12 @@ pub struct Args {
     pub only_longest_n_per_group: Option<usize>,
 
     /// Per file, only include the longest N lines
-    #[arg(long, value_name = "N")]
+    #[arg(long, value_name = "N", value_parser=parse_int_human)]
     pub only_longest_n_per_file: Option<usize>,
 
     /// When splitting a waygroup into paths, only take the following longest N paths (default:
     /// take all)
-    #[arg(long, value_name = "N")]
+    #[arg(long, value_name = "N", value_parser=parse_int_human)]
     pub only_longest_n_splitted_paths: Option<usize>,
 
     /// Set this to make each group a different filename, or have everything in one file. Default:
@@ -226,7 +243,7 @@ pub struct Args {
     pub ends_csv_min_length_m: Option<f64>,
 
     /// Only the largest N ends (by `upstream_m`) are included in CSV file
-    #[arg(long, requires = "ends_csv_file")]
+    #[arg(long, requires = "ends_csv_file", value_parser=parse_int_human)]
     pub ends_csv_only_largest_n: Option<usize>,
 
     /// When calculating ens CSV file, only include end points which have an tag.
@@ -299,6 +316,6 @@ pub struct Args {
     pub relation_tags_overwrite: bool,
 
     /// If using relation_tags_overwrite, only relation members with this role will be used.
-    #[arg(long, requires = "relation_tags_overwrite")]
+    #[arg(long, requires = "relation_tags_overwrite", value_name = "ROLE_NAME")]
     pub relation_tags_role: Vec<String>,
 }

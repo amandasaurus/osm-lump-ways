@@ -3,6 +3,7 @@
 ## Unreleased 
 
 * Dependencies updated
+* Many CLI arguments that take an integer will now accept `K` & `M` suffixes.
 
 ## v3.4.0 (2025-08-27)
 
