@@ -307,7 +307,7 @@ pub struct Args {
 
     /// Creates a GeoJSON(Seq) file which has one Feature per grouped, connected waterway (based on
     /// --flow-follows-tag value).
-    #[arg(long)]
+    #[arg(long, value_name = "FILENAME")]
     pub grouped_waterways: Option<PathBuf>,
 
     /// If a way is in a relation, which matches the tag filters, then apply that relation tags to
