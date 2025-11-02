@@ -13,10 +13,6 @@ pub enum SplitPathsMethod {
     LongestPath,
 }
 
-fn min_max<T: PartialOrd>(a: T, b: T) -> (T, T) {
-    if a < b { (a, b) } else { (b, a) }
-}
-
 /// Does a single Dijkstra search from start_idx to all vertexes.
 /// return a hashmap for each other vertex in the graph, with the previous node to go to (if
 /// applicable) and the total distance along the path

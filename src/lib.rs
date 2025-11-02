@@ -28,6 +28,7 @@ pub mod way_id_rel_tags;
 
 pub mod fileio;
 pub mod formatting;
+pub mod utils;
 
 use anyhow::Result;
 use indicatif::ProgressBar;

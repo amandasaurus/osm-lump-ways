@@ -198,7 +198,3 @@ impl Ord for WayGroup {
         self.length_m.total_cmp(&other.length_m).reverse()
     }
 }
-
-fn min_max<T: PartialOrd>(a: T, b: T) -> (T, T) {
-    if a < b { (a, b) } else { (b, a) }
-}
