@@ -99,6 +99,18 @@ where
     }
 }
 
+impl<K, V> Clone for SortedSliceMap<K, V>
+where
+    K: Clone,
+    V: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct SortedSliceSet<T> {
     data: Box<[T]>,
