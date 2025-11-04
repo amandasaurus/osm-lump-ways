@@ -1,14 +1,11 @@
 use super::*;
 use anyhow::Result;
-use indicatif::{MultiProgress, ProgressStyle};
 #[allow(unused_imports)]
 use log::{
     Level::{Debug, Trace},
     debug, error, info, log, trace, warn,
 };
-use osmio::prelude::*;
-use rayon::prelude::*;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
+use std::collections::HashMap;
 use std::path::Path;
 
 use itertools::Itertools;
@@ -28,8 +25,6 @@ use serde_json::json;
 pub(crate) fn do_longest_source_mouth(
     output_filename: &Path,
     g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
-    progress_bars: &MultiProgress,
-    style: &ProgressStyle,
     nodeid_pos: &impl NodeIdPosition,
     inter_store: &inter_store::InterStore,
     tag_group_info: &[TagGroupInfo],
@@ -39,7 +34,7 @@ pub(crate) fn do_longest_source_mouth(
     longest_source_mouth_longest_n: Option<usize>,
     longest_source_mouth_unnamed_string: &str,
 ) -> Result<()> {
-    /// Calc all mouth nids
+    // Calc all mouth nids
     let mut mouths: Vec<i64> = g
         .vertexes_par_iter()
         .filter(|nid| {
@@ -55,14 +50,13 @@ pub(crate) fn do_longest_source_mouth(
         mouths.len().to_formatted_string(&Locale::en)
     );
 
-    /// We can remove any mouth where total upstream is below our min, that'll definitely never be
-    /// OK
+    // We can remove any mouth where total upstream is below our min, that'll definitely never be
+    // OK
     mouths.retain(|nid| g.vertex_property_unchecked(nid).upstream_m >= min_length_m);
 
-    /// Calc longest upstream line per mouth
-    /// Any edges, which are in a taggroup, which has a parent channel, is not included.
-    /// This allows us to ignore all side channels
-    ///
+    // Calc longest upstream line per mouth
+    // Any edges, which are in a taggroup, which has a parent channel, is not included.
+    // This allows us to ignore all side channels
     let mut longest_mouth_source_per_mouth: Vec<_> = mouths
         .into_par_iter()
         .filter_map(|mouth_nid| {
@@ -70,9 +64,9 @@ pub(crate) fn do_longest_source_mouth(
                 let tg = &tag_group_info[g.edge_property_unchecked((nid1, nid2)).taggroupid_us()];
                 let has_name = tg.tagid.is_some();
 
-                !(only_named && !has_name)		// bit tricky, but this is the boolean
-													// expression
-						&& tg.parent_channels.is_empty()
+                !(only_named && !has_name)        // bit tricky, but this is the boolean
+                                                  // expression
+                        && tg.parent_channels.is_empty()
             })
         })
         .collect();
@@ -91,11 +85,8 @@ pub(crate) fn do_longest_source_mouth(
                 g,
                 nodeid_pos,
                 inter_store,
-                tag_group_info,
-                tag_group_value,
                 longest_source_mouth_unnamed_string,
             )
-            .into_iter()
         });
 
     let output_format = fileio::format_for_filename(output_filename);
@@ -124,7 +115,7 @@ fn longest_upstream_path(
 
     let (source_nid, (prev, dist)) = prev_dist
         .par_iter()
-        .max_by_key(|(nid, (prev, dist))| dist)
+        .max_by_key(|(_nid, (_prev, dist))| dist)
         .unwrap();
     if *dist < OrderedFloat(min_length_m) {
         return None;
@@ -194,7 +185,7 @@ fn group_path_parts_by_name(
 ) -> Vec<(Option<String>, Box<[i64]>)> {
     let mut names: Vec<(Option<String>, Box<[i64]>)> = Vec::new();
 
-    for (name, mut chunk) in &path
+    for (_name, mut chunk) in &path
         .iter()
         .tuple_windows()
         .map(|(nid1, nid2)| {
@@ -205,14 +196,14 @@ fn group_path_parts_by_name(
                     .map(|tgid| tag_group_value[tgid as usize].as_str()),
             )
         })
-        .chunk_by(|(seg, name)| *name)
+        .chunk_by(|(_seg, name)| *name)
     {
         let mut coords: Vec<i64> = Vec::new();
         let (first_seg, name) = chunk.next().unwrap();
         coords.push(*first_seg.0);
         coords.push(*first_seg.1);
         coords.extend(chunk.map(|(seg, _name)| *seg.1));
-        names.push((name.clone().map(String::from), coords.into_boxed_slice()));
+        names.push((name.map(String::from), coords.into_boxed_slice()));
     }
 
     names
@@ -223,8 +214,6 @@ fn name_group_to_geojson(
     g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
     nodeid_pos: &impl NodeIdPosition,
     inter_store: &inter_store::InterStore,
-    tag_group_info: &[TagGroupInfo],
-    tag_group_value: &[String],
     unnnamed_string: &str,
 ) -> impl Iterator<Item = (serde_json::Value, Vec<(f64, f64)>)> {
     let all_names: Vec<String> = names

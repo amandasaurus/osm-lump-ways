@@ -1,4 +1,3 @@
-#![allow(warnings)]
 use crate::sorted_slice_store::SortedSliceMap;
 use num_format::{Locale, ToFormattedString};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -28,7 +27,7 @@ impl WayIdToRelationTags {
         for (_objtype, wid, _role) in rel
             .members()
             .filter(|m| m.0 == osmio::OSMObjectType::Way)
-            .filter(|m| only_roles.is_empty() || only_roles.iter().any(|r| r == &m.2))
+            .filter(|m| only_roles.is_empty() || only_roles.iter().any(|r| r == m.2))
         {
             // Update which relation we use for this wayid
             self.wid_to_rid
@@ -51,7 +50,7 @@ impl WayIdToRelationTags {
         self.wid_to_rid
             .get(&wid)
             .and_then(|rid| self.rid_to_tags.get(rid))
-            .and_then(|tags| tags.get(&*key))
+            .and_then(|tags| tags.get(key))
             .map(|v| v.as_str())
     }
 

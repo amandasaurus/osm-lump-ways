@@ -1,23 +1,16 @@
-#![allow(warnings)]
 use anyhow::{Context, Result};
 use clap::Parser;
 use get_size::GetSize;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use indicatif_log_bridge::LogWrapper;
-use itertools::Itertools;
-use kdtree::KdTree;
-use log::{
-    Level::{Debug, Trace},
-    debug, error, info, log, trace, warn,
-};
+use log::{debug, error, info, trace, warn};
 use osm_lump_ways::inter_store;
 use osmio::OSMObjBase;
 use osmio::prelude::*;
 use rayon::prelude::*;
 use smallvec::SmallVec;
-use std::iter;
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::time::Instant;
 
 use std::path::{Path, PathBuf};
@@ -27,13 +20,12 @@ use std::sync::{Arc, Mutex};
 //use get_size_derive::*;
 
 use num_format::{Locale, ToFormattedString};
-use std::collections::HashSet;
 
 mod cli_args;
 
 use nodeid_position::NodeIdPosition;
 use osm_lump_ways::dij;
-use osm_lump_ways::haversine::{haversine_m, haversine_m_fpair};
+use osm_lump_ways::haversine::haversine_m_fpair;
 use osm_lump_ways::nodeid_position;
 use osm_lump_ways::sorted_slice_store::SortedSliceSet;
 use osm_lump_ways::tagfilter;
@@ -257,7 +249,7 @@ fn main() -> Result<()> {
     progress_bars.remove(&input_bar);
     let nid2nways = Arc::try_unwrap(nid2nways).unwrap().into_inner().unwrap();
     let num_nids = nid2nways.len();
-    let mut nids_in_ne2_ways: SortedSliceSet<i64> =
+    let nids_in_ne2_ways: SortedSliceSet<i64> =
         SortedSliceSet::from_iter(nid2nways.into_iter().filter_map(|(nid, nvertexes)| {
             if nvertexes != 2 { Some(nid) } else { None }
         }));
@@ -442,7 +434,7 @@ fn main() -> Result<()> {
 
     let mut way_groups = graphs
         .into_par_iter()
-        .flat_map_iter(|(group, mut complete_graph)| {
+        .flat_map_iter(|(group, complete_graph)| {
             complete_graph
                 .into_disconnected_graphs(grouping.clone())
                 .map({
@@ -502,7 +494,7 @@ fn main() -> Result<()> {
     way_groups.shrink_to_fit();
 
     way_groups.par_iter_mut().for_each(|wg| {
-        let mut json_props = &mut wg.json_props;
+        let json_props = &mut wg.json_props;
         json_props["root_nodeid"] = wg.root_nodeid.into();
         json_props["root_nodeid_120"] = (wg.root_nodeid % 120).into();
         json_props["length_m"] = wg.length_m.into();
@@ -521,8 +513,8 @@ fn main() -> Result<()> {
     if let Some(output_frames) = args.output_frames {
         do_frames(
             &output_frames,
-            args.frames_group_min_length_m.clone(),
-            args.save_as_linestrings.clone(),
+            args.frames_group_min_length_m,
+            args.save_as_linestrings,
             &way_groups,
             &progress_bars,
             &style,
@@ -656,10 +648,7 @@ fn main() -> Result<()> {
             let mut results = Vec::with_capacity(way_groups.len());
             for wg in way_groups.into_iter() {
                 let WayGroup {
-                    json_props,
-                    graph,
-                    group,
-                    ..
+                    json_props, graph, ..
                 } = wg;
                 // Iterator which yields lines of nids for each line
                 let lines_nids_iter = if args.split_into_single_paths {
@@ -813,7 +802,7 @@ fn do_frames(
     let started_frames_calculation = Instant::now();
     let frames: Vec<_> = way_groups
         .par_iter()
-        .filter(|wg| frames_group_min_length_m.map_or(true, |min| wg.length_m >= min))
+        .filter(|wg| frames_group_min_length_m.is_none_or(|min| wg.length_m >= min))
         .flat_map_iter(
             |wg| -> Box<dyn Iterator<Item = (serde_json::Value, Vec<_>)>> {
                 let paths = wg
@@ -865,7 +854,7 @@ fn do_frames(
             .with_style(style.clone()),
     );
 
-    let f = std::fs::File::create(&frames_filepath).unwrap();
+    let f = std::fs::File::create(frames_filepath).unwrap();
     let mut f = std::io::BufWriter::new(f);
     let num_written = fileio::write_geojson_features_directly(
         frames_writing_bar.wrap_iter(frames.into_iter()),

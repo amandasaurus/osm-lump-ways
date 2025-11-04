@@ -1,4 +1,3 @@
-#![allow(warnings)]
 use anyhow::Result;
 use clap::Parser;
 use get_size::GetSize;
@@ -1224,8 +1223,6 @@ fn main() -> Result<()> {
         longest_source_mouth::do_longest_source_mouth(
             longest_source_mouth_file,
             &g,
-            &progress_bars,
-            &style,
             &nodeid_pos,
             &inter_store,
             tag_group_info,

@@ -315,8 +315,6 @@ pub fn calc_tag_group(
                 a.parent_rivers.push(b_id);
                 b.terminal_distributaries.push(a_id);
             }
-
-            _ => todo!("{:?}", rr),
         }
     }
 
@@ -328,126 +326,103 @@ pub fn calc_tag_group(
         );
     }
 
-    tag_group_info
-        .par_iter_mut()
-        .enumerate()
-        .filter(|(_taggroupid, tg)| !tg.unallocated_other_groups.is_empty())
-        .for_each(|(taggroupid, tg)| {
-            let taggroupid = taggroupid as u64;
+    if tag_group_info.par_iter().any(|tg| !tg.unallocated_other_groups.is_empty()) {
+        let (count, sum_length) = tag_group_info.par_iter().filter(|tg| !tg.unallocated_other_groups.is_empty()).map(|tg| (1, tg.length_m)).reduce(|| (0, 0.), |a, b| (a.0+b.0, a.1+b.1));
+        let (total_count, total_sum_length) = tag_group_info.par_iter().map(|tg| (1, tg.length_m)).reduce(|| (0, 0.), |a, b| (a.0+b.0, a.1+b.1));
+        warn!("Unable to connect up {count} of {total_count} ({count_per:.1}%) river pairs, representing {sum_length} km of {total_sum_length} km ({len_per:.1}%) rivers",
+            count=count, total_count=total_count,
+            count_per=(count as f64 * 100. / total_count as f64),
+            sum_length=(sum_length.round() as u64/1000).to_formatted_string(&Locale::en),
+            total_sum_length=(total_sum_length.round() as u64/1000).to_formatted_string(&Locale::en),
+            len_per=(sum_length * 100. / total_sum_length),
+        );
+    }
+    //assert_eq!(0, tag_group_info.par_iter().filter(|tg| !tg.unallocated_other_groups.is_empty()).count());
 
-            let mut confluences: SmallVec<[i64; 3]> = smallvec![]; // buffer
-            let mut put_back_in: SmallVec<[_; 2]> = smallvec![];
+    // Below is the original code for deciding relationships.
+    //tag_group_info
+    //    .par_iter_mut()
+    //    .enumerate()
+    //    .filter(|(_taggroupid, tg)| !tg.unallocated_other_groups.is_empty())
+    //    .for_each(|(taggroupid, tg)| {
+    //        let taggroupid = taggroupid as u64;
 
-            // This is true 70% of the time
-            //if tg.unallocated_other_groups.len() == 1 && tg.confluences.len() <= 2 {
-            //	let other_taggroupid = tg.unallocated_other_groups.pop().unwrap();
-            //	//dbg!(tg.confluences.len());
-            //	if tg.confluences.len() == 1 {		// true 92% of the time
-            //		let nid1 = tg.confluences[0];
-            //		dbg!(flow_type(g, nid1, taggroupid)); dbg!(flow_type(g, nid1, other_taggroupid));
-            //	} else if tg.confluences.len() == 2 {
-            //		let nid1 = tg.confluences[0];
-            //		let nid2 = tg.confluences[1];
-            //		if tg.confluences.iter().any(|nid| flows_out(g, nid, taggroupid)) && tg.confluences.iter().any(|nid| flows_in(g, nid, taggroupid)) {
-            //		}
-            //		dbg!(nid1, taggroupid, flow_type(g, nid1, taggroupid), other_taggroupid, flow_type(g, nid1, other_taggroupid));
-            //		dbg!(nid2, taggroupid, flow_type(g, nid2, taggroupid), other_taggroupid, flow_type(g, nid2, other_taggroupid));
+    //        let mut confluences: SmallVec<[i64; 3]> = smallvec![]; // buffer
+    //        let mut put_back_in: SmallVec<[_; 2]> = smallvec![];
 
-            //	} else {
-            //		unreachable!();
-            //	}
-            //}
-            //dbg!(&tg.unallocated_other_groups);
-            //dbg!(&tg.confluences);
-            //dbg!(tg.confluences.iter().map(|nid| (nid, taggroupid, flow_type(g, *nid, taggroupid))).collect::<Vec<_>>());
+    //        for other_taggroupid in tg.unallocated_other_groups.drain(..) {
+    //            assert!(other_taggroupid != taggroupid);
+    //            confluences.truncate(0);
+    //            confluences.extend(
+    //                tg.confluences
+    //                    .iter()
+    //                    .flat_map(|&nid| {
+    //                        g.in_edges_w_prop(nid)
+    //                            .filter(|(_, _, eprop)| eprop.taggroupid == other_taggroupid)
+    //                    })
+    //                    .map(|(_, nid2, _)| nid2),
+    //            );
+    //            confluences.extend(
+    //                tg.confluences
+    //                    .iter()
+    //                    .flat_map(|&nid| {
+    //                        g.out_edges_w_prop(nid)
+    //                            .filter(|(_, _, eprop)| eprop.taggroupid == other_taggroupid)
+    //                    })
+    //                    .map(|(nid1, _, _)| nid1),
+    //            );
+    //            sort_dedup!(confluences);
+    //            assert!(!confluences.is_empty());
 
-            for other_taggroupid in tg.unallocated_other_groups.drain(..) {
-                assert!(other_taggroupid != taggroupid);
-                confluences.truncate(0);
-                confluences.extend(
-                    tg.confluences
-                        .iter()
-                        .flat_map(|&nid| {
-                            g.in_edges_w_prop(nid)
-                                .filter(|(_, _, eprop)| eprop.taggroupid == other_taggroupid)
-                        })
-                        .map(|(_, nid2, _)| nid2),
-                );
-                confluences.extend(
-                    tg.confluences
-                        .iter()
-                        .flat_map(|&nid| {
-                            g.out_edges_w_prop(nid)
-                                .filter(|(_, _, eprop)| eprop.taggroupid == other_taggroupid)
-                        })
-                        .map(|(nid1, _, _)| nid1),
-                );
-                sort_dedup!(confluences);
-                assert!(!confluences.is_empty());
+    //            if confluences.len() >= 2
+    //                && confluences.iter().any(|nid| {
+    //                    flows_out(g, *nid, taggroupid)
+    //                        && flows_through_or_in(g, *nid, other_taggroupid)
+    //                })
+    //                && confluences.iter().any(|nid| {
+    //                    flows_in(g, *nid, taggroupid)
+    //                        && flows_through_or_out(g, *nid, other_taggroupid)
+    //                })
+    //            {
+    //                tg.parent_channels.push(other_taggroupid);
+    //            } else if confluences.len() >= 2
+    //                && confluences.iter().any(|nid| {
+    //                    flows_through_or_in(g, *nid, taggroupid)
+    //                        && flows_out(g, *nid, other_taggroupid)
+    //                })
+    //                && confluences.iter().any(|nid| {
+    //                    flows_through_or_out(g, *nid, taggroupid)
+    //                        && flows_in(g, *nid, other_taggroupid)
+    //                })
+    //            {
+    //                tg.side_channels.push(other_taggroupid);
+    //            } else if confluences
+    //                .iter()
+    //                .all(|nid| flows_in(g, *nid, other_taggroupid))
+    //            {
+    //                tg.tributaries.push(other_taggroupid);
+    //            } else if confluences.iter().any(|nid| flows_in(g, *nid, taggroupid)) {
+    //                tg.terminal_distributaries.push(other_taggroupid)
+    //            } else if confluences.iter().all(|nid| {
+    //                flows_out(g, *nid, taggroupid) && flows_through(g, *nid, other_taggroupid)
+    //            }) {
+    //                tg.parent_rivers.push(other_taggroupid)
+    //            } else if confluences.iter().all(|nid| {
+    //                flows_through(g, *nid, taggroupid) && flows_out(g, *nid, other_taggroupid)
+    //            }) {
+    //                tg.branching_distributaries.push(other_taggroupid)
+    //            } else if confluences.iter().any(|nid| {
+    //                flows_out(g, *nid, taggroupid) && flows_out(g, *nid, other_taggroupid)
+    //            }) {
+    //                tg.sibling_distributaries.push(other_taggroupid)
+    //            } else {
+    //                put_back_in.push(other_taggroupid);
+    //            }
+    //        }
 
-                if confluences.len() >= 2
-                    && confluences.iter().any(|nid| {
-                        flows_out(g, *nid, taggroupid)
-                            && flows_through_or_in(g, *nid, other_taggroupid)
-                    })
-                    && confluences.iter().any(|nid| {
-                        flows_in(g, *nid, taggroupid)
-                            && flows_through_or_out(g, *nid, other_taggroupid)
-                    })
-                {
-                    tg.parent_channels.push(other_taggroupid);
-                } else if confluences.len() >= 2
-                    && confluences.iter().any(|nid| {
-                        flows_through_or_in(g, *nid, taggroupid)
-                            && flows_out(g, *nid, other_taggroupid)
-                    })
-                    && confluences.iter().any(|nid| {
-                        flows_through_or_out(g, *nid, taggroupid)
-                            && flows_in(g, *nid, other_taggroupid)
-                    })
-                {
-                    tg.side_channels.push(other_taggroupid);
-                } else if confluences
-                    .iter()
-                    .all(|nid| flows_in(g, *nid, other_taggroupid))
-                {
-                    tg.tributaries.push(other_taggroupid);
-                } else if confluences.iter().any(|nid| flows_in(g, *nid, taggroupid)) {
-                    tg.terminal_distributaries.push(other_taggroupid)
-                } else if confluences.iter().all(|nid| {
-                    flows_out(g, *nid, taggroupid) && flows_through(g, *nid, other_taggroupid)
-                }) {
-                    tg.parent_rivers.push(other_taggroupid)
-                } else if confluences.iter().all(|nid| {
-                    flows_through(g, *nid, taggroupid) && flows_out(g, *nid, other_taggroupid)
-                }) {
-                    tg.branching_distributaries.push(other_taggroupid)
-                } else if confluences.iter().any(|nid| {
-                    flows_out(g, *nid, taggroupid) && flows_out(g, *nid, other_taggroupid)
-                }) {
-                    tg.sibling_distributaries.push(other_taggroupid)
-                } else {
-                    put_back_in.push(other_taggroupid);
-                    //unreachable!(
-                    //    "Unable to allocate. Main: {} other id: {} flows {:?}",
-                    //    tg.tagid
-                    //        .map_or("(no name tag)", |tagid| &tag_group_value[tagid as usize]),
-                    //    other_taggroupid,
-                    //    confluences
-                    //        .iter()
-                    //        .map(|nid| (
-                    //            nid,
-                    //            flow_type(*nid, taggroupid),
-                    //            flow_type(*nid, other_taggroupid)
-                    //        ))
-                    //        .collect::<Vec<_>>(),
-                    //);
-                }
-            }
-
-            sort_dedup!(put_back_in);
-            tg.unallocated_other_groups.extend(put_back_in);
-        });
+    //        sort_dedup!(put_back_in);
+    //        tg.unallocated_other_groups.extend(put_back_in);
+    //    });
 
     tag_group_info.par_iter_mut().for_each(|tg| {
         sort_dedup!(tg.unallocated_other_groups);
@@ -556,6 +531,7 @@ impl FlowType {
     fn out(&self) -> bool {
         *self == FlowType::Out
     }
+    #[allow(unused)]
     fn through(&self) -> bool {
         *self == FlowType::Through
     }
@@ -574,6 +550,7 @@ impl FlowType {
             FlowType::Out | FlowType::No => false,
         }
     }
+    #[allow(unused)]
     fn code(&self) -> char {
         match self {
             FlowType::In => 'I',
@@ -603,59 +580,60 @@ fn flow_type(
     }
 }
 
-fn flows_out(
-    g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
-    nid: i64,
-    group_id: u64,
-) -> bool {
-    flow_type(g, nid, group_id) == FlowType::Out
-}
-
-fn flows_out_or_through(
-    g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
-    nid: i64,
-    group_id: u64,
-) -> bool {
-    match flow_type(g, nid, group_id) {
-        FlowType::Out | FlowType::Through => true,
-        FlowType::In | FlowType::No => false,
-    }
-}
-
-fn flows_in(
-    g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
-    nid: i64,
-    group_id: u64,
-) -> bool {
-    flow_type(g, nid, group_id) == FlowType::In
-}
-fn flows_through(
-    g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
-    nid: i64,
-    group_id: u64,
-) -> bool {
-    flow_type(g, nid, group_id) == FlowType::Through
-}
-fn flows_through_or_in(
-    g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
-    nid: i64,
-    group_id: u64,
-) -> bool {
-    matches!(
-        flow_type(g, nid, group_id),
-        FlowType::Through | FlowType::In
-    )
-}
-fn flows_through_or_out(
-    g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
-    nid: i64,
-    group_id: u64,
-) -> bool {
-    matches!(
-        flow_type(g, nid, group_id),
-        FlowType::Through | FlowType::Out
-    )
-}
+// Below is not used as much now.
+//fn flows_out(
+//    g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
+//    nid: i64,
+//    group_id: u64,
+//) -> bool {
+//    flow_type(g, nid, group_id) == FlowType::Out
+//}
+//
+//fn flows_out_or_through(
+//    g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
+//    nid: i64,
+//    group_id: u64,
+//) -> bool {
+//    match flow_type(g, nid, group_id) {
+//        FlowType::Out | FlowType::Through => true,
+//        FlowType::In | FlowType::No => false,
+//    }
+//}
+//
+//fn flows_in(
+//    g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
+//    nid: i64,
+//    group_id: u64,
+//) -> bool {
+//    flow_type(g, nid, group_id) == FlowType::In
+//}
+//fn flows_through(
+//    g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
+//    nid: i64,
+//    group_id: u64,
+//) -> bool {
+//    flow_type(g, nid, group_id) == FlowType::Through
+//}
+//fn flows_through_or_in(
+//    g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
+//    nid: i64,
+//    group_id: u64,
+//) -> bool {
+//    matches!(
+//        flow_type(g, nid, group_id),
+//        FlowType::Through | FlowType::In
+//    )
+//}
+//fn flows_through_or_out(
+//    g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
+//    nid: i64,
+//    group_id: u64,
+//) -> bool {
+//    matches!(
+//        flow_type(g, nid, group_id),
+//        FlowType::Through | FlowType::Out
+//    )
+//}
 
 fn assert_sanity_check(tag_group_info: &[TagGroupInfo]) {
     assert!(tag_group_info.par_iter().all(|tg| tg.has_stream_level()));
@@ -737,8 +715,8 @@ pub fn calc_all_confluence_distances(
                                 return None;
                             }
                             let nid2 = &all_confluences[j as usize].clone();
-                            if let Some((_prev, dist)) = &downstreams.get(&nid2) {
-                                Some(((nid1, *nid2), dist.0.clone()))
+                            if let Some((_prev, dist)) = &downstreams.get(nid2) {
+                                Some(((nid1, *nid2), dist.0))
                             } else {
                                 None
                             }
@@ -796,17 +774,6 @@ fn dij_flood_fill_downwards(
     prev_dist
 }
 
-fn one_of_each<T>(els: &[T], func1: &impl Fn(&T) -> bool, func2: &impl Fn(&T) -> bool) -> bool {
-    let i = els.iter().position(func1);
-    let j = els.iter().position(func2);
-
-    i.is_some()
-        && j.is_some()
-        && i != j
-        && !els[i.unwrap() + 1..].iter().any(func1)
-        && !els[j.unwrap() + 1..].iter().any(func2)
-}
-
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
 enum RiverRelationship {
     AIsTributaryOfB,
@@ -839,7 +806,7 @@ fn calc_river_relationship(
     // do this exactly twice, with some reversing code at the end of the loop (i.e the middle)
     use FlowType::*;
     use RiverRelationship::*;
-    for step in [0, 1] {
+    for _step in [0, 1] {
         //dbg!(step, a_id, b_id);
         if confluences.iter().all(|c| c == &(In, Out)) {
             possible_res.push((AIsTerminalDistrubtoryOfB, a_id, b_id));
@@ -851,7 +818,7 @@ fn calc_river_relationship(
             possible_res.push((AIsBranchingDistrubtoryOfB, a_id, b_id));
         }
 
-        if is_side_channel_of(a, b, a_id, b_id, &confluences) {
+        if is_side_channel_of(a, b, &confluences) {
             possible_res.push((AIsSideChannelOfB, a_id, b_id));
         }
 
@@ -864,9 +831,9 @@ fn calc_river_relationship(
             .collect();
     }
 
-    if possible_res.len() == 0 {
+    if possible_res.is_empty() {
         // we try again for worse case scenarios
-        for step in [0, 1] {
+        for _step in [0, 1] {
             // a = small, unnamed, and only joins with b. so put it as trib.
             if a.length_m / b.length_m <= 0.1
                 && a.tagid.is_none()
@@ -917,7 +884,7 @@ fn calc_river_relationship(
     //    //dbg!(&a.confluences); dbg!(&b.confluences);
     //    dbg!(&confluences);
     //}
-    if possible_res.len() == 0 {
+    if possible_res.is_empty() {
         debug!(
             "Unable to deduce river connection: {:?}",
             (a_id, b_id, confluences)
@@ -930,8 +897,6 @@ fn calc_river_relationship(
 fn is_side_channel_of(
     a: &TagGroupInfo,
     b: &TagGroupInfo,
-    a_id: u64,
-    b_id: u64,
     confluences: &[(FlowType, FlowType)],
 ) -> bool {
     confluences.len() >= 2
@@ -944,15 +909,3 @@ fn is_side_channel_of(
         && confluences.iter().any(|&(flow_a, flow_b)| flow_a.out() && flow_b.in_or_through())
         && confluences.iter().any(|&(flow_a, flow_b)| flow_a.in_() && flow_b.out_or_through())
 }
-
-fn is_tributary_of(
-    a: &TagGroupInfo,
-    b: &TagGroupInfo,
-    a_id: u64,
-    b_id: u64,
-    confluences: &[(FlowType, FlowType)],
-) -> bool {
-    confluences.len() == 1 && confluences[0].0.in_() && confluences[0].1.through()
-}
-
-//

@@ -1,4 +1,3 @@
-#![allow(warnings)]
 #![allow(dead_code, unused_imports)]
 use super::*;
 use geo::algorithm::convex_hull::qhull::quick_hull;
@@ -123,7 +122,7 @@ impl WayGroup {
         convex_hull_nodes.par_sort_by_key(|(n, _)| *n);
 
         // Frames have a lot of overlap with each other.
-        let mut frames_graph = Arc::new(Mutex::new(Graph2::new()));
+        let frames_graph = Arc::new(Mutex::new(Graph2::new()));
 
         convex_hull_nodes
             .par_iter()
@@ -140,12 +139,12 @@ impl WayGroup {
             .inspect(|_| frames_bar.inc(self.graph.num_vertexes() as u64))
             .for_each_with(
                 frames_graph.clone(),
-                |frames_graph, ((from_nid, to_nid), path)| {
+                |frames_graph, ((_from_nid, _to_nid), path)| {
                     frames_graph.lock().unwrap().add_edge_chain(&path);
                 },
             );
 
-        let mut frames_graph = Arc::try_unwrap(frames_graph).unwrap().into_inner().unwrap();
+        let frames_graph = Arc::try_unwrap(frames_graph).unwrap().into_inner().unwrap();
 
         frames_graph.into_lines_random()
     }
