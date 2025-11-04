@@ -2,11 +2,12 @@
 
 ## Unreleased 
 
-* Dependencies updated
-* Many CLI arguments that take an integer will now accept `K` & `M` suffixes.
+* `--longest-source-mouth` added, to calculated long river systems
 * `--relation-tags-overwrite` will now prefer the relation with the larger
   number of member. This makes overlapping river relations give more sensible
   results (e.g. the “Bann” & “Upper Bann” river relations)
+* Many CLI arguments that take an integer will now accept `K` & `M` suffixes.
+* Dependencies updated
 
 ## v3.4.0 (2025-08-27)
 

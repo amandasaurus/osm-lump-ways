@@ -318,4 +318,27 @@ pub struct Args {
     /// If using relation_tags_overwrite, only relation members with this role will be used.
     #[arg(long, requires = "relation_tags_overwrite", value_name = "ROLE_NAME")]
     pub relation_tags_role: Vec<String>,
+
+    /// Write a geojson file with the longest geometry from
+    #[arg(long, value_name = "FILENAME")]
+    pub longest_source_mouth: Option<PathBuf>,
+
+    /// Only include source/mouth values where the total length is at least this many metres.
+    #[arg(
+        long,
+        default_value = "0.",
+        requires = "longest_source_mouth",
+        value_name = "NUMBER"
+    )]
+    pub longest_source_mouth_min_length_m: f64,
+
+    /// Only include the longest N groups of longest source/mouth
+    #[arg(long, requires = "longest_source_mouth", value_name = "NUMBER", value_parser=parse_int_human)]
+    pub longest_source_mouth_longest_n: Option<usize>,
+
+    #[arg(long, default_value = "unnnamed", value_name = "STRING")]
+    pub longest_source_mouth_unnamed_string: String,
+
+    #[arg(long)]
+    pub longest_source_mouth_only_named: bool,
 }

@@ -346,6 +346,74 @@ Based on the value of the `--flow-follows-tag` argument, ways are grouped into
 connected GeoJSON Features, along with many attributes about what is connected
 to what.
 
+### Longest from Source to Mouth (`--longest-source-mouth FILENAME`)
+
+Calculates the river systems from the input data, i.e. the longest downstream
+segment from a source/start to a mouth/end of a river.
+
+For example, the Mississippi River is 3,000 km long. The Missouri River is
+3,200 km, and joins the Mississippi about half way down (at St. Louis). If you
+start at the start of the Missouri, follow it downstream, then join the
+Mississippi, and follow that down, you will travel a longer length. This is the
+true length of the this single “river system”.
+
+INFO: This Missouri-Mississippi system actually goes Hell Roaring → Red Rock →
+Beaverhead River → Jefferson River → Missouri → Mississippi
+
+INFO: Sometimes a large river splits towards the mouth, into several
+distributaries, each of which takes a large amount of upstream. This can result
+in apparetly duplicate river systems. This happens with the Mississippi system.
+There are currently 3 small distributaries, causing this Missouri-Mississippi
+system to appear 3 times in the output.
+
+Each river system is composed of 1 or more segments. The output is a collection
+of GeoJSON `LineString` Features. Each Feature represents one segment in the
+river system. In the Missouri-Mississippi example, the entire length & geometry
+of the Missouri river will be included, and then the section of the Mississippi
+downstream of where the Missouri joins will be included. Each river system can
+be uniquely identified by the `river_system_mouth_source_nids` (or equivalent
+`river_system_mouth_source_nids_s`) value.
+
+* `idx` _(integer)_ Index of this segment within this river system. Starts at
+  0, for the most upstream segment.
+* `revidx` _(integer)_ Reverse Index. 0 is the most downstream segment. i.e.
+  it's `num_parts - idx - 1`.
+* `num_parts` _(integer)_ Total number of segments in this river system.
+* `length_m` _(float)_ Length of this segment in metres. NB: It might not be
+  the full length of this river.
+* `name` _(string)_ The name of this segment from OSM. `null` is this has no
+  name.
+* `river_system_length_m` _(float)_ Length of entire river system in metres.
+* `river_system_source_nid` _(integer)_ OSM node id of the source of this river
+  system.
+* `river_system_mouth_nid` _(integer)_ OSM node id of the mouth of this river
+  system.
+* `river_system_mouth_source_nids` _(array of integers)_ JSON array of
+  `[mouth_nid, source_nid]` from above.
+* `river_system_mouth_source_nids_s` _(string)_ `mouth_source_nids` but already
+  formatted as a string (e.g. `"1,2"`)
+* `river_system_names` _(array of strings)_ JSON Array of all the names in this
+  river system, going upstream. i.e. element 0 is the end of the river. If a
+  segment has no name, then `--longest-source-mouth-unnamed-string` argument
+  will be used, which is `"unnamed"` if not set. There are no JSON `null`s in
+  this value
+* `river_system_names_s` _(string)_ the `river_system_names` value, but joined
+  together with `" - "`, e.g. `"Shannon - Boyle - Lung"` for the
+  Shannon river system.
+
+The follow extra CLI arguments change the output.
+
+* `--longest-source-mouth-min-length-m FLOAT` Only river systems with at least
+  this total length will be inclued.
+* `--longest-source-mouth-longest-n INTEGER` Only the longest N river systems
+  will be included. NB: since 1 river system will often be composed of more
+  than 1 segment, there will almost certainly be more then N GeoJSON Features
+  in the output file.
+* `--longest-source-mouth-only-named` Only named river segments will be used
+  for calculation. Without this argument, all segments, incl unnamed rivers
+  will be included.
+* `--longest-source-mouth-unnamed-string STRING` _(see above)_
+
 ## Loop removal
 
 After the loops are detected, all the edges (way segments) in the loops are
