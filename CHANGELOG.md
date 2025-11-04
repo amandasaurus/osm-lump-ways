@@ -4,6 +4,9 @@
 
 * Dependencies updated
 * Many CLI arguments that take an integer will now accept `K` & `M` suffixes.
+* `--relation-tags-overwrite` will now prefer the relation with the larger
+  number of member. This makes overlapping river relations give more sensible
+  results (e.g. the “Bann” & “Upper Bann” river relations)
 
 ## v3.4.0 (2025-08-27)
 

@@ -8,21 +8,41 @@ use std::collections::HashMap;
 pub struct WayIdToRelationTags {
     wid_to_rid: HashMap<i64, i64>,
     rid_to_tags: HashMap<i64, SortedSliceMap<String, String>>,
+
+    /// How many members does this relation id have
+    rid_to_nmembers: HashMap<i64, usize>,
 }
 
 impl WayIdToRelationTags {
     pub fn record_relation(&mut self, rel: &impl osmio::Relation, only_roles: &[String]) {
+        // Save number of members
+        let nmembers = rel.members().count();
+        self.rid_to_nmembers.insert(rel.id(), nmembers);
+
+        // Save tags
+        self.rid_to_tags.insert(
+            rel.id(),
+            SortedSliceMap::from_iter(rel.tags().map(|(k, v)| (k.to_string(), v.to_string()))),
+        );
+
         for (_objtype, wid, _role) in rel
             .members()
             .filter(|m| m.0 == osmio::OSMObjectType::Way)
             .filter(|m| only_roles.is_empty() || only_roles.iter().any(|r| r == &m.2))
         {
-            self.wid_to_rid.insert(wid, rel.id());
+            // Update which relation we use for this wayid
+            self.wid_to_rid
+                .entry(wid)
+                .and_modify(|rid| {
+                    // If this wid already has a rid, then overwrite it iff we currenty have more
+                    // members
+                    if nmembers >= *self.rid_to_nmembers.get(rid).unwrap() {
+                        *rid = rel.id()
+                    }
+                })
+                // Not seen before → simple insert
+                .or_insert(rel.id());
         }
-        self.rid_to_tags.insert(
-            rel.id(),
-            SortedSliceMap::from_iter(rel.tags().map(|(k, v)| (k.to_string(), v.to_string()))),
-        );
     }
 
     /// For this way id, what is the value of this tag

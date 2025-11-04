@@ -97,8 +97,9 @@ that role will be included (can be specified more than once).
 If a relation has a tag, and a way has a tag (e.g. `name`) the tag value from
 the relation will be used not the way.
 
-If a way is a member of more than one relation, then the last seen relation
-will be used (which for normal, sorted, OSM files is the highest numbered
+If a way is a member of more than one relation, then the relation with the
+higher number of members will be used (if equal, the last seen relation in the
+file will be used, which for normal, sorted, OSM files is the highest numbered
 relation). Only one level of way-in-relation membership is included. Relations
 as members in other relations are ignored.
 
