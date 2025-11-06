@@ -41,6 +41,11 @@ pub trait DirectedGraphTrait<V, E>: Send + Sync + Sized {
         self.out_neighbours(vertex).map(move |nid2| (vertex, nid2))
     }
 
+    /// All edges that go to/from this vertex. No guarantee of order.
+    fn edges(&self, vertex: i64) -> impl Iterator<Item = (i64, i64)> {
+        self.in_edges(vertex).chain(self.out_edges(vertex))
+    }
+
     // For an edge (defined by 2 vertexes), return all other edges which are connected to the first
     // or last vertex (excl. this edge)
     fn all_connected_edges(&self, edge: &(i64, i64)) -> impl Iterator<Item = (i64, i64)> {
