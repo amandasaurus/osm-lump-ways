@@ -2,10 +2,6 @@ pub fn get_two_muts<T>(arr: &mut [T], i: usize, j: usize) -> (&mut T, &mut T) {
     assert!(i <= arr.len());
     assert!(j <= arr.len());
     assert!(i != j);
-    if i > j {
-        let (b, a) = get_two_muts(arr, j, i);
-        return (a, b);
-    }
     assert!(i < j);
 
     let (left, right) = arr.split_at_mut(i + 1);
