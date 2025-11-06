@@ -2045,7 +2045,7 @@ fn do_waterway_grouped(
                 .map(|(dist_tg_idx, dist_tg)| {
                     let confluences = tg.confluences
                         .iter().filter(|nid| dist_tg.confluences.contains(nid))
-                        .flat_map(|&nid| g.out_edges(nid))
+                        .flat_map(|&nid| g.edges(nid))
                         .filter(|seg| g.edge_property_unchecked(*seg).taggroupid == *dist_tg_idx)
                         .map(|seg| seg_to_distrib_json(&seg, seg.0, false))
                         .collect::<Vec<_>>();
@@ -2066,7 +2066,7 @@ fn do_waterway_grouped(
                 .map(|(dist_tg_idx, dist_tg)| {
                     let confluences = tg.confluences
                         .iter().filter(|nid| dist_tg.confluences.contains(nid))
-                        .flat_map(|&nid| g.out_edges(nid))
+                        .flat_map(|&nid| g.edges(nid))
                         .filter(|seg| g.edge_property_unchecked(*seg).taggroupid == *dist_tg_idx)
                         .map(|seg| seg_to_distrib_json(&seg, seg.0, false))
                         .collect::<Vec<_>>();
@@ -2097,7 +2097,7 @@ fn do_waterway_grouped(
                 .map(|(trib_tg_idx, trib_tg)| {
                 let confluences = tg.confluences
                     .iter().filter(|nid| trib_tg.confluences.contains(nid))
-                    .flat_map(|&nid| g.in_edges(nid))
+                    .flat_map(|&nid| g.edges(nid))
                     .filter(|seg| g.edge_property_unchecked(*seg).taggroupid == *trib_tg_idx)
                     .map(|seg| seg_to_distrib_json(&seg, seg.1, true))
                     .collect::<Vec<_>>();
@@ -2114,22 +2114,27 @@ fn do_waterway_grouped(
 
             props["parent_rivers"] = tg.parent_rivers
                 .par_iter()
-                .map(|parent_tg_idx| (parent_tg_idx, &tag_group_info[*parent_tg_idx as usize]))
-                .map(|(parent_tg_idx, parent_tg)| {
-                let confluences = tg.confluences
-                    .iter().filter(|nid| parent_tg.confluences.contains(nid))
-                    .flat_map(|&nid| g.out_edges(nid))
-                    .filter(|seg| g.edge_property_unchecked(*seg).taggroupid == taggroupid)
-                    .map(|seg| seg_to_distrib_json(&seg, seg.0, false))
-                    .collect::<Vec<_>>();
-                assert!(!confluences.is_empty(), "Can't find confluence with a parent river main: {:?} & parent_river: {:?} taggroupid {} trib_tg_idx {}", tg, parent_tg, taggroupid, parent_tg_idx);
-                serde_json::json!({
-                    "tag_group_value": parent_tg.tagid.map(|t| tag_group_value[t as usize].clone()),
-                    "min_nid": parent_tg.min_nid,
-                    "stream_level_code": parent_tg.stream_level_code.as_ref(),
-                    "confluences": confluences,
-                    //"inflow_m": confluences.iter().map(|c| c["upstream_m"].as_f64().unwrap()).sum::<f64>(),
-                })
+                .map(|parent_tg_idx| {
+                    let parent_tg = &tag_group_info[*parent_tg_idx as usize];
+                    let confluences = tg.confluences
+                        .iter().filter(|nid| parent_tg.confluences.contains(nid))
+                        .flat_map(|&nid| g.edges(nid))
+                        .filter(|seg| g.edge_property_unchecked(*seg).taggroupid == taggroupid)
+                        .map(|seg| seg_to_distrib_json(&seg, seg.0, false))
+                        .collect::<Vec<_>>();
+                    assert!(!confluences.is_empty(), "Can't find a single confluence nid with a parent river.\nthis group = {tg:?}\naffected parent river = {parentid}\n{parent:?}",
+                         tg=tg, parentid=parent_tg_idx, parent=parent_tg,
+                    );
+
+                    //taggroupid {} = {:?}\ntrib_tg_idx {}\nmain tg: {:?}\nparent_river: {:?} ", taggroupid, tag_group_info[taggroupid as usize], parent_tg_idx, tg, parent_tg);
+                    serde_json::json!({
+                        "tag_group_value": parent_tg.tagid.map(|t| tag_group_value[t as usize].clone()),
+                        "min_nid": parent_tg.min_nid,
+                        "stream_level_code": parent_tg.stream_level_code.as_ref(),
+                        "confluences": confluences,
+                        //"inflow_m": confluences.iter().map(|c| c["upstream_m"].as_f64().unwrap()).sum::<f64>(),
+                    }
+                )
             }).collect::<Vec<_>>().into();
             //props["parent_rivers"].as_array_mut().unwrap().sort_by_key(|e| OrderedFloat(-e["inflow_m"].as_f64().unwrap()));
 
