@@ -295,12 +295,20 @@ pub fn calc_tag_group(
             continue;
         }
         let (rr, a_id, b_id) = rr.unwrap();
+        assert!(a_id != b_id);
         let (a, b) = if a_id < b_id {
             get_two_muts(&mut tag_group_info, a_id as usize, b_id as usize)
         } else {
             let (x, y) = get_two_muts(&mut tag_group_info, b_id as usize, a_id as usize);
             (y, x)
         };
+
+        // ↓ sanity checks
+        assert!(a.unallocated_other_groups.contains(&b_id));
+        assert!(b.unallocated_other_groups.contains(&a_id));
+        assert!(a.confluences.iter().any(|nid| b.confluences.contains(nid)));
+        assert!(b.confluences.iter().any(|nid| a.confluences.contains(nid)));
+
         a.unallocated_other_groups.retain(|x| *x != b_id);
         b.unallocated_other_groups.retain(|x| *x != a_id);
         match rr {
