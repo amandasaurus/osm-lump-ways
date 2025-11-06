@@ -295,7 +295,12 @@ pub fn calc_tag_group(
             continue;
         }
         let (rr, a_id, b_id) = rr.unwrap();
-        let (a, b) = get_two_muts(&mut tag_group_info, a_id as usize, b_id as usize);
+        let (a, b) = if a_id < b_id {
+            get_two_muts(&mut tag_group_info, a_id as usize, b_id as usize)
+        } else {
+            let (x, y) = get_two_muts(&mut tag_group_info, b_id as usize, a_id as usize);
+            (y, x)
+        };
         a.unallocated_other_groups.retain(|x| *x != b_id);
         b.unallocated_other_groups.retain(|x| *x != a_id);
         match rr {
