@@ -311,6 +311,7 @@ pub fn calc_tag_group(
 
         a.unallocated_other_groups.retain(|x| *x != b_id);
         b.unallocated_other_groups.retain(|x| *x != a_id);
+
         match rr {
             RiverRelationship::AIsSideChannelOfB => {
                 a.parent_channels.push(b_id);
@@ -339,15 +340,28 @@ pub fn calc_tag_group(
         );
     }
 
-    if tag_group_info.par_iter().any(|tg| !tg.unallocated_other_groups.is_empty()) {
-        let (count, sum_length) = tag_group_info.par_iter().filter(|tg| !tg.unallocated_other_groups.is_empty()).map(|tg| (1, tg.length_m)).reduce(|| (0, 0.), |a, b| (a.0+b.0, a.1+b.1));
-        let (total_count, total_sum_length) = tag_group_info.par_iter().map(|tg| (1, tg.length_m)).reduce(|| (0, 0.), |a, b| (a.0+b.0, a.1+b.1));
-        warn!("Unable to connect up {count} of {total_count} ({count_per:.1}%) river pairs, representing {sum_length} km of {total_sum_length} km ({len_per:.1}%) rivers",
-            count=count, total_count=total_count,
-            count_per=(count as f64 * 100. / total_count as f64),
-            sum_length=(sum_length.round() as u64/1000).to_formatted_string(&Locale::en),
-            total_sum_length=(total_sum_length.round() as u64/1000).to_formatted_string(&Locale::en),
-            len_per=(sum_length * 100. / total_sum_length),
+    if tag_group_info
+        .par_iter()
+        .any(|tg| !tg.unallocated_other_groups.is_empty())
+    {
+        let (count, sum_length) = tag_group_info
+            .par_iter()
+            .filter(|tg| !tg.unallocated_other_groups.is_empty())
+            .map(|tg| (1, tg.length_m))
+            .reduce(|| (0, 0.), |a, b| (a.0 + b.0, a.1 + b.1));
+        let (total_count, total_sum_length) = tag_group_info
+            .par_iter()
+            .map(|tg| (1, tg.length_m))
+            .reduce(|| (0, 0.), |a, b| (a.0 + b.0, a.1 + b.1));
+        warn!(
+            "Unable to connect up {count} of {total_count} ({count_per:.1}%) river pairs, representing {sum_length} km of {total_sum_length} km ({len_per:.1}%) rivers",
+            count = count,
+            total_count = total_count,
+            count_per = (count as f64 * 100. / total_count as f64),
+            sum_length = (sum_length.round() as u64 / 1000).to_formatted_string(&Locale::en),
+            total_sum_length =
+                (total_sum_length.round() as u64 / 1000).to_formatted_string(&Locale::en),
+            len_per = (sum_length * 100. / total_sum_length),
         );
     }
     //assert_eq!(0, tag_group_info.par_iter().filter(|tg| !tg.unallocated_other_groups.is_empty()).count());
