@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## v3.5.1 (2025-11-06)
 
 * Fix bug with `--grouped-waterways`
