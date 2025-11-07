@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.5.1 (2025-11-06)
+
+* Fix bug with `--grouped-waterways`
+
 ## v3.5.0 (2025-11-05)
 
 * Dependencies updated
