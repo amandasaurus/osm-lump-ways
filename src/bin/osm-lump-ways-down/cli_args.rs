@@ -336,9 +336,14 @@ pub struct Args {
     #[arg(long, requires = "longest_source_mouth", value_name = "NUMBER", value_parser=parse_int_human)]
     pub longest_source_mouth_longest_n: Option<usize>,
 
-    #[arg(long, requires = "longest_source_mouth", default_value = "unnnamed", value_name = "STRING")]
+    #[arg(
+        long,
+        requires = "longest_source_mouth",
+        default_value = "unnnamed",
+        value_name = "STRING"
+    )]
     pub longest_source_mouth_unnamed_string: String,
 
-    #[arg(long, requires = "longest_source_mouth",)]
+    #[arg(long, requires = "longest_source_mouth")]
     pub longest_source_mouth_only_named: bool,
 }
