@@ -120,6 +120,9 @@ fn longest_upstream_path(
     if *dist < OrderedFloat(min_length_m) {
         return None;
     }
+    if prev.is_none() {
+        return None;
+    }
     // build the path
     let mut path: Vec<i64> = Vec::new();
     path.push(*source_nid);
