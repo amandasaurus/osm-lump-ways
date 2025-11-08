@@ -8,6 +8,7 @@
 /*.gpkg*
 /*.mbtiles
 /*.mbtiles-journal
+/*.osm
 /*.osm.pbf
 /*.pgw
 /*.pmtiles
