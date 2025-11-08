@@ -102,7 +102,7 @@ pub(crate) fn do_longest_source_mouth(
     Ok(())
 }
 
-/// Calculate the longest upstream path starting at a certain edge.
+/// Calculate the longest upstream path starting at a certain vertex,
 fn longest_upstream_path(
     g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
     mouth_nid: i64,
