@@ -3,6 +3,8 @@
 ## Unreleased
 
 * Minor bugfixes
+* `osm-lump-ways-down`, `longest-source-mouth` now includes `internal_groupid`
+  & `river_system_internal_groupids`
 
 ## v3.5.1 (2025-11-06)
 

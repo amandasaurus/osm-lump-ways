@@ -1764,12 +1764,9 @@ fn do_write_upstreams(
                             let from_upstream_len = *curr_upstream_len;
                             *curr_upstream_len += this_len;
                             Some((
-                                nid1,
-                                nid2,
-                                p1,
-                                p2,
-                                from_upstream_len,
-                                *curr_upstream_len,
+                                nid1, nid2,
+                                p1, p2,
+                                from_upstream_len, *curr_upstream_len,
                                 end_idx,
                                 flow_tag_group,
                                 tag_group_info,
@@ -1780,12 +1777,9 @@ fn do_write_upstreams(
         )
         .filter(
             |(
-                _from_nid,
-                _to_nid,
-                _p1,
-                _p2,
-                from_upstream_len,
-                to_upstream_len,
+                _from_nid, _to_nid,
+                _p1, _p2,
+                from_upstream_len, to_upstream_len,
                 _end_idx,
                 _flow_tag_group,
                 _tag_group_info,
@@ -1796,10 +1790,8 @@ fn do_write_upstreams(
         )
         .map(
             |(
-                from_nid,
-                to_nid,
-                p1,
-                p2,
+                from_nid, to_nid,
+                p1, p2,
                 from_upstream_len,
                 to_upstream_len,
                 end_idx,
@@ -1998,7 +1990,7 @@ fn do_waterway_grouped(
             }
 
             props["tag_group_value"] = tg.tagid.map(|tagid| tag_group_value[tagid as usize].as_str()).into();
-            props["taggroupid"] = taggroupid.into();
+            props["internal_groupid"] = taggroupid.into();
             props["min_nid"] = tg.min_nid.into();
 
             let multilinestrings: Vec<_> = lines

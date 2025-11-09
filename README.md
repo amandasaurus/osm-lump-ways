@@ -377,7 +377,8 @@ be uniquely identified by the `river_system_mouth_source_nids` (or equivalent
 * `idx` _(integer)_ Index of this segment within this river system. Starts at
   0, for the most upstream segment.
 * `revidx` _(integer)_ Reverse Index. 0 is the most downstream segment. i.e.
-  it's `num_parts - idx - 1`.
+* `internal_groupid` _(integer)_ Internal integer id for this group. It can
+  change between identical runs of this programme.
 * `num_parts` _(integer)_ Total number of segments in this river system.
 * `length_m` _(float)_ Length of this segment in metres. NB: It might not be
   the full length of this river.
@@ -400,6 +401,8 @@ be uniquely identified by the `river_system_mouth_source_nids` (or equivalent
 * `river_system_names_s` _(string)_ the `river_system_names` value, but joined
   together with `" - "`, e.g. `"Shannon - Boyle - Lung"` for the
   Shannon river system.
+* `river_system_names` _(array of integers)_ JSON Array of all the
+  `internal_groupid`, same order as `river_system_names`.
 
 The follow extra CLI arguments change the output.
 

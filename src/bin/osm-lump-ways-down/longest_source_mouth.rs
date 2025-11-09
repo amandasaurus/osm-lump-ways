@@ -79,12 +79,14 @@ pub(crate) fn do_longest_source_mouth(
     let names = longest_mouth_source_per_mouth
         .into_iter()
         .flat_map(|(_length_m, nids)| {
-            let grouped_names = group_path_parts_by_name(&nids, g, tag_group_info, tag_group_value);
-            name_group_to_geojson(
-                grouped_names,
+            let grouped_paths = group_path_parts_by_taggroup(&nids, g);
+            path_group_to_geojson(
+                grouped_paths,
                 g,
                 nodeid_pos,
                 inter_store,
+                tag_group_info,
+                tag_group_value,
                 longest_source_mouth_unnamed_string,
             )
         });
@@ -180,84 +182,85 @@ fn dij_flood_fill_upwards(
     prev_dist
 }
 
-fn group_path_parts_by_name(
+fn group_path_parts_by_taggroup(
     path: &[i64],
     g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
-    tag_group_info: &[TagGroupInfo],
-    tag_group_value: &[String],
-) -> Vec<(Option<String>, Box<[i64]>)> {
-    let mut names: Vec<(Option<String>, Box<[i64]>)> = Vec::new();
+) -> Vec<(usize, Box<[i64]>)> {
+    let mut groups: Vec<(usize, Box<[i64]>)> = Vec::new();
 
-    for (_name, mut chunk) in &path
+    for (_taggroupid, mut chunks) in &path
         .iter()
         .tuple_windows()
-        .map(|(nid1, nid2)| {
+        .map(|(nid1, nid2)| 
             (
+                g.edge_property_unchecked((*nid1, *nid2)).taggroupid_us(),
                 (nid1, nid2),
-                tag_group_info[g.edge_property_unchecked((*nid1, *nid2)).taggroupid as usize]
-                    .tagid
-                    .map(|tgid| tag_group_value[tgid as usize].as_str()),
             )
-        })
-        .chunk_by(|(_seg, name)| *name)
+        )
+        .chunk_by(|(taggroupid, _seg)| *taggroupid)
     {
         let mut coords: Vec<i64> = Vec::new();
-        let (first_seg, name) = chunk.next().unwrap();
+        let (taggroupid, first_seg) = chunks.next().unwrap();
         coords.push(*first_seg.0);
         coords.push(*first_seg.1);
-        coords.extend(chunk.map(|(seg, _name)| *seg.1));
-        names.push((name.map(String::from), coords.into_boxed_slice()));
+        coords.extend(chunks.map(|(_taggroupid, seg)| *seg.1));
+        groups.push((taggroupid, coords.into_boxed_slice()));
     }
 
-    names
+    groups
 }
 
-fn name_group_to_geojson(
-    names: Vec<(Option<String>, Box<[i64]>)>,
+fn path_group_to_geojson(
+    groups: Vec<(usize, Box<[i64]>)>,
     g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
     nodeid_pos: &impl NodeIdPosition,
     inter_store: &inter_store::InterStore,
+    tag_group_info: &[TagGroupInfo],
+    tag_group_value: &[String],
     unnnamed_string: &str,
 ) -> impl Iterator<Item = (serde_json::Value, Vec<(f64, f64)>)> {
-    let all_names: Vec<String> = names
-        .iter()
-        .rev()
-        .cloned()
-        .map(|(name, _nids)| name.map_or_else(|| unnnamed_string.to_string(), |s| s.to_string()))
-        .collect();
-    let names = names
+    let names = groups
         .into_iter()
-        .map(|(name, nids)| {
+        .map(|(taggroupid, nids)| {
             let length_m: f64 = nids
                 .iter()
                 .tuple_windows()
                 .map(|(nid1, nid2)| g.edge_property_unchecked((*nid1, *nid2)).length_m)
                 .sum();
-            (name, nids, length_m)
+            let name = tag_group_info[taggroupid].tagid
+                .map_or_else(
+                    || unnnamed_string,
+                    |tgid| tag_group_value[tgid as usize].as_str(),
+                ).to_owned();
+            (taggroupid, name, nids, length_m)
         })
         .collect::<Vec<_>>();
+    let all_names = names.iter().rev().map(|(_, name, _, _)| name.to_owned()).collect::<Vec<_>>();
     let num_parts = names.len();
-    let total_length_m = names.iter().map(|(_, _, length_m)| length_m).sum::<f64>();
-    let mouth_nid: i64 = names[0].1[0];
-    let source_nid: i64 = *names.last().unwrap().1.last().unwrap();
+    let total_length_m = names.iter().map(|(_, _, _, length_m)| length_m).sum::<f64>();
+    let mouth_nid: i64 = names[0].2[0];
+    let source_nid: i64 = *names.last().unwrap().2.last().unwrap();
+    let all_taggroupids = names.iter().rev().map(|(taggroupid, _, _, _)| *taggroupid).collect::<Vec<usize>>();
 
     names
         .into_iter()
         .enumerate()
-        .map(move |(idx, (name, nids, length_m))| {
+        .map(move |(idx, (taggroupid, name, nids, length_m))| {
             let props = json!({
                 "name": name,
                 "length_m": round(&length_m, 1),
                 "idx": idx,
                 "revidx": (num_parts - idx - 1),
                 "num_parts": num_parts,
+                "internal_groupid": taggroupid,
 
                 "river_system_length_m": round(&total_length_m, 1),
                 "river_system_names": all_names,
-                "river_system_names_s": all_names.join(" - "),
+                "river_system_names_s": all_names.iter().join(" - "),
                 "river_system_mouth_nid": mouth_nid, "river_system_source_nid": source_nid,
                 "river_system_mouth_source_nids": (mouth_nid, source_nid),
                 "river_system_mouth_source_nids_s": format!("{},{}", mouth_nid, source_nid),
+                "river_system_internal_groupids": all_taggroupids,
             });
             let line: Vec<(f64, f64)> = inter_store
                 .expand_line_directed(&nids)
