@@ -1157,9 +1157,9 @@ fn main() -> Result<()> {
         )
     };
 
-    let mut f = std::io::BufWriter::new(std::fs::File::create("graph.geojsons")?);
-    write_debug_geojson(&g, &nodeid_pos, &mut f)?;
-    drop(f);
+    //let mut f = std::io::BufWriter::new(std::fs::File::create("graph.geojsons")?);
+    //write_debug_geojson(&g, &nodeid_pos, &mut f)?;
+    //drop(f);
 
     let tag_group_data_opt = if args.upstreams.is_some()
         || args.grouped_waterways.is_some()
@@ -2200,6 +2200,7 @@ fn calc_through_path_length(
     *longest_path_len
 }
 
+#[allow(dead_code)]
 fn write_debug_geojson<V, E>(
     g: &impl DirectedGraphTrait<V, E>,
     nodeid_pos: &impl NodeIdPosition,
