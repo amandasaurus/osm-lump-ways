@@ -11,6 +11,7 @@ use log::{
 use osmio::OSMObjBase;
 use osmio::prelude::*;
 use rayon::prelude::*;
+use std::cmp::max;
 
 use itertools::Itertools;
 use std::cmp::min;
@@ -1992,6 +1993,24 @@ fn do_waterway_grouped(
             props["tag_group_value"] = tg.tagid.map(|tagid| tag_group_value[tagid as usize].as_str()).into();
             props["internal_groupid"] = taggroupid.into();
             props["min_nid"] = tg.min_nid.into();
+
+			// There's probably other things to do, like the p90
+			let upstream_stats: (OrderedFloat<f64>, OrderedFloat<f64>, usize, OrderedFloat<f64>) = lines.par_iter().flat_map_iter(|v| v)
+				.map(|nid| OrderedFloat(g.vertex_property_unchecked(nid).upstream_m))
+				.map(|nid_upstream| (nid_upstream, nid_upstream, 1usize, nid_upstream))
+				.reduce(Default::default,
+					|mut acc, nid_upstream| {
+						acc.0 = min(acc.0, nid_upstream.0);
+						acc.1 = max(acc.1, nid_upstream.1);
+						acc.2 += nid_upstream.2;
+						acc.3 += nid_upstream.3;
+						acc
+					}
+				);
+
+			props["min_upstream_m"] = upstream_stats.0.into_inner().into();
+			props["max_upstream_m"] = upstream_stats.1.into_inner().into();
+			props["mean_upstream_m"] = (upstream_stats.3.into_inner() / upstream_stats.2 as f64).into();
 
             let multilinestrings: Vec<_> = lines
                 .par_iter()

@@ -5,6 +5,9 @@
 * Minor bugfixes
 * `osm-lump-ways-down`, `longest-source-mouth` now includes `internal_groupid`
   & `river_system_internal_groupids`
+* `osm-lump-ways-down`'s `--grouped-waterways` now includes
+  `{min,max,mean}_upstream_m` attribute for each waterway, showing the
+  min/max/mean `upstream_m` value for every node in this waterway. This can give an idea of the importance
 
 ## v3.5.1 (2025-11-06)
 
