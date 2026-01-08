@@ -2,6 +2,7 @@
 /*.geojson
 /*.geojson.zst
 /*.geojsons
+/*.geojsonseq
 /*.geojsons.gz
 /*.geojsons.zst
 /*.gpkg
