@@ -191,12 +191,12 @@ fn group_path_parts_by_taggroup(
     for (_taggroupid, mut chunks) in &path
         .iter()
         .tuple_windows()
-        .map(|(nid1, nid2)| 
+        .map(|(nid1, nid2)| {
             (
                 g.edge_property_unchecked((*nid1, *nid2)).taggroupid_us(),
                 (nid1, nid2),
             )
-        )
+        })
         .chunk_by(|(taggroupid, _seg)| *taggroupid)
     {
         let mut coords: Vec<i64> = Vec::new();
@@ -227,20 +227,33 @@ fn path_group_to_geojson(
                 .tuple_windows()
                 .map(|(nid1, nid2)| g.edge_property_unchecked((*nid1, *nid2)).length_m)
                 .sum();
-            let name = tag_group_info[taggroupid].tagid
+            let name = tag_group_info[taggroupid]
+                .tagid
                 .map_or_else(
                     || unnnamed_string,
                     |tgid| tag_group_value[tgid as usize].as_str(),
-                ).to_owned();
+                )
+                .to_owned();
             (taggroupid, name, nids, length_m)
         })
         .collect::<Vec<_>>();
-    let all_names = names.iter().rev().map(|(_, name, _, _)| name.to_owned()).collect::<Vec<_>>();
+    let all_names = names
+        .iter()
+        .rev()
+        .map(|(_, name, _, _)| name.to_owned())
+        .collect::<Vec<_>>();
     let num_parts = names.len();
-    let total_length_m = names.iter().map(|(_, _, _, length_m)| length_m).sum::<f64>();
+    let total_length_m = names
+        .iter()
+        .map(|(_, _, _, length_m)| length_m)
+        .sum::<f64>();
     let mouth_nid: i64 = names[0].2[0];
     let source_nid: i64 = *names.last().unwrap().2.last().unwrap();
-    let all_taggroupids = names.iter().rev().map(|(taggroupid, _, _, _)| *taggroupid).collect::<Vec<usize>>();
+    let all_taggroupids = names
+        .iter()
+        .rev()
+        .map(|(taggroupid, _, _, _)| *taggroupid)
+        .collect::<Vec<usize>>();
 
     names
         .into_iter()
