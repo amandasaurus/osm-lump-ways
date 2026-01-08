@@ -1765,9 +1765,12 @@ fn do_write_upstreams(
                             let from_upstream_len = *curr_upstream_len;
                             *curr_upstream_len += this_len;
                             Some((
-                                nid1, nid2,
-                                p1, p2,
-                                from_upstream_len, *curr_upstream_len,
+                                nid1,
+                                nid2,
+                                p1,
+                                p2,
+                                from_upstream_len,
+                                *curr_upstream_len,
                                 end_idx,
                                 flow_tag_group,
                                 tag_group_info,
@@ -1778,9 +1781,12 @@ fn do_write_upstreams(
         )
         .filter(
             |(
-                _from_nid, _to_nid,
-                _p1, _p2,
-                from_upstream_len, to_upstream_len,
+                _from_nid,
+                _to_nid,
+                _p1,
+                _p2,
+                from_upstream_len,
+                to_upstream_len,
                 _end_idx,
                 _flow_tag_group,
                 _tag_group_info,
@@ -1791,8 +1797,10 @@ fn do_write_upstreams(
         )
         .map(
             |(
-                from_nid, to_nid,
-                p1, p2,
+                from_nid,
+                to_nid,
+                p1,
+                p2,
                 from_upstream_len,
                 to_upstream_len,
                 end_idx,
@@ -1994,23 +2002,25 @@ fn do_waterway_grouped(
             props["internal_groupid"] = taggroupid.into();
             props["min_nid"] = tg.min_nid.into();
 
-			// There's probably other things to do, like the p90
-			let upstream_stats: (OrderedFloat<f64>, OrderedFloat<f64>, usize, OrderedFloat<f64>) = lines.par_iter().flat_map_iter(|v| v)
-				.map(|nid| OrderedFloat(g.vertex_property_unchecked(nid).upstream_m))
-				.map(|nid_upstream| (nid_upstream, nid_upstream, 1usize, nid_upstream))
-				.reduce(Default::default,
-					|mut acc, nid_upstream| {
-						acc.0 = min(acc.0, nid_upstream.0);
-						acc.1 = max(acc.1, nid_upstream.1);
-						acc.2 += nid_upstream.2;
-						acc.3 += nid_upstream.3;
-						acc
-					}
-				);
+            // There's probably other things to do, like the p90
+            // Get all the edges of this line
+            let upstream_stats: (OrderedFloat<f64>, OrderedFloat<f64>, usize, OrderedFloat<f64>) =
+                lines.iter().map(|line| line.iter().tuple_windows::<(_,_)>()).flatten()
+                .map(|(nid1, nid2)| OrderedFloat(g.edge_property_unchecked((*nid1, *nid2)).upstream_m))
+                .map(|nid_upstream| (nid_upstream, nid_upstream, 1usize, nid_upstream))
+                .fold(Default::default(),
+                    |mut acc, nid_upstream| {
+                        acc.0 = min(acc.0, nid_upstream.0);
+                        acc.1 = max(acc.1, nid_upstream.1);
+                        acc.2 += nid_upstream.2;
+                        acc.3 += nid_upstream.3;
+                        acc
+                    }
+                );
 
-			props["min_upstream_m"] = upstream_stats.0.into_inner().into();
-			props["max_upstream_m"] = upstream_stats.1.into_inner().into();
-			props["mean_upstream_m"] = (upstream_stats.3.into_inner() / upstream_stats.2 as f64).into();
+            props["min_upstream_m"] = round(&upstream_stats.0.into_inner(), 1).into();
+            props["max_upstream_m"] = round(&upstream_stats.1.into_inner(), 1).into();
+            props["mean_upstream_m"] = round(&(upstream_stats.3.into_inner() / upstream_stats.2 as f64), 1).into();
 
             let multilinestrings: Vec<_> = lines
                 .par_iter()
