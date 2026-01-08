@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v3.6.0 (2026-01-08)
 
 * Minor bugfixes
 * `osm-lump-ways-down`, `longest-source-mouth` now includes `internal_groupid`
