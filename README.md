@@ -37,6 +37,7 @@ There are 2 ways to select which OSM ways will be used.
 * `key∈value1,value2,…`  way has this key and the value is one of these
 * `key∉value1,value2,…`  way either doesn't have this key,
    or if it does, it's not one of these values
+* `∃key∉value1,value2,…`  way has this key, and it's not one of these values.
 * `key~regex` way has this key and the value matches this regex.
 * `F1∨F2∨F3…` logical OR of the other tag filters F1, F2, …
 * `F1∧F2∧F3…` logical AND of the other tag filters F1, F2, …

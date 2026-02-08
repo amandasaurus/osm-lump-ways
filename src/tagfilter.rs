@@ -14,6 +14,7 @@ pub enum TagFilter {
     KV(SmolStr, SmolStr),
     KinV(SmolStr, Vec<SmolStr>),
     KnotInV(SmolStr, Vec<SmolStr>),
+    HasKnotInV(SmolStr, Vec<SmolStr>),
     KneV(SmolStr, SmolStr),
     KreV(SmolStr, Regex),
     And(Vec<TagFilter>),
@@ -31,6 +32,7 @@ impl std::fmt::Display for TagFilter {
             TagFilter::KneV(k, v) => write!(f, "{}≠{}", k, v),
             TagFilter::KinV(k, vs) => write!(f, "{}∈{}", k, vs.join(",")),
             TagFilter::KnotInV(k, vs) => write!(f, "{}∉{}", k, vs.join(",")),
+            TagFilter::HasKnotInV(k, vs) => write!(f, "∃{}∉{}", k, vs.join(",")),
             TagFilter::KreV(k, r) => write!(f, "{}~{}", k, r),
             TagFilter::Or(tfs) => write!(
                 f,
@@ -71,6 +73,9 @@ impl TagFilter {
             TagFilter::KnotInV(k, vs) => o
                 .tag(k)
                 .is_none_or(|tag_value| vs.iter().all(|v| v != tag_value)),
+            TagFilter::HasKnotInV(k, vs) => o
+                .tag(k)
+                .is_some_and(|tag_value| vs.iter().all(|v| v != tag_value)),
             TagFilter::KreV(k, r) => o.tag(k).is_some_and(|v| r.is_match(v)),
             TagFilter::Or(tfs) => tfs.iter().any(|tf| tf.filter(o)),
             TagFilter::And(tfs) => tfs.iter().all(|tf| tf.filter(o)),
@@ -121,6 +126,12 @@ impl std::str::FromStr for TagFilter {
             } else {
                 Ok(TagFilter::KneV(s[0].into(), s[1].into()))
             }
+        } else if s.starts_with("∃") && s.contains('∉') {
+            let s = s.strip_prefix("∃").unwrap();
+            let s = s.splitn(2, '∉').collect::<Vec<_>>();
+
+            let vs = s[1].split(',').map(SmolStr::from).collect::<Vec<_>>();
+            Ok(TagFilter::HasKnotInV(s[0].into(), vs))
         } else if s.contains('∉') {
             let s = s.splitn(2, '∉').collect::<Vec<_>>();
             let vs = s[1].split(',').map(SmolStr::from).collect::<Vec<_>>();
@@ -369,6 +380,14 @@ mod tests {
         "∄~name:.*",
         TagFilter::NotHasReK(Regex::new("name:.*").unwrap())
     );
+    test_parse!(
+        parse_has_not_in1,
+        "∃highway∉motorway,motorway_link",
+        TagFilter::HasKnotInV(
+            "highway".into(),
+            vec!["motorway".into(), "motorway_link".into()]
+        )
+    );
 
     #[test]
     fn parse() {
@@ -411,6 +430,55 @@ mod tests {
             ])
         );
     }
+
+    macro_rules! test_tag_filter {
+        ( $name:ident, $input_tf:expr, $input_tags:expr, $expected_result:expr ) => {
+            #[test]
+            fn $name() {
+                let tf: TagFilter = $input_tf.parse().unwrap();
+                let mut n = osmio::obj_types::StringNodeBuilder::default()
+                    ._id(1)
+                    .build()
+                    .unwrap();
+                for (k, v) in $input_tags.iter() {
+                    n.set_tag(k.to_string(), v.to_string());
+                }
+                assert_eq!(tf.filter(&n), $expected_result);
+            }
+        };
+    }
+
+    test_tag_filter!(filter_pass1, "highway", [("highway", "primary")], true);
+    test_tag_filter!(
+        filter_pass2,
+        "highway∈primary,seconary",
+        [("highway", "primary")],
+        true
+    );
+    test_tag_filter!(
+        filter_pass3,
+        "∃highway∉primary,seconary",
+        [("highway", "primary")],
+        false
+    );
+    test_tag_filter!(
+        filter_pass4,
+        "∃highway∉primary,seconary",
+        [("amenity", "bar")],
+        false
+    );
+    test_tag_filter!(
+        filter_pass5,
+        "highway∉primary,seconary",
+        [("amenity", "bar")],
+        true
+    );
+    test_tag_filter!(
+        filter_pass6,
+        "∃highway∉primary,seconary",
+        [("highway", "motorway")],
+        true
+    );
 
     #[test]
     fn tag_filter_func_parse() {
