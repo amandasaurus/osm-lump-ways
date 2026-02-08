@@ -88,7 +88,7 @@ fn main() -> Result<()> {
 
     if !args.output_filename.ends_with(".geojson") && !args.output_filename.ends_with(".geojsons") {
         warn!(
-            "Output filename '{}' doesn't end with '.geojson' or '.geojsons'. This programme only created GeoJSON or GeoJSONSeq files",
+            "Output filename '{}' doesn't end with '.geojson' or '.geojsons'. This programme only creates GeoJSON or GeoJSONSeq files",
             args.output_filename
         );
     }
