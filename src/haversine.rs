@@ -21,6 +21,7 @@ pub(crate) fn haversine_m_fpair_ord(
     OrderedFloat(haversine_m_fpair(lat_lon1, lat_lon2))
 }
 
+#[allow(dead_code)]
 pub(crate) fn haversine_m_fpair_ord_ord(
     lat_lon1: (OrderedFloat<f64>, OrderedFloat<f64>),
     lat_lon2: (OrderedFloat<f64>, OrderedFloat<f64>),

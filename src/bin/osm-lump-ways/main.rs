@@ -30,7 +30,7 @@ use osm_lump_ways::haversine::haversine_m_fpair;
 use osm_lump_ways::nodeid_position;
 use osm_lump_ways::sorted_slice_store::SortedSliceSet;
 use osm_lump_ways::tagfilter;
-use osm_lump_ways::utils::{round, round_mult};
+use osm_lump_ways::utils::round;
 use osm_lump_ways::way_group;
 use way_group::{MinLengthFilter, WayGroup};
 
