@@ -548,6 +548,8 @@ fn main() -> Result<()> {
 
     info!("all JSON properties set");
 
+    way_groups.par_sort_unstable_by_key(|wg| OrderedFloat(-wg.length_m));
+
     if let Some(output_frames) = args.output_frames {
         do_frames(
             &output_frames,

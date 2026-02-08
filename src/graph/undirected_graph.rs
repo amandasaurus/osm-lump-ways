@@ -1,10 +1,13 @@
 use super::*;
 use haversine::haversine_m_fpair_ord;
 use ordered_float::OrderedFloat;
+use rand::prelude::*;
 use rayon::prelude::ParallelIterator;
 use smallvec::SmallVec;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
+
+use kiddo::{KdTree, SquaredEuclidean};
 
 use itertools::Itertools;
 use smallvec::smallvec;
@@ -454,4 +457,76 @@ impl Graph2 {
             Some(path.into_boxed_slice())
         })
     }
+
+    /// Return a random sample of points in this graph, somewhat spread out.
+    #[allow(clippy::type_complexity)]
+    pub fn random_sample_vertexes(
+        &self,
+        num: usize,
+        nodeid_pos: &impl NodeIdPosition,
+    ) -> Box<[(i64, (OrderedFloat<f64>, OrderedFloat<f64>))]> {
+        if num >= self.num_vertexes() {
+            let all_nodes = self
+                .vertexes()
+                .map(|nid| (*nid, nodeid_pos.get_ord(nid).unwrap()))
+                .collect::<Vec<_>>();
+            return all_nodes.into_boxed_slice();
+        }
+
+        let all_nodes = self
+            .vertexes()
+            .copied()
+            .collect::<Vec<i64>>()
+            .into_boxed_slice();
+        assert!(!all_nodes.is_empty());
+
+        // In each iteration, how many to
+        let k = 100;
+
+        // Need to quickly check existing nodes, so keep as a hashmap
+        let mut new_nodes = HashMap::with_capacity(num);
+
+        let mut kdtree: KdTree<f64, 2> = KdTree::with_capacity(num);
+        let mut rng = &mut rand::rng();
+
+        let first = *all_nodes.choose(&mut rng).unwrap();
+        let pos = nodeid_pos.get_arr(&first).unwrap();
+        new_nodes.insert(first, (OrderedFloat(pos[0]), OrderedFloat(pos[1])));
+        kdtree.add(&pos, first.try_into().unwrap());
+
+        // Buffer of possible nodes for each iteration.
+        let mut possible_nodes = Vec::with_capacity(k);
+
+        while new_nodes.len() < num {
+            // We need to exclude nodes we
+            // It's quicker to repidly call choose_multiple rather than multiple .choose.
+            possible_nodes.truncate(0);
+            while possible_nodes.len() < k {
+                possible_nodes.extend(
+                    all_nodes
+                        .choose_multiple(&mut rng, k - possible_nodes.len() + 1)
+                        .filter(|nid| !new_nodes.contains_key(nid))
+                        .map(|nid| {
+                            let pos = nodeid_pos.get_arr(nid).unwrap();
+                            let dist = kdtree.nearest_one::<SquaredEuclidean>(&pos).distance;
+
+                            // dist is minus → largest dist is first
+                            (OrderedFloat(-dist), *nid, pos)
+                        }),
+                );
+            }
+
+            // Take the node with the largest distance
+            possible_nodes.par_sort_by_key(|(dist, _nid, _pos)| *dist);
+            let (_dist, nid, pos) = possible_nodes[0];
+
+            // save it
+            kdtree.add(&pos, nid.try_into().unwrap());
+            new_nodes.insert(nid, (OrderedFloat(pos[0]), OrderedFloat(pos[1])));
+        }
+
+        let new_nodes = new_nodes.into_iter().collect::<Vec<_>>();
+        new_nodes.into_boxed_slice()
+    }
+
 }
