@@ -202,6 +202,7 @@ impl Ord for WayGroup {
 pub enum MinLengthFilter {
     Length(f64),
     PercentLongest(f64),
+    TotalPercentage(f64),
 }
 
 impl std::str::FromStr for MinLengthFilter {
@@ -223,6 +224,11 @@ impl std::str::FromStr for MinLengthFilter {
             && let Ok(perc) = perc.parse::<f64>()
         {
             Ok(MinLengthFilter::PercentLongest(perc / 100.))
+        } else if let Some(perc0) = s.strip_prefix("incl")
+            && let Some(perc) = perc0.strip_suffix("%total")
+            && let Ok(perc) = perc.parse::<f64>()
+        {
+            Ok(MinLengthFilter::TotalPercentage(perc / 100.))
         } else {
             Err("Cannot parse".to_string())
         }

@@ -495,11 +495,26 @@ fn main() -> Result<()> {
                 .unwrap()
                 .into_inner();
             longest * perc
+        } else if let Some(MinLengthFilter::TotalPercentage(perc)) = args.min_length {
+            let total_length = way_groups.par_iter().map(|wg| wg.length_m).sum::<f64>();
+            let desired_total = total_length * perc;
+            way_groups.par_sort_by_key(|wg| OrderedFloat(-wg.length_m));
+            let mut cum_total = 0.;
+            let mut min_length = way_groups[0].length_m;
+            for val in way_groups.iter().map(|wg| wg.length_m) {
+                cum_total += val;
+                if cum_total > desired_total {
+                    min_length = val;
+                    break;
+                }
+            }
+            min_length
         } else {
             unreachable!()
         };
 
         way_groups.retain(|wg| wg.length_m >= min_length_m);
+
         info!(
             "Removed {} way_groups which were smaller than {:.1} m",
             (old - way_groups.len()).to_formatted_string(&Locale::en),
