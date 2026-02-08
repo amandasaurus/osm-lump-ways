@@ -530,14 +530,16 @@ fn main() -> Result<()> {
         let json_props = &mut wg.json_props;
         json_props["root_nodeid"] = wg.root_nodeid.into();
         json_props["root_nodeid_120"] = (wg.root_nodeid % 120).into();
-        json_props["length_m"] = wg.length_m.into();
+
+        json_props["length_m"] = round(&wg.length_m, 1).into();
+        json_props["length_m_int"] = (wg.length_m.round() as i64).into();
+        json_props["length_km"] = round(&(wg.length_m / 1000.), 2).into();
+        json_props["length_km_int"] = ((wg.length_m / 1000.).round() as i64).into();
+
         for (i, group) in wg.group.iter().enumerate() {
             json_props[format!("tag_group_{}", i)] = group.as_ref().cloned().into();
         }
         json_props["tag_groups"] = wg.group.to_vec().into();
-        json_props["length_m_int"] = (wg.length_m.round() as i64).into();
-        json_props["length_km"] = (wg.length_m / 1000.).into();
-        json_props["length_km_int"] = ((wg.length_m / 1000.).round() as i64).into();
         json_props["num_nodes"] = wg.graph.num_vertexes().into();
     });
 
