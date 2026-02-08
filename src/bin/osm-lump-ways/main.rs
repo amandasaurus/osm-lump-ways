@@ -543,6 +543,9 @@ fn main() -> Result<()> {
         json_props["num_nodes"] = wg.graph.num_vertexes().into();
     });
 
+    update_length_m_fraction_total(&mut way_groups);
+    update_length_ranks(&mut way_groups);
+
     info!("all JSON properties set");
 
     if let Some(output_frames) = args.output_frames {
@@ -614,70 +617,8 @@ fn main() -> Result<()> {
             }
         })
         .update(|(_filename, way_groups)| {
-            let mut feature_ranks = Vec::with_capacity(way_groups.len());
-
-            // calc longest lengths
-            // (length of way group, idx of this way group in way_groups, rank)
-            way_groups
-                .par_iter()
-                .enumerate()
-                .map(|(i, wg)| (wg.length_m, i, 0))
-                .collect_into_vec(&mut feature_ranks);
-            // sort by longest first
-            feature_ranks.par_sort_unstable_by(|a, b| a.0.total_cmp(&b.0).reverse());
-            // update feature_ranks to store the local rank
-            feature_ranks
-                .par_iter_mut()
-                .enumerate()
-                .for_each(|(rank, (_len, _idx, new_rank))| {
-                    *new_rank = rank;
-                });
-            // sort back by way_groups idx
-            feature_ranks.par_sort_unstable_by_key(|(_len, wg_idx, _rank)| *wg_idx);
-            // now update the way_groups
-            let way_groups_len = way_groups.len();
-            let way_groups_len_f = way_groups_len as f64;
-            way_groups
-                .par_iter_mut()
-                .zip(feature_ranks.par_iter())
-                .for_each(|(wg, (_len, _wg_idx, rank))| {
-                    wg.json_props["length_desc_rank"] = (*rank).into();
-                    wg.json_props["length_desc_rank_perc"] =
-                        ((*rank as f64) / way_groups_len_f).into();
-                    wg.json_props["length_asc_rank"] = (way_groups_len - *rank).into();
-                    wg.json_props["length_asc_rank_perc"] =
-                        ((way_groups_len - *rank) as f64 / way_groups_len_f).into();
-                });
-
-            //if args.split_into_single_paths {
-            //    // dist between ends
-            //    feature_ranks.truncate(0);
-
-            //    // (length of way group, idx of this way group in way_groups, rank)
-            //    way_groups
-            //        .par_iter()
-            //        .enumerate()
-            //        .map(|(i, wg)| (wg.json_props["dist_ends_m"].as_f64().unwrap(), i, 0))
-            //        .collect_into_vec(&mut feature_ranks);
-            //    // sort by longest first
-            //    feature_ranks.par_sort_unstable_by(|a, b| a.0.total_cmp(&b.0).reverse());
-            //    // update feature_ranks to store the local rank
-            //    feature_ranks.par_iter_mut().enumerate().for_each(
-            //        |(rank, (_len, _idx, new_rank))| {
-            //            *new_rank = rank;
-            //        },
-            //    );
-            //    // sort back by way_groups idx
-            //    feature_ranks.par_sort_unstable_by_key(|(_len, wg_idx, _rank)| *wg_idx);
-            //    // now update the way_groups
-            //    way_groups
-            //        .par_iter_mut()
-            //        .zip(feature_ranks.par_iter())
-            //        .for_each(|(wg, (_len, _wg_idx, rank))| {
-            //            wg.json_props["dist_ends_desc_rank"] = (*rank).into();
-            //            wg.json_props["dist_ends_asc_rank"] = (way_groups_len - *rank).into();
-            //        });
-            //}
+            update_length_m_fraction_total(way_groups);
+            update_length_ranks(way_groups);
         })
         .map(|(filename, way_groups)| {
             let mut results = Vec::with_capacity(way_groups.len());
@@ -913,4 +854,48 @@ fn debug_var_size(name: &str, size: usize) {
         size,
         size.to_formatted_string(&Locale::en)
     );
+}
+
+fn update_length_m_fraction_total(way_groups: &mut [WayGroup]) {
+    let total_length = way_groups.par_iter().map(|wg| wg.length_m).sum::<f64>();
+
+    way_groups.par_iter_mut().for_each(|wg| {
+        wg.json_props["length_m_fraction_total"] = round(&(wg.length_m / total_length), 6).into();
+    });
+}
+
+fn update_length_ranks(way_groups: &mut [WayGroup]) {
+    let mut feature_ranks = Vec::with_capacity(way_groups.len());
+
+    // calc longest lengths
+    // (length of way group, idx of this way group in way_groups, rank)
+    way_groups
+        .par_iter()
+        .enumerate()
+        .map(|(i, wg)| (wg.length_m, i, 0))
+        .collect_into_vec(&mut feature_ranks);
+    // sort by longest first
+    feature_ranks.par_sort_unstable_by(|a, b| a.0.total_cmp(&b.0).reverse());
+    // update feature_ranks to store the local rank
+    feature_ranks
+        .par_iter_mut()
+        .enumerate()
+        .for_each(|(rank, (_len, _idx, new_rank))| {
+            *new_rank = rank;
+        });
+    // sort back by way_groups idx
+    feature_ranks.par_sort_unstable_by_key(|(_len, wg_idx, _rank)| *wg_idx);
+    // now update the way_groups
+    let way_groups_len = way_groups.len();
+    let way_groups_len_f = way_groups_len as f64;
+    way_groups
+        .par_iter_mut()
+        .zip(feature_ranks.par_iter())
+        .for_each(|(wg, (_len, _wg_idx, rank))| {
+            wg.json_props["length_desc_rank"] = (*rank).into();
+            wg.json_props["length_desc_rank_perc"] = ((*rank as f64) / way_groups_len_f).into();
+            wg.json_props["length_asc_rank"] = (way_groups_len - *rank).into();
+            wg.json_props["length_asc_rank_perc"] =
+                ((way_groups_len - *rank) as f64 / way_groups_len_f).into();
+        });
 }
