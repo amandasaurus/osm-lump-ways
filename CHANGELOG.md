@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v3.7.0 (2026-02-08)
 
 * Edge Betweenness Centrality can be calculated (`--betweenness-centrality`)
   * Includes a JOSM map style to show this data
