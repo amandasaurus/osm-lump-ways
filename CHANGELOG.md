@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## v3.6.0 (2026-01-08)
 
 * Minor bugfixes
