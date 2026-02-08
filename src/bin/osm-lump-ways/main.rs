@@ -10,6 +10,7 @@ use osmio::OSMObjBase;
 use osmio::prelude::*;
 use rayon::prelude::*;
 use smallvec::SmallVec;
+use std::cmp;
 
 use std::collections::HashMap;
 use std::time::Instant;
@@ -563,6 +564,30 @@ fn main() -> Result<()> {
         )?;
     }
 
+    if let Some(output_betweenness) = args.betweenness_output {
+        let way_groups = if let Some(only_longest_n_per_file) = args.only_longest_n_per_file {
+            &way_groups[0..only_longest_n_per_file]
+        } else {
+            &way_groups
+        };
+        info!(
+            "Calculating betweenness centrality for {} way groups, with {} max nodes per group",
+            way_groups.len(),
+            args.betweenness_max_nodes
+        );
+        do_betweenness(
+            &output_betweenness,
+            args.betweenness_min_value,
+            args.betweenness_min_fraction,
+            args.betweenness_max_nodes,
+            &way_groups,
+            &progress_bars,
+            &style,
+            &nodeid_pos,
+            &inter_store,
+        )?;
+    }
+
     let split_into_lines = progress_bars.add(
         ProgressBar::new(
             way_groups
@@ -856,6 +881,112 @@ fn debug_var_size(name: &str, size: usize) {
         size,
         size.to_formatted_string(&Locale::en)
     );
+}
+
+fn do_betweenness(
+    betweenness_filepath: &PathBuf,
+    betweenness_min_value: u64,
+    betweenness_min_fraction: f64,
+    betweenness_max_nodes: u64,
+
+    way_groups: &[WayGroup],
+    progress_bars: &MultiProgress,
+    style: &ProgressStyle,
+    nodeid_pos: &impl NodeIdPosition,
+    inter_store: &inter_store::InterStore,
+) -> Result<()> {
+    let _started_betweenness_calculation = Instant::now();
+    info!("Starting to calculate Betweenness Centrality");
+
+    let all_wg_bar = progress_bars.add(
+        ProgressBar::new(way_groups.len() as u64)
+            .with_message("Calc. Betweenness")
+            .with_style(style.clone()),
+    );
+    all_wg_bar.tick(); // w/o this, the bar isn't shown until first WG is done.
+
+    let betweenness_bar = progress_bars.add(
+        ProgressBar::new(
+            way_groups
+                .iter()
+                .map(|wg| {
+                    let n = cmp::min(wg.graph.num_vertexes() as u64, betweenness_max_nodes);
+                    n * (n - 1) / 2
+                })
+                .sum::<u64>(),
+        )
+        .with_message("Betweenness (per node)")
+        .with_style(style.clone()),
+    );
+    betweenness_bar.tick(); // w/o this, the bar isn't shown until first WG is done.
+
+    let (obj_to_write_tx, obj_to_write_rx) = std::sync::mpsc::sync_channel(10000);
+
+    let output_format = fileio::format_for_filename(betweenness_filepath);
+    let f = std::fs::File::create(betweenness_filepath).unwrap();
+    let mut f = std::io::BufWriter::new(f);
+
+    let writer_thread = std::thread::spawn({
+        move || {
+            let _total_written = fileio::write_geojson_features_directly(
+                obj_to_write_rx.iter(),
+                &mut f,
+                &output_format,
+            )
+            .unwrap();
+        }
+    });
+
+    way_groups
+        .par_iter()
+        .for_each_with(obj_to_write_tx.clone(), |obj_to_write_tx, wg| {
+            let bc_values = wg.graph.betweenness_centrality(
+                betweenness_max_nodes,
+                nodeid_pos,
+                inter_store,
+                betweenness_bar.clone(),
+            );
+
+            let max_betweenness_value =
+                *bc_values.iter().map(|(_nids, value)| value).max().unwrap();
+
+            wg.graph.edges_par_iter().for_each(move |(&nid1, &nid2)| {
+                let val = *bc_values
+                    .get(&(nid1, nid2))
+                    .or_else(|| bc_values.get(&(nid2, nid1)))
+                    .unwrap();
+                let fraction = (val as f64) / (max_betweenness_value as f64);
+
+                if val < betweenness_min_value || fraction < betweenness_min_fraction {
+                    return;
+                }
+                let mut json_props = wg.json_props.clone();
+                json_props["betweenness_value"] = val.into();
+                json_props["max_betweenness_value"] = max_betweenness_value.into();
+                json_props["betweenness_fraction"] = round(&fraction, 6).into();
+
+                obj_to_write_tx.send((
+                    json_props,
+                    inter_store
+                        .expand_undirected(nid1, nid2)
+                        .map(|nid| nodeid_pos.get(&nid).unwrap())
+                        .collect::<Vec<_>>(),
+                )).unwrap();
+            });
+            all_wg_bar.inc(1);
+        });
+    drop(obj_to_write_tx);
+
+    writer_thread.join().unwrap();
+
+    //    info!(
+    //        "Calculated & wrote {} betweenness centrality edges to {:?} in {}",
+    //        num_written.to_formatted_string(&Locale::en),
+    //        betweenness_filepath,
+    //        formatting::format_duration(started_betweenness_calculation.elapsed())
+    //    );
+
+    Ok(())
 }
 
 fn update_length_m_fraction_total(way_groups: &mut [WayGroup]) {

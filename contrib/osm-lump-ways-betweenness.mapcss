@@ -1,0 +1,67 @@
+meta {
+    title: "OSMLumpWays Betweenness Centrality";   /* title shown in the menu */
+    version: "0.1";           /* the version of the style */
+    author: "Amanda McCann";
+    /* link: "https://...";      /* URL to the web page of the style */
+}
+
+way[betweenness_fraction<0.1] {
+	width: 8;
+	color: "#455bcd";
+	z-index: 0;
+}
+
+way[betweenness_fraction>=0.1][betweenness_fraction<0.2] {
+	width: 8;
+	color: "#3e9bfe";
+	z-index: 1;
+}
+
+way[betweenness_fraction>=0.2][betweenness_fraction<0.3] {
+	width: 8;
+	color: "#18d7cb";
+	z-index: 2;
+}
+
+way[betweenness_fraction>=0.3][betweenness_fraction<0.4] {
+	width: 8;
+	color: "#47f883";
+	z-index: 3;
+}
+
+way[betweenness_fraction>=0.4][betweenness_fraction<0.5] {
+	width: 8;
+	color: "#a4fc3c";
+	z-index: 4;
+}
+
+way[betweenness_fraction>=0.5][betweenness_fraction<0.6] {
+	width: 8;
+	color: "#e2dc38";
+	z-index: 5;
+}
+
+way[betweenness_fraction>=0.6][betweenness_fraction<0.7] {
+	width: 8;
+	color: "#fea331";
+	z-index: 6;
+}
+
+way[betweenness_fraction>=0.7][betweenness_fraction<0.8] {
+	width: 8;
+	color: "#ef5911";
+	z-index: 7;
+}
+
+way[betweenness_fraction>=0.8][betweenness_fraction<0.9] {
+	width: 8;
+	color: "#c22403";
+	z-index: 8;
+}
+
+way[betweenness_fraction>=0.9][betweenness_fraction<=1.0] {
+	width: 8;
+	color: "#7a0403";
+	z-index: 9;
+}
+

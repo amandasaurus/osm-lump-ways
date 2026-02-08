@@ -4,8 +4,10 @@ use ordered_float::OrderedFloat;
 use rand::prelude::*;
 use rayon::prelude::ParallelIterator;
 use smallvec::SmallVec;
+use sorted_slice_store::SortedSliceMap;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
+use utils::min_max;
 
 use kiddo::{KdTree, SquaredEuclidean};
 
@@ -442,6 +444,7 @@ impl Graph2 {
                 (*dest_nid, (OrderedFloat(dest_p.0), OrderedFloat(dest_p.1))),
                 nodeid_pos,
                 &graph,
+                None,
             );
             let path = res.1;
 
@@ -529,4 +532,94 @@ impl Graph2 {
         new_nodes.into_boxed_slice()
     }
 
+    pub fn betweenness_centrality(
+        &self,
+        max_nodes: u64,
+        nodeid_pos: &impl NodeIdPosition,
+        inter_store: &inter_store::InterStore,
+        progress_bar: impl Into<Option<ProgressBar>>,
+    ) -> SortedSliceMap<(i64, i64), u64> {
+        let progress_bar: Option<ProgressBar> = progress_bar.into();
+
+        //let started_selecting_nodes = Instant::now();
+
+        let mut nodes = self.random_sample_vertexes(max_nodes as usize, nodeid_pos);
+
+        //info!("Finished selecting the {} to include in {}", nodes.len(), format_di
+
+        nodes.par_sort();
+
+        let edge_lengths = SortedSliceMap::from_iter(self.edges_iter().map(|(nid1, nid2)| {
+            let edge_len = inter_store
+                .expand_undirected(*nid1, *nid2)
+                .map(|nid| nodeid_pos.get(&nid).unwrap())
+                .tuple_windows::<(_, _)>()
+                .par_bridge()
+                .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
+                .sum::<f64>();
+
+            let edge_len = (edge_len * 100.).round() as u64;
+
+            ((*nid1, *nid2), edge_len)
+        }));
+
+        let res =
+            SortedSliceMap::from_iter(self.edges_iter().map(|(&nid1, &nid2)| ((nid1, nid2), 0)));
+        let res = Arc::new(Mutex::new(res));
+
+        nodes.par_iter().enumerate().for_each_with(
+            (res.clone(), HashMap::new()),
+            |(res, prev_dist), (i, &node0)| {
+                let nid0 = node0.0;
+                let new_nodes = &nodes[(i + 1)..];
+
+                dij::dij_single(nid0, self, &edge_lengths, prev_dist);
+
+                let mut new_segs: Vec<((i64, i64), u64)> = Vec::with_capacity(new_nodes.len());
+                let mut buf_segs = Vec::with_capacity(new_nodes.len());
+
+                buf_segs.extend(
+                    new_nodes
+                        .iter()
+                        .map(|nid_n| (prev_dist[&nid_n.0].1, nid_n.0, 1)),
+                );
+                buf_segs.par_sort_by_key(|(dist, nid, _acc)| (*dist, *nid));
+
+                while let Some((_dist, nid_b, acc)) = buf_segs.pop() {
+                    if nid_b == nid0 {
+                        continue;
+                    }
+                    let (nid_aopt, new_dist) = prev_dist[&nid_b];
+                    let nid_a = nid_aopt.unwrap();
+
+                    // save this segment
+                    new_segs.push((min_max(nid_a, nid_b), acc));
+
+                    let k = buf_segs.partition_point(|(thisdist, nid, _acc)| {
+                        (*thisdist, *nid).le(&(new_dist, nid_a))
+                    });
+                    if k >= buf_segs.len() {
+                        // put it on the end
+                        buf_segs.push((new_dist, nid_a, acc));
+                    } else if buf_segs[k].1 == nid_a {
+                        // we update this item
+                        buf_segs[k].2 += acc;
+                    } else {
+                        // new item, put it here
+                        buf_segs.insert(k, (new_dist, nid_a, acc));
+                    }
+                }
+
+                let mut res = res.lock().unwrap();
+                for ((nid_a, nid_b), val) in new_segs.into_iter() {
+                    *res.get_mut(&(nid_a, nid_b)).unwrap() += val;
+                }
+                if let Some(progress_bar) = &progress_bar {
+                    progress_bar.inc(new_nodes.len() as u64);
+                }
+            },
+        );
+
+        Arc::try_unwrap(res).unwrap().into_inner().unwrap()
+    }
 }

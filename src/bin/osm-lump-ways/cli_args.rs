@@ -214,6 +214,42 @@ pub struct Args {
     /// Path to store OpenMetrics/Prometheus metrics
     #[arg(long, value_name = "FILENAME.prom")]
     pub openmetrics: Option<PathBuf>,
+
+    /// Calculate the betweenness centrality and write it to this file
+    #[arg(long, value_name = "FILENAME.geojson[s]")]
+    pub betweenness_output: Option<PathBuf>,
+
+    /// The output will only include lines with at least this betweenness value.
+    /// Default value of 1 will reduce output file size, and include nearly everthing needed for
+    /// proper output.
+    /// use --betweenness-min-value 0 to get everything
+    #[arg(
+        long,
+        value_name = "NUMBER",
+        requires = "betweenness_output",
+        default_value = "1"
+    )]
+    pub betweenness_min_value: u64,
+
+    /// The output will only include lines with at least this betweenness_fraction
+    #[arg(
+        long,
+        value_name = "NUMBER",
+        requires = "betweenness_output",
+        default_value = "0"
+    )]
+    pub betweenness_min_fraction: f64,
+
+    /// For each way group, only use this many nodes.
+    /// Default of 2000 is usually only a small percentage, but larger numbers will be exponentially
+    /// longer to calculate.
+    #[arg(
+        long,
+        value_name = "NUMBER",
+        requires = "betweenness_output",
+        default_value = "2000"
+    )]
+    pub betweenness_max_nodes: u64,
 }
 
 /// CLI arg parser. If the value starts with @, the rest is assumed to be a filename, the contents

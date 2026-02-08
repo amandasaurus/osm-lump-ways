@@ -134,6 +134,7 @@ impl WayGroup {
                     &convex_hull_nodes[(i + 1)..],
                     nodeid_pos,
                     &self.graph,
+                    None,
                 )
             })
             .inspect(|_| frames_bar.inc(self.graph.num_vertexes() as u64))
