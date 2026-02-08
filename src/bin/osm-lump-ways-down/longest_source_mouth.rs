@@ -64,7 +64,7 @@ pub(crate) fn do_longest_source_mouth(
                 let tg = &tag_group_info[g.edge_property_unchecked((nid1, nid2)).taggroupid_us()];
                 let has_name = tg.tagid.is_some();
 
-                !(only_named && !has_name)        // bit tricky, but this is the boolean
+                (has_name || !only_named)        // bit tricky, but this is the boolean
                                                   // expression
                         && tg.parent_channels.is_empty()
             })
