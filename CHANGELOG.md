@@ -3,6 +3,7 @@
 ## Unreleased
 
 * New Tag filter `∃key∉value1,value2,value3,…`
+* New option `--min-length N%longest`
 
 ## v3.6.0 (2026-01-08)
 

@@ -4,6 +4,7 @@ use get_size::GetSize;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use indicatif_log_bridge::LogWrapper;
 use log::{debug, error, info, trace, warn};
+use ordered_float::OrderedFloat;
 use osm_lump_ways::inter_store;
 use osmio::OSMObjBase;
 use osmio::prelude::*;
@@ -30,7 +31,7 @@ use osm_lump_ways::nodeid_position;
 use osm_lump_ways::sorted_slice_store::SortedSliceSet;
 use osm_lump_ways::tagfilter;
 use osm_lump_ways::way_group;
-use way_group::WayGroup;
+use way_group::{MinLengthFilter, WayGroup};
 
 use fileio::OutputFormat;
 use osm_lump_ways::fileio;
@@ -479,11 +480,27 @@ fn main() -> Result<()> {
         .par_iter_mut()
         .for_each(|wg| wg.calculate_length(&nodeid_pos));
 
-    if let Some(min_length_m) = args.min_length_m {
+    if args.min_length.is_some() || args.min_length_m.is_some() {
         let old = way_groups.len();
+        let min_length_m = if let Some(min_length_m) = args.min_length_m {
+            min_length_m
+        } else if let Some(MinLengthFilter::Length(m)) = args.min_length {
+            m
+        } else if let Some(MinLengthFilter::PercentLongest(perc)) = args.min_length {
+            let longest = way_groups
+                .par_iter()
+                .map(|wg| OrderedFloat(wg.length_m))
+                .max()
+                .unwrap()
+                .into_inner();
+            longest * perc
+        } else {
+            unreachable!()
+        };
+
         way_groups.retain(|wg| wg.length_m >= min_length_m);
         info!(
-            "Removed {} way_groups which were smaller than {} m",
+            "Removed {} way_groups which were smaller than {:.1} m",
             (old - way_groups.len()).to_formatted_string(&Locale::en),
             min_length_m
         );
