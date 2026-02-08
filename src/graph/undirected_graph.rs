@@ -206,7 +206,7 @@ impl Graph2 {
         }
     }
 
-    pub fn vertexes(&self) -> impl Iterator<Item = &i64> {
+    pub fn vertexes(&self) -> impl ExactSizeIterator<Item = &i64> {
         self.edges.keys()
     }
     pub fn vertexes_par_iter(&self) -> impl ParallelIterator<Item = &i64> {
@@ -253,6 +253,13 @@ impl Graph2 {
 
     pub fn num_vertexes(&self) -> usize {
         self.edges.len()
+    }
+    pub fn num_edges(&self) -> usize {
+        self.edges
+            .values()
+            .map(|from_i| from_i.len())
+            .sum::<usize>()
+            / 2
     }
     pub fn is_empty(&self) -> bool {
         self.edges.is_empty()

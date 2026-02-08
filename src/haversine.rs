@@ -14,10 +14,21 @@ pub fn haversine_m_fpair(lat_lon1: (f64, f64), lat_lon2: (f64, f64)) -> f64 {
     haversine_m(lat_lon1.0, lat_lon1.1, lat_lon2.0, lat_lon2.1)
 }
 
-#[allow(dead_code)]
 pub(crate) fn haversine_m_fpair_ord(
     lat_lon1: (f64, f64),
     lat_lon2: (f64, f64),
 ) -> OrderedFloat<f64> {
     OrderedFloat(haversine_m_fpair(lat_lon1, lat_lon2))
+}
+
+pub(crate) fn haversine_m_fpair_ord_ord(
+    lat_lon1: (OrderedFloat<f64>, OrderedFloat<f64>),
+    lat_lon2: (OrderedFloat<f64>, OrderedFloat<f64>),
+) -> OrderedFloat<f64> {
+    OrderedFloat(haversine_m(
+        *lat_lon1.0,
+        *lat_lon1.1,
+        *lat_lon2.0,
+        *lat_lon2.1,
+    ))
 }

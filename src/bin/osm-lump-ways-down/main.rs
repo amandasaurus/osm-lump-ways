@@ -34,6 +34,8 @@ use smallvec::SmallVec;
 use country_boundaries::{BOUNDARIES_ODBL_360X180, CountryBoundaries, LatLon};
 use ordered_float::OrderedFloat;
 
+use osm_lump_ways::utils::{round, round_mult};
+
 mod cli_args;
 
 mod longest_source_mouth;
@@ -1361,18 +1363,6 @@ fn multilinestring_length(coords: &Vec<Vec<(f64, f64)>>) -> f64 {
     coords.par_iter().map(|c| linestring_length(c)).sum()
 }
 
-/// Round this float to this many places after the decimal point.
-/// Used to reduce size of output geojson file
-fn round(f: &f64, places: u8) -> f64 {
-    let places: f64 = 10_u64.pow(places as u32) as f64;
-    (f * places).round() / places
-}
-
-/// Round this float to be a whole number multiple of base.
-fn round_mult(f: &f64, base: f64) -> i64 {
-    ((f / base).round() * base) as i64
-}
-
 fn _bbox_area(points: impl Iterator<Item = (f64, f64)>) -> Option<f64> {
     use std::cmp::{max, min};
     points
@@ -2005,7 +1995,7 @@ fn do_waterway_grouped(
             // There's probably other things to do, like the p90
             // Get all the edges of this line
             let upstream_stats: (OrderedFloat<f64>, OrderedFloat<f64>, usize, OrderedFloat<f64>) =
-                lines.iter().map(|line| line.iter().tuple_windows::<(_,_)>()).flatten()
+                lines.iter().flat_map(|line| line.iter().tuple_windows::<(_,_)>())
                 .map(|(nid1, nid2)| OrderedFloat(g.edge_property_unchecked((*nid1, *nid2)).upstream_m))
                 .map(|nid_upstream| (nid_upstream, nid_upstream, 1usize, nid_upstream))
                 .fold(Default::default(),

@@ -30,6 +30,7 @@ use osm_lump_ways::haversine::haversine_m_fpair;
 use osm_lump_ways::nodeid_position;
 use osm_lump_ways::sorted_slice_store::SortedSliceSet;
 use osm_lump_ways::tagfilter;
+use osm_lump_ways::utils::{round, round_mult};
 use osm_lump_ways::way_group;
 use way_group::{MinLengthFilter, WayGroup};
 
@@ -587,7 +588,7 @@ fn main() -> Result<()> {
         .update(|(_filename, way_groups)| {
             debug!("sorting ways by length & truncating");
             // in calc dist to longer, we need this sorted too
-            way_groups.par_sort_unstable_by(|a, b| a.length_m.total_cmp(&b.length_m).reverse());
+            way_groups.par_sort_unstable_by_key(|wg| OrderedFloat(-wg.length_m));
         })
         .update(|(_filename, way_groups)| {
             if let Some(limit) = args.only_longest_n_per_file {

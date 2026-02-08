@@ -45,6 +45,9 @@ where
     pub fn iter_mut(&mut self) -> impl ExactSizeIterator<Item = &mut (K, V)> {
         self.data.iter_mut()
     }
+    pub fn par_iter_mut(&mut self) -> impl IndexedParallelIterator<Item = &mut (K, V)> {
+        self.data.par_iter_mut()
+    }
     pub fn keys(&self) -> impl ExactSizeIterator<Item = &K> {
         self.data.iter().map(|(k, _)| k)
     }
@@ -108,6 +111,19 @@ where
         Self {
             data: self.data.clone(),
         }
+    }
+}
+
+impl<K, V> IntoIterator for SortedSliceMap<K, V>
+where
+    K: Ord + Send,
+    V: Send,
+{
+    type Item = (K, V);
+    type IntoIter = std::vec::IntoIter<(K, V)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.data.into_iter()
     }
 }
 

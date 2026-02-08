@@ -1,5 +1,6 @@
 /// Storing the position of nodes based on their node id
 use super::*;
+use ordered_float::OrderedFloat;
 use osmio::{Lat, Lon};
 use std::collections::BTreeMap;
 
@@ -31,6 +32,16 @@ pub trait NodeIdPosition: std::fmt::Debug + std::marker::Send + std::marker::Syn
     }
     /// Return the location for this node id
     fn get(&self, node_id: &i64) -> Result<(f64, f64)>;
+
+    fn get_arr(&self, node_id: &i64) -> Result<[f64; 2]> {
+        let res = self.get(node_id)?;
+        Ok([res.0, res.1])
+    }
+
+    fn get_ord(&self, node_id: &i64) -> Result<(OrderedFloat<f64>, OrderedFloat<f64>)> {
+        let res = self.get(node_id)?;
+        Ok((OrderedFloat(res.0), OrderedFloat(res.1)))
+    }
 
     fn get_many_unwrap(&self, nids: &[i64], output: &mut [(f64, f64)]) {
         for (nid, output) in nids.iter().zip(output.iter_mut()) {
