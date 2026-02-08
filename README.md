@@ -23,6 +23,15 @@ model](https://wiki.openstreetmap.org/wiki/Tags) often requires one feature to
 be mapped as many different ways, “splitting the way”. `osm-lump-ways` will
 undo this splitting, and recursively merge the original OSM objects together.
 
+# Examples of usage
+
+* [WaterwayMap.org](https://waterwaymap.org)
+* [Longest O'Connell Street in Ireland](https://en.osm.town/@amapanda/110270516183776589)
+* [Road most split in UK&Irl](https://en.osm.town/@amapanda/110762435236476901)
+* [Die Bahnhofstrassen in jeder Schweizer Sprachregion (german language only)](https://habi.gna.ch/2023/11/14/die-bahnhofstrassen-in-jeder-schweizer-sprachregion/)
+* [Roads without etymology data](https://en.osm.town/@amapanda/114562398764953834)
+* Your project here!
+
 # Filtering OSM Data
 
 There are 2 ways to select which OSM ways will be used.
@@ -181,14 +190,6 @@ group is connected.
 `--output-frames FILENAME.geojsons` will save these features to a file.
 GeoJSONSeq output format only.
 
-# Examples of usage
-
-* [WaterwayMap.org](https://waterwaymap.org)
-* [Longest O'Connell Street in Ireland](https://en.osm.town/@amapanda/110270516183776589)
-* [Road most split in UK&Irl](https://en.osm.town/@amapanda/110762435236476901)
-* [Die Bahnhofstrassen in jeder Schweizer Sprachregion (german language only)](https://habi.gna.ch/2023/11/14/die-bahnhofstrassen-in-jeder-schweizer-sprachregion/)
-* [Roads without etymology data](https://en.osm.town/@amapanda/114562398764953834)
-* Your project here!
 
 # `osm-lump-ways-down`
 
@@ -427,7 +428,7 @@ contracted together, producing a new graph which is loop-free.
 
 This software isn't finished. Lots is being motivated for
 [WaterwayMap.org](https://waterwaymap.org), a topological analysis of waterways
-in OpenStreetMap.
+in OpenStreetMap, or for other analysis of OpenStreetMap data.
 
 # External Mentions
 
