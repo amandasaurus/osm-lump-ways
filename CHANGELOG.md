@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## v3.7.0 (2026-02-08)
 
 * Edge Betweenness Centrality can be calculated (`--betweenness-centrality`)
