@@ -23,12 +23,10 @@ pub enum SplitPathsMethod {
 /// &mut argument, the allocated memory can be reused between runs
 pub fn dij_single(
     start_idx: i64,
-    target_idxs: &[i64],
     edges: &Graph2,
     edge_lengths: &SortedSliceMap<(i64, i64), u64>,
     prev_dist: &mut HashMap<i64, (Option<i64>, u64)>,
 ) {
-    let mut seen_idx = vec![false; target_idxs.len()].into_boxed_slice();
     prev_dist.clear();
     prev_dist.reserve(edges.num_vertexes());
     prev_dist.extend(edges.vertexes().map(|nid| (*nid, (None, u64::MAX))));
@@ -42,19 +40,6 @@ pub fn dij_single(
         if curr_dist > prev_dist[&curr_id].1 {
             continue;
         }
-
-        if let Some(i) = target_idxs.par_iter().position_any(|x| *x == curr_id) {
-            assert!(
-                !seen_idx[i],
-                "This shouldn't happen. If it does, then the Dijkstra early exit work around can't work, or is based on false assumptions."
-            );
-            seen_idx[i] = true;
-            if seen_idx.par_iter().all(|x| *x) {
-                // early exit possible
-                break;
-            }
-        }
-
         for neighbour_idx in edges.neighbours(&curr_id) {
             let this_dist =
                 curr_dist + edge_lengths.get(&min_max(curr_id, *neighbour_idx)).unwrap();

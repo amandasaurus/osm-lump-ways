@@ -568,16 +568,12 @@ impl Graph2 {
         let res = Arc::new(Mutex::new(res));
 
         nodes.par_iter().enumerate().for_each_with(
-            (res.clone(), HashMap::new(), Vec::new()),
-            |(res, prev_dist, target_nids), (i, &node0)| {
+            (res.clone(), HashMap::new()),
+            |(res, prev_dist), (i, &node0)| {
                 let nid0 = node0.0;
                 let new_nodes = &nodes[(i + 1)..];
 
-                target_nids.truncate(0);
-                target_nids.reserve(new_nodes.len());
-                target_nids.extend(new_nodes.iter().map(|(nid, _pos)| *nid));
-
-                dij::dij_single(nid0, &target_nids, self, &edge_lengths, prev_dist);
+                dij::dij_single(nid0, self, &edge_lengths, prev_dist);
 
                 let mut new_segs: Vec<((i64, i64), u64)> = Vec::with_capacity(new_nodes.len());
                 let mut buf_segs = Vec::with_capacity(new_nodes.len());
