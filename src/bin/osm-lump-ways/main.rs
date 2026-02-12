@@ -970,13 +970,15 @@ fn do_betweenness(
                 json_props["max_betweenness_value"] = max_betweenness_value.into();
                 json_props["betweenness_fraction"] = round(&fraction, 6).into();
 
-                obj_to_write_tx.send((
-                    json_props,
-                    inter_store
-                        .expand_undirected(nid1, nid2)
-                        .map(|nid| nodeid_pos.get(&nid).unwrap())
-                        .collect::<Vec<_>>(),
-                )).unwrap();
+                obj_to_write_tx
+                    .send((
+                        json_props,
+                        inter_store
+                            .expand_undirected(nid1, nid2)
+                            .map(|nid| nodeid_pos.get(&nid).unwrap())
+                            .collect::<Vec<_>>(),
+                    ))
+                    .unwrap();
             });
             all_wg_bar.inc(1);
         });
