@@ -127,6 +127,10 @@ fn main() -> Result<()> {
         );
     }
 
+    if args.min_length_m.is_some() {
+        warn!("The argument `--min-length-m` can be replaced with `--min-length`");
+    }
+
     let output_format = if args.output_filename.ends_with(".geojson") {
         OutputFormat::GeoJSON
     } else if args.output_filename.ends_with(".geojsons") {
