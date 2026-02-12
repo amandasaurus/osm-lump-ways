@@ -486,30 +486,35 @@ fn main() -> Result<()> {
         let old = way_groups.len();
         let min_length_m = if let Some(min_length_m) = args.min_length_m {
             min_length_m
-        } else if let Some(MinLengthFilter::Length(m)) = args.min_length {
-            m
-        } else if let Some(MinLengthFilter::PercentLongest(perc)) = args.min_length {
-            let longest = way_groups
-                .par_iter()
-                .map(|wg| OrderedFloat(wg.length_m))
-                .max()
-                .unwrap()
-                .into_inner();
-            longest * perc
-        } else if let Some(MinLengthFilter::TotalPercentage(perc)) = args.min_length {
-            let total_length = way_groups.par_iter().map(|wg| wg.length_m).sum::<f64>();
-            let desired_total = total_length * perc;
-            way_groups.par_sort_by_key(|wg| OrderedFloat(-wg.length_m));
-            let mut cum_total = 0.;
-            let mut min_length = way_groups[0].length_m;
-            for val in way_groups.iter().map(|wg| wg.length_m) {
-                cum_total += val;
-                if cum_total > desired_total {
-                    min_length = val;
-                    break;
+        } else if let Some(mlf) = args.min_length {
+            use MinLengthFilter::*;
+            match mlf {
+                Length(m) => m,
+                PercentLongest(perc) => {
+                    let longest = way_groups
+                        .par_iter()
+                        .map(|wg| OrderedFloat(wg.length_m))
+                        .max()
+                        .unwrap()
+                        .into_inner();
+                    longest * perc
+                }
+                IncludeTotalPercentage(perc) => {
+                    let total_length = way_groups.par_iter().map(|wg| wg.length_m).sum::<f64>();
+                    let desired_total = total_length * perc;
+                    way_groups.par_sort_by_key(|wg| OrderedFloat(-wg.length_m));
+                    let mut cum_total = 0.;
+                    let mut min_length = way_groups[0].length_m;
+                    for val in way_groups.iter().map(|wg| wg.length_m) {
+                        cum_total += val;
+                        if cum_total > desired_total {
+                            min_length = val;
+                            break;
+                        }
+                    }
+                    min_length
                 }
             }
-            min_length
         } else {
             unreachable!()
         };
