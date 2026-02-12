@@ -190,6 +190,27 @@ group is connected.
 `--output-frames FILENAME.geojsons` will save these features to a file.
 GeoJSONSeq output format only.
 
+## Excluding by length
+
+By default, all groups are included.
+
+`--only-longest-n-per-file N` only includes the longest `N` groups.
+
+`--max-length-m N` will only include groups where each is N m long or less.
+
+`--min-length` only includes groups which are at least this long.
+
+* `--min-length 10` / `--min-length 25m` / `--min-length 50km`: Simple length
+  filter. A bare number (here `10`) is metres.
+* `--min-length 10%longest`: The longest group will be included, and any group
+  at least as long as 10% of the length of that longest will be included.
+* `--min-length 20%total`: The sum total length of all groups will be
+  calculated. Any group at least as long as (here) 20% of that value will be
+  included.
+* `--min-length incl90%total`: The groups are sorted by length from largest to
+  smallest, and are included until at least (here) 90% of the total length has
+  been included.
+
 
 # `osm-lump-ways-down`
 
