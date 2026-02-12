@@ -522,13 +522,23 @@ fn main() -> Result<()> {
         way_groups.retain(|wg| wg.length_m >= min_length_m);
 
         info!(
-            "Removed {} way_groups which were smaller than {:.1} m",
+            "Removed {} way_groups (leaving {}) which were smaller than {:.1} m",
             (old - way_groups.len()).to_formatted_string(&Locale::en),
+            way_groups.len().to_formatted_string(&Locale::en),
             min_length_m
         );
     }
     if let Some(max_length_m) = args.max_length_m {
+        let old = way_groups.len();
+
         way_groups.retain(|wg| wg.length_m <= max_length_m);
+
+        info!(
+            "Removed {} way_groups (leaving {}) which are longer than than {:.1} m",
+            (old - way_groups.len()).to_formatted_string(&Locale::en),
+            way_groups.len().to_formatted_string(&Locale::en),
+            max_length_m
+        );
     }
     way_groups.shrink_to_fit();
 
@@ -575,11 +585,6 @@ fn main() -> Result<()> {
         } else {
             &way_groups
         };
-        info!(
-            "Calculating betweenness centrality for {} way groups, with {} max nodes per group",
-            way_groups.len(),
-            args.betweenness_max_nodes
-        );
         do_betweenness(
             &output_betweenness,
             args.betweenness_min_value,
@@ -901,7 +906,11 @@ fn do_betweenness(
     inter_store: &inter_store::InterStore,
 ) -> Result<()> {
     let _started_betweenness_calculation = Instant::now();
-    info!("Starting to calculate Betweenness Centrality");
+    info!(
+        "Calculating betweenness centrality for {} way groups, with {} max nodes per group",
+        way_groups.len(),
+        betweenness_max_nodes
+    );
 
     let all_wg_bar = progress_bars.add(
         ProgressBar::new(way_groups.len() as u64)
@@ -932,13 +941,21 @@ fn do_betweenness(
     let mut f = std::io::BufWriter::new(f);
 
     let writer_thread = std::thread::spawn({
+        let betweenness_filepath = betweenness_filepath.clone();
         move || {
-            let _total_written = fileio::write_geojson_features_directly(
+            let started_betweenness_calculation = Instant::now();
+            let total_written = fileio::write_geojson_features_directly(
                 obj_to_write_rx.iter(),
                 &mut f,
                 &output_format,
             )
             .unwrap();
+            info!(
+                "Calculated & wrote {} betweenness centrality edges to {:?} in {}",
+                total_written.to_formatted_string(&Locale::en),
+                betweenness_filepath,
+                formatting::format_duration(started_betweenness_calculation.elapsed())
+            );
         }
     });
 
@@ -985,13 +1002,6 @@ fn do_betweenness(
     drop(obj_to_write_tx);
 
     writer_thread.join().unwrap();
-
-    //    info!(
-    //        "Calculated & wrote {} betweenness centrality edges to {:?} in {}",
-    //        num_written.to_formatted_string(&Locale::en),
-    //        betweenness_filepath,
-    //        formatting::format_duration(started_betweenness_calculation.elapsed())
-    //    );
 
     Ok(())
 }
