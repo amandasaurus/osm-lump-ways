@@ -499,6 +499,10 @@ fn main() -> Result<()> {
                         .into_inner();
                     longest * perc
                 }
+                PercentTotal(perc) => {
+                    let total_length = way_groups.par_iter().map(|wg| wg.length_m).sum::<f64>();
+                    total_length * perc
+                }
                 IncludeTotalPercentage(perc) => {
                     let total_length = way_groups.par_iter().map(|wg| wg.length_m).sum::<f64>();
                     let desired_total = total_length * perc;

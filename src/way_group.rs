@@ -204,6 +204,7 @@ pub enum MinLengthFilter {
     Length(f64),
     PercentLongest(f64),
     IncludeTotalPercentage(f64),
+    PercentTotal(f64),
 }
 
 impl std::str::FromStr for MinLengthFilter {
@@ -230,6 +231,10 @@ impl std::str::FromStr for MinLengthFilter {
             && let Ok(perc) = perc.parse::<f64>()
         {
             Ok(MinLengthFilter::IncludeTotalPercentage(perc / 100.))
+        } else if let Some(perc) = s.strip_suffix("%total")
+            && let Ok(perc) = perc.parse::<f64>()
+        {
+            Ok(MinLengthFilter::PercentTotal(perc / 100.))
         } else {
             Err("Cannot parse".to_string())
         }
