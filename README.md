@@ -41,6 +41,10 @@ There are 2 ways to select which OSM ways will be used.
 * `key` / `∃key`  way has this tag
 * `~key_regex` / `∃~key_regex`  There is a key, which matches this regex.
 * `∄key`  way does not has this key
+* `∃(lrb)key`  way has this `key`, or `key:both`, or (`key:left` _and_
+  `key:right`).
+* `∄(lrb)key`  way does not have this `key`, nor `key:both`, nor (`key:left`
+  _and_ `key:right`).
 * `key=value`  way has this key and this value
 * `key≠value`  way either doesn't have this key, or if it does, it's not equal to value
 * `key∈value1,value2,…`  way has this key and the value is one of these

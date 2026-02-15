@@ -3,6 +3,7 @@
 ## Unreleased
 
 * New option `--min-length N%total`
+* New tag filter `∃(lrb)KEY` (for `KEY:left`/`KEY:right`/…), and `∄(lrb)…`.
 
 ## v3.7.0 (2026-02-08)
 

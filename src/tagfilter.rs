@@ -9,6 +9,8 @@ use std::path::Path;
 pub enum TagFilter {
     HasK(SmolStr),
     HasReK(Regex),
+    HasKLeftRightBoth(SmolStr),
+    NotHasKLeftRightBoth(SmolStr),
     NotHasK(SmolStr),
     NotHasReK(Regex),
     KV(SmolStr, SmolStr),
@@ -26,6 +28,8 @@ impl std::fmt::Display for TagFilter {
         match self {
             TagFilter::HasK(k) => write!(f, "∃{}", k),
             TagFilter::HasReK(k) => write!(f, "∃~{}", k),
+            TagFilter::HasKLeftRightBoth(k) => write!(f, "∃(lrb){}", k),
+            TagFilter::NotHasKLeftRightBoth(k) => write!(f, "∄(lrb){}", k),
             TagFilter::NotHasK(k) => write!(f, "∄{}", k),
             TagFilter::NotHasReK(k) => write!(f, "∄~{}", k),
             TagFilter::KV(k, v) => write!(f, "{}={}", k, v),
@@ -65,6 +69,16 @@ impl TagFilter {
         match self {
             TagFilter::HasK(k) => o.has_tag(k),
             TagFilter::HasReK(kre) => o.tags().any(|(k, _v)| kre.is_match(k)),
+            TagFilter::HasKLeftRightBoth(k) => {
+                o.has_tag(k)
+                    || o.has_tag(format!("{}:both", k))
+                    || (o.has_tag(format!("{}:left", k)) && o.has_tag(format!("{}:right", k)))
+            }
+            TagFilter::NotHasKLeftRightBoth(k) => {
+                !(o.has_tag(k)
+                    || o.has_tag(format!("{}:both", k))
+                    || (o.has_tag(format!("{}:left", k)) && o.has_tag(format!("{}:right", k))))
+            }
             TagFilter::NotHasK(k) => !o.has_tag(k),
             TagFilter::NotHasReK(kre) => !o.tags().any(|(k, _v)| kre.is_match(k)),
             TagFilter::KV(k, v) => o.tag(k) == Some(v),
@@ -126,6 +140,10 @@ impl std::str::FromStr for TagFilter {
             } else {
                 Ok(TagFilter::KneV(s[0].into(), s[1].into()))
             }
+        } else if let Some(key) = s.strip_prefix("∃(lrb)") {
+            Ok(TagFilter::HasKLeftRightBoth(key.into()))
+        } else if let Some(key) = s.strip_prefix("∄(lrb)") {
+            Ok(TagFilter::NotHasKLeftRightBoth(key.into()))
         } else if s.starts_with("∃") && s.contains('∉') {
             let s = s.strip_prefix("∃").unwrap();
             let s = s.splitn(2, '∉').collect::<Vec<_>>();
@@ -389,6 +407,17 @@ mod tests {
         )
     );
 
+    test_parse!(
+        parse_lrb1,
+        "∃(lrb)a",
+        TagFilter::HasKLeftRightBoth("a".into())
+    );
+    test_parse!(
+        parse_lrb2,
+        "∄(lrb)b",
+        TagFilter::NotHasKLeftRightBoth("b".into())
+    );
+
     #[test]
     fn parse() {
         assert!("".parse::<TagFilter>().is_err());
@@ -478,6 +507,57 @@ mod tests {
         "∃highway∉primary,seconary",
         [("highway", "motorway")],
         true
+    );
+    test_tag_filter!(lrb_exists0, "∃(lrb)sidewalk", &[] as &[(&str, &str)], false);
+    test_tag_filter!(lrb_exists1, "∃(lrb)sidewalk", [("sidewalk", "yes")], true);
+    test_tag_filter!(
+        lrb_exists2,
+        "∃(lrb)sidewalk",
+        [("sidewalk:both", "yes")],
+        true
+    );
+    test_tag_filter!(
+        lrb_exists3,
+        "∃(lrb)sidewalk",
+        [("sidewalk:left", "yes")],
+        false
+    );
+    test_tag_filter!(
+        lrb_exists4,
+        "∃(lrb)sidewalk",
+        [("sidewalk:left", "yes"), ("sidewalk:right", "yes")],
+        true
+    );
+
+    test_tag_filter!(
+        lrb_notexists0,
+        "∄(lrb)sidewalk",
+        &[] as &[(&str, &str)],
+        true
+    );
+    test_tag_filter!(
+        lrb_notexists1,
+        "∄(lrb)sidewalk",
+        [("sidewalk", "yes")],
+        false
+    );
+    test_tag_filter!(
+        lrb_notexists2,
+        "∄(lrb)sidewalk",
+        [("sidewalk:both", "yes")],
+        false
+    );
+    test_tag_filter!(
+        lrb_notexists3,
+        "∄(lrb)sidewalk",
+        [("sidewalk:left", "yes")],
+        true
+    );
+    test_tag_filter!(
+        lrb_notexists4,
+        "∄(lrb)sidewalk",
+        [("sidewalk:left", "yes"), ("sidewalk:right", "yes")],
+        false
     );
 
     #[test]
