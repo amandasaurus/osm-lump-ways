@@ -589,8 +589,7 @@ impl Graph2 {
                     if nid_b == nid0 {
                         continue;
                     }
-                    let (nid_aopt, new_dist) = prev_dist[&nid_b];
-                    let nid_a = nid_aopt.unwrap();
+                    let (nid_a, new_dist) = prev_dist[&nid_b];
 
                     // save this segment
                     new_segs.push((min_max(nid_a, nid_b), acc));

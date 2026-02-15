@@ -25,13 +25,13 @@ pub fn dij_single(
     start_idx: i64,
     edges: &Graph2,
     edge_lengths: &SortedSliceMap<(i64, i64), u64>,
-    prev_dist: &mut HashMap<i64, (Option<i64>, u64)>,
+    prev_dist: &mut HashMap<i64, (i64, u64)>,
 ) {
     prev_dist.clear();
     prev_dist.reserve(edges.num_vertexes());
-    prev_dist.extend(edges.vertexes().map(|nid| (*nid, (None, u64::MAX))));
+    prev_dist.extend(edges.vertexes().map(|nid| (*nid, (0, u64::MAX))));
 
-    prev_dist.insert(start_idx, (None, 0));
+    prev_dist.insert(start_idx, (start_idx, 0));
 
     let mut frontier = RadixHeapMap::new();
     frontier.push(Reverse(0), start_idx);
@@ -45,7 +45,7 @@ pub fn dij_single(
                 curr_dist + edge_lengths.get(&min_max(curr_id, *neighbour_idx)).unwrap();
             let old_value = prev_dist.get_mut(neighbour_idx).unwrap();
             if this_dist < old_value.1 {
-                old_value.0 = Some(curr_id);
+                old_value.0 = curr_id;
                 old_value.1 = this_dist;
                 frontier.push(Reverse(this_dist), *neighbour_idx);
             }
