@@ -21,6 +21,7 @@ pub enum TagFilter {
     KreV(SmolStr, Regex),
     And(Vec<TagFilter>),
     Or(Vec<TagFilter>),
+    OSMObj(bool, char, i64),
 }
 
 impl std::fmt::Display for TagFilter {
@@ -54,6 +55,9 @@ impl std::fmt::Display for TagFilter {
                     .collect::<Vec<_>>()
                     .join("∧")
             ),
+            TagFilter::OSMObj(incl, osm_type, osm_id) => {
+                write!(f, "{}{}{}", if *incl { "" } else { "¬" }, osm_type, osm_id)
+            }
         }
     }
 }
@@ -93,6 +97,15 @@ impl TagFilter {
             TagFilter::KreV(k, r) => o.tag(k).is_some_and(|v| r.is_match(v)),
             TagFilter::Or(tfs) => tfs.iter().any(|tf| tf.filter(o)),
             TagFilter::And(tfs) => tfs.iter().all(|tf| tf.filter(o)),
+            TagFilter::OSMObj(incl, osm_type, osm_id) => {
+                if o.object_type().name_short().chars().next().unwrap() == *osm_type
+                    && o.id() == *osm_id
+                {
+                    *incl
+                } else {
+                    !incl
+                }
+            }
         }
     }
 }
@@ -120,6 +133,17 @@ impl std::str::FromStr for TagFilter {
                 .map(|tf| tf.parse::<TagFilter>())
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(TagFilter::And(tfs))
+        } else if let Some((incl_type, idstr)) =
+            split_prefix(s, &["w", "!w", "¬w", "r", "!r", "¬r"])
+            && let Ok(id) = idstr.parse()
+        {
+            match incl_type {
+                "w" => Ok(TagFilter::OSMObj(true, 'w', id)),
+                "!w" | "¬w" => Ok(TagFilter::OSMObj(false, 'w', id)),
+                "r" => Ok(TagFilter::OSMObj(true, 'r', id)),
+                "!r" | "¬r" => Ok(TagFilter::OSMObj(false, 'r', id)),
+                _ => unreachable!(),
+            }
         } else if s.contains('=') {
             let s = s.splitn(2, '=').collect::<Vec<_>>();
             if s[1].contains(',') {
@@ -344,6 +368,17 @@ pub fn obj_pass_filters(
     }
 }
 
+/// If the string haystack starts with one of those prefixes (checked in order), then return
+/// Some((that_prefix, the_rest)). Else None.
+fn split_prefix<'a>(haystack: &'a str, prefixes: &'a [&'a str]) -> Option<(&'a str, &'a str)> {
+    for prefix in prefixes {
+        if let Some(suffix) = haystack.strip_prefix(prefix) {
+            return Some((prefix, suffix));
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -417,6 +452,11 @@ mod tests {
         "∄(lrb)b",
         TagFilter::NotHasKLeftRightBoth("b".into())
     );
+
+    test_parse!(parse_osmid1, "w123", TagFilter::OSMObj(true, 'w', 123));
+    test_parse!(parse_osmid2, "r123", TagFilter::OSMObj(true, 'r', 123));
+    test_parse!(parse_osmid3, "!w3", TagFilter::OSMObj(false, 'w', 3));
+    test_parse!(parse_osmid4, "¬w3", TagFilter::OSMObj(false, 'w', 3));
 
     #[test]
     fn parse() {
@@ -706,4 +746,26 @@ mod tests {
         [("waterway", "canal")],
         Some(true)
     );
+
+    macro_rules! test_id_filter {
+        ( $name:ident, $input_tf:expr, $input_type:ident, $input_id:expr, $expected_result:expr ) => {
+            #[test]
+            fn $name() {
+                let tf: TagFilter = $input_tf.parse().unwrap();
+                let o = osmio::obj_types::$input_type::default()
+                    ._id($input_id)
+                    .build()
+                    .unwrap();
+                assert_eq!(tf.filter(&o), $expected_result);
+            }
+        };
+    }
+
+    test_id_filter!(id_filter0, "w1", StringWayBuilder, 1, true);
+    test_id_filter!(id_filter1, "w1", StringWayBuilder, 2, false);
+    test_id_filter!(id_filter2, "w1", StringRelationBuilder, 1, false);
+    test_id_filter!(id_filter3, "!w1", StringWayBuilder, 1, false);
+    test_id_filter!(id_filter4, "!w1", StringWayBuilder, 2, true);
+    test_id_filter!(id_filter5, "¬w1", StringWayBuilder, 1, false);
+    test_id_filter!(id_filter6, "¬w1", StringWayBuilder, 2, true);
 }

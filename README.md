@@ -54,6 +54,10 @@ There are 2 ways to select which OSM ways will be used.
 * `key~regex` way has this key and the value matches this regex.
 * `F1∨F2∨F3…` logical OR of the other tag filters F1, F2, …
 * `F1∧F2∧F3…` logical AND of the other tag filters F1, F2, …
+* `w123` matches OSM way with id 123. also available `r123`. Use `!` or `¬` to
+  exclude this object, e.g. `!r45` will match everything except relation 45.
+  Raw OSM object id matching is discourged in general, but is provided for
+  testing situations like “Exactly this object is included/excluded”.
 
 The popular [`regex` crate](https://docs.rs/regex/latest/regex/) is used for
 matching. Regexes, and string comparison, are case sensitive. Add `(?i)` at
