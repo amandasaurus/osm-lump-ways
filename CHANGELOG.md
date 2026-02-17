@@ -2,14 +2,19 @@
 
 ## Unreleased
 
-* New option `--min-length N%total`
 * New tag filter `∃(lrb)KEY` (for `KEY:left`/`KEY:right`/…), and `∄(lrb)…`.
+
+###  `osm-lump-ways`
+
+* New option `--min-length N%total`
 
 ## v3.7.0 (2026-02-08)
 
+* New Tag filter `∃key∉value1,value2,value3,…`
+
+###  `osm-lump-ways`
 * Edge Betweenness Centrality can be calculated (`--betweenness-centrality`)
   * Includes a JOSM map style to show this data
-* New Tag filter `∃key∉value1,value2,value3,…`
 * New option `--min-length N%longest` and `--min-length inclN%total`
 
 ## v3.6.0 (2026-01-08)
