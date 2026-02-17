@@ -1015,10 +1015,18 @@ fn do_betweenness(
 }
 
 fn update_length_m_fraction_total(way_groups: &mut [WayGroup]) {
+    let longest_length = way_groups
+        .par_iter()
+        .map(|wg| OrderedFloat(wg.length_m))
+        .max()
+        .unwrap()
+        .into_inner();
     let total_length = way_groups.par_iter().map(|wg| wg.length_m).sum::<f64>();
 
     way_groups.par_iter_mut().for_each(|wg| {
-        wg.json_props["length_m_fraction_total"] = round(&(wg.length_m / total_length), 6).into();
+        wg.json_props["length_m_fraction_total"] = round(&(wg.length_m / total_length), 4).into();
+        wg.json_props["length_m_fraction_longest"] =
+            round(&(wg.length_m / longest_length), 4).into();
     });
 }
 
@@ -1051,9 +1059,10 @@ fn update_length_ranks(way_groups: &mut [WayGroup]) {
         .zip(feature_ranks.par_iter())
         .for_each(|(wg, (_len, _wg_idx, rank))| {
             wg.json_props["length_desc_rank"] = (*rank).into();
-            wg.json_props["length_desc_rank_perc"] = ((*rank as f64) / way_groups_len_f).into();
+            wg.json_props["length_desc_rank_perc"] =
+                round(&((*rank as f64) / way_groups_len_f), 4).into();
             wg.json_props["length_asc_rank"] = (way_groups_len - *rank).into();
             wg.json_props["length_asc_rank_perc"] =
-                ((way_groups_len - *rank) as f64 / way_groups_len_f).into();
+                round(&((way_groups_len - *rank) as f64 / way_groups_len_f), 4).into();
         });
 }

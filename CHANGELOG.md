@@ -7,12 +7,15 @@
 ###  `osm-lump-ways`
 
 * New option `--min-length N%total`
+* New Attribute: `length_m_fraction_longest` what fraction this group is
+      compared to the longest group
 
 ## v3.7.0 (2026-02-08)
 
 * New Tag filter `∃key∉value1,value2,value3,…`
 
 ###  `osm-lump-ways`
+
 * Edge Betweenness Centrality can be calculated (`--betweenness-centrality`)
   * Includes a JOSM map style to show this data
 * New option `--min-length N%longest` and `--min-length inclN%total`
