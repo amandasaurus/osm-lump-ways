@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering as atomic_Ordering};
+use std::sync::atomic::{AtomicI64, AtomicU64, AtomicUsize, Ordering as atomic_Ordering};
 use std::sync::{Arc, Mutex};
 
 //use get_size_derive::*;
@@ -226,6 +226,8 @@ fn main() -> Result<()> {
         ),
     );
 
+    let latest_timestamp = AtomicI64::new(0);
+
     let started_reading_for_pillar_nodes = Instant::now();
     let input_fp = std::fs::File::open(&args.input_filename)?;
     let input_bar = progress_bars.add(
@@ -251,6 +253,10 @@ fn main() -> Result<()> {
             for n in &nids[1..nids.len()] {
                 nid2nways.entry(*n).and_modify(|v| {*v=v.saturating_add(2);}).or_insert(2);
             }
+
+            if let Some(t) = w.timestamp().as_ref().map(|t| t.to_epoch_number()) {
+                latest_timestamp.fetch_max(t, atomic_Ordering::SeqCst);
+            }
         });
     input_bar.finish();
     progress_bars.remove(&input_bar);
@@ -272,6 +278,14 @@ fn main() -> Result<()> {
         warn!("No ways in the file matched your filters. Nothing to do.");
         return Ok(());
     }
+
+    let latest_timestamp = latest_timestamp.into_inner();
+    let latest_timestamp_iso =
+        osmio::TimestampFormat::EpochNunber(latest_timestamp).to_iso_string();
+    info!(
+        "Latest timestamp in this file is {} / {}",
+        latest_timestamp, latest_timestamp_iso
+    );
 
     let input_fp = std::fs::File::open(&args.input_filename)?;
     let input_bar = progress_bars.add(
