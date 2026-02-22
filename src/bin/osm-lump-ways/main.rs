@@ -361,7 +361,7 @@ fn main() -> Result<()> {
     ways_added.finish_and_clear();
     input_bar.finish_and_clear();
     let graphs = Arc::try_unwrap(graphs).unwrap().into_inner().unwrap();
-    let inter_store = Arc::try_unwrap(inter_store).unwrap().into_inner().unwrap();
+    let mut inter_store = Arc::try_unwrap(inter_store).unwrap().into_inner().unwrap();
 
     let assemble_nids_needed = progress_bars
         .add(ProgressBar::new_spinner().with_style(
@@ -563,6 +563,24 @@ fn main() -> Result<()> {
         );
     }
     way_groups.shrink_to_fit();
+
+    let old_num_vertexes = way_groups
+        .par_iter()
+        .map(|wg| wg.graph.num_vertexes())
+        .sum::<usize>();
+    for wg in way_groups.iter_mut() {
+        wg.graph.compress_graph(&mut inter_store);
+    }
+    let new_num_vertexes = way_groups
+        .par_iter()
+        .map(|wg| wg.graph.num_vertexes())
+        .sum::<usize>();
+    let delta_num_vertexes = old_num_vertexes - new_num_vertexes;
+    info!(
+        "Removed {} vertexes ({}%)",
+        delta_num_vertexes.to_formatted_string(&Locale::en),
+        delta_num_vertexes * 100 / old_num_vertexes,
+    );
 
     way_groups.par_iter_mut().for_each(|wg| {
         let json_props = &mut wg.json_props;

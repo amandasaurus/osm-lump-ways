@@ -6,6 +6,7 @@
 
 ###  `osm-lump-ways`
 
+* Speed up for calculating bewtweenness centrality by compressing the graph
 * New option `--min-length N%total`
 * New Attribute: `length_m_fraction_longest` what fraction this group is
       compared to the longest group
