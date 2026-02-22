@@ -243,6 +243,10 @@ impl Graph2 {
         self.edges.get(vertex).into_iter().flat_map(|ns| ns.iter())
     }
 
+    pub fn num_neighbors(&self, vertex: &i64) -> Option<usize> {
+        self.edges.get(vertex).map(|others| others.len())
+    }
+
     pub fn add_edge_chain(&mut self, vertexes: &[i64]) -> bool {
         // This could be speed up by keeping a reference to the current vertex edges and walking
         // along. saved looking up the same vertex twice in the btreemap

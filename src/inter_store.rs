@@ -18,6 +18,13 @@ impl InterStore {
     pub fn contains_directed(&self, from: &i64, to: &i64) -> bool {
         self.0.contains_key(&(*from, *to))
     }
+    pub fn remove_undirected(&mut self, from: &i64, to: &i64) {
+        let (from, to) = min_max(from, to);
+        self.0.remove(&(*from, *to));
+    }
+    pub fn remove_directed(&mut self, from: &i64, to: &i64) {
+        self.0.remove(&(*from, *to));
+    }
 
     pub fn insert_directed(&mut self, edge: (i64, i64), nids: &[i64]) {
         let bytes = vartyint::write_many_delta_new(nids).into_boxed_slice();
