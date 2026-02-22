@@ -1,4 +1,5 @@
 use super::*;
+use crate::inter_store::InterStore;
 use haversine::haversine_m_fpair_ord;
 use ordered_float::OrderedFloat;
 use rand::prelude::*;
@@ -624,5 +625,47 @@ impl Graph2 {
         );
 
         Arc::try_unwrap(res).unwrap().into_inner().unwrap()
+    }
+
+    pub fn compress_graph(&mut self, inter_store: &mut InterStore) {
+        let num_orig_vertexes = self.num_vertexes();
+        let mut vertex_queue: Vec<i64> = Vec::new();
+        let mut tmp_inters = Vec::new();
+
+        loop {
+            vertex_queue.extend(
+                self.vertexes_w_num_neighbours()
+                    .filter_map(|(nid, nneigh)| if nneigh == 2 { Some(*nid) } else { None }),
+            );
+            if vertex_queue.is_empty() {
+                break;
+            }
+
+            while let Some(nid) = vertex_queue.pop() {
+                if self.num_neighbors(&nid) != Some(2) {
+                    continue;
+                }
+                let mut others = self.remove_vertex(nid).unwrap();
+                let nid_b = others.pop().unwrap();
+                let nid_a = others.pop().unwrap();
+                tmp_inters.truncate(0);
+                tmp_inters.extend(inter_store.inters_undirected(&nid_a, &nid));
+                tmp_inters.push(nid);
+                tmp_inters.extend(inter_store.inters_undirected(&nid, &nid_b));
+                inter_store.remove_undirected(&nid_a, &nid);
+                inter_store.remove_undirected(&nid, &nid_b);
+                inter_store.insert_undirected((nid_a, nid_b), &tmp_inters);
+
+                self.add_edge(nid_a, nid_b);
+                vertex_queue.push(nid_a);
+                vertex_queue.push(nid_b);
+            }
+        }
+
+        debug!(
+            "Removed {} vertexes ({}%)",
+            num_orig_vertexes - self.num_vertexes(),
+            (num_orig_vertexes - self.num_vertexes()) * 100 / num_orig_vertexes,
+        );
     }
 }
