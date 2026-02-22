@@ -361,7 +361,7 @@ fn main() -> Result<()> {
     ways_added.finish_and_clear();
     input_bar.finish_and_clear();
     let graphs = Arc::try_unwrap(graphs).unwrap().into_inner().unwrap();
-    let mut inter_store = Arc::try_unwrap(inter_store).unwrap().into_inner().unwrap();
+    let inter_store = Arc::try_unwrap(inter_store).unwrap().into_inner().unwrap();
 
     let assemble_nids_needed = progress_bars
         .add(ProgressBar::new_spinner().with_style(
@@ -568,9 +568,11 @@ fn main() -> Result<()> {
         .par_iter()
         .map(|wg| wg.graph.num_vertexes())
         .sum::<usize>();
-    for wg in way_groups.iter_mut() {
-        wg.graph.compress_graph(&mut inter_store);
-    }
+    let inter_store = Arc::new(Mutex::new(inter_store));
+    way_groups.par_iter_mut().for_each_with(inter_store.clone(), |mut inter_store, wg| {
+        wg.graph.compress_graph(&mut inter_store, true);
+    });
+    let inter_store = Arc::try_unwrap(inter_store).unwrap().into_inner().unwrap();
     let new_num_vertexes = way_groups
         .par_iter()
         .map(|wg| wg.graph.num_vertexes())
@@ -1002,8 +1004,11 @@ fn do_betweenness(
     way_groups
         .par_iter()
         .for_each_with(obj_to_write_tx.clone(), |obj_to_write_tx, wg| {
-            let bc_values = wg.graph.betweenness_centrality(
-                betweenness_max_nodes,
+			let graph = &wg.graph;
+			let mut nodes = graph.random_sample_vertexes(betweenness_max_nodes as usize, nodeid_pos);
+			nodes.par_sort();
+            let bc_values = graph.betweenness_centrality(
+				&nodes,
                 nodeid_pos,
                 inter_store,
                 betweenness_bar.clone(),
@@ -1012,7 +1017,7 @@ fn do_betweenness(
             let max_betweenness_value =
                 *bc_values.iter().map(|(_nids, value)| value).max().unwrap();
 
-            wg.graph.edges_par_iter().for_each(move |(&nid1, &nid2)| {
+            graph.edges_par_iter().for_each(move |(&nid1, &nid2)| {
                 let val = *bc_values
                     .get(&(nid1, nid2))
                     .or_else(|| bc_values.get(&(nid2, nid1)))

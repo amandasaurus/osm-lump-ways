@@ -539,20 +539,13 @@ impl Graph2 {
 
     pub fn betweenness_centrality(
         &self,
-        max_nodes: u64,
+        nodes: &[(i64, (OrderedFloat<f64>, OrderedFloat<f64>))],
         nodeid_pos: &impl NodeIdPosition,
         inter_store: &inter_store::InterStore,
         progress_bar: impl Into<Option<ProgressBar>>,
     ) -> SortedSliceMap<(i64, i64), u64> {
         let progress_bar: Option<ProgressBar> = progress_bar.into();
 
-        //let started_selecting_nodes = Instant::now();
-
-        let mut nodes = self.random_sample_vertexes(max_nodes as usize, nodeid_pos);
-
-        //info!("Finished selecting the {} to include in {}", nodes.len(), format_di
-
-        nodes.par_sort();
 
         let edge_lengths = SortedSliceMap::from_iter(self.edges_iter().map(|(nid1, nid2)| {
             let edge_len = inter_store
@@ -627,7 +620,7 @@ impl Graph2 {
         Arc::try_unwrap(res).unwrap().into_inner().unwrap()
     }
 
-    pub fn compress_graph(&mut self, inter_store: &mut InterStore) {
+    pub fn compress_graph(&mut self, inter_store: &mut Arc<Mutex<InterStore>>, remove_old_inters: bool) {
         let num_orig_vertexes = self.num_vertexes();
         let mut vertex_queue: Vec<i64> = Vec::new();
         let mut tmp_inters = Vec::new();
@@ -648,12 +641,17 @@ impl Graph2 {
                 let mut others = self.remove_vertex(nid).unwrap();
                 let nid_b = others.pop().unwrap();
                 let nid_a = others.pop().unwrap();
+
+                let mut inter_store = inter_store.lock().unwrap();
                 tmp_inters.truncate(0);
                 tmp_inters.extend(inter_store.inters_undirected(&nid_a, &nid));
                 tmp_inters.push(nid);
                 tmp_inters.extend(inter_store.inters_undirected(&nid, &nid_b));
-                inter_store.remove_undirected(&nid_a, &nid);
-                inter_store.remove_undirected(&nid, &nid_b);
+
+                if remove_old_inters {
+                    inter_store.remove_undirected(&nid_a, &nid);
+                    inter_store.remove_undirected(&nid, &nid_b);
+                }
                 inter_store.insert_undirected((nid_a, nid_b), &tmp_inters);
 
                 self.add_edge(nid_a, nid_b);
