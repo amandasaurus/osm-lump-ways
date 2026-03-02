@@ -704,4 +704,42 @@ impl Graph2 {
             (num_orig_vertexes - self.num_vertexes()) * 100 / num_orig_vertexes,
         );
     }
+
+    pub fn remove_spikes(&mut self, never_remove_vertexes: impl Fn(i64) -> bool + Sync) {
+        let num_orig_vertexes = self.num_vertexes();
+
+        // temp needed buffers
+        let mut vertex_queue: Vec<i64> = Vec::new();
+
+        loop {
+            vertex_queue.par_extend(self.vertexes_w_num_neighbours_par().filter_map(
+                |(nid, nneigh)| {
+                    if nneigh == 1 && !never_remove_vertexes(*nid) {
+                        Some(*nid)
+                    } else {
+                        None
+                    }
+                },
+            ));
+            if vertex_queue.is_empty() {
+                break;
+            }
+
+            while let Some(nid) = vertex_queue.pop() {
+                if self.num_neighbors(&nid) != Some(1) || never_remove_vertexes(nid) {
+                    continue;
+                }
+                let mut others = self.remove_vertex(nid).unwrap();
+                let nid_a = others.pop().unwrap();
+
+                vertex_queue.push(nid_a);
+            }
+        }
+
+        debug!(
+            "Removed {} vertexes ({}%)",
+            num_orig_vertexes - self.num_vertexes(),
+            (num_orig_vertexes - self.num_vertexes()) * 100 / num_orig_vertexes,
+        );
+    }
 }
