@@ -7,6 +7,7 @@ use rayon::prelude::ParallelIterator;
 use smallvec::SmallVec;
 use sorted_slice_store::SortedSliceMap;
 use std::collections::BTreeMap;
+use std::collections::HashSet;
 use std::fmt::Debug;
 use utils::min_max;
 
@@ -625,13 +626,24 @@ impl Graph2 {
         remove_old_inters: bool,
     ) {
         let num_orig_vertexes = self.num_vertexes();
+
+        // these nodes have 2 neighbours, but shouldn't be removed.
+        let mut never_compress_nodes = HashSet::new();
+
+        // temp needed buffers
         let mut vertex_queue: Vec<i64> = Vec::new();
         let mut tmp_inters = Vec::new();
 
         loop {
             vertex_queue.extend(
                 self.vertexes_w_num_neighbours()
-                    .filter_map(|(nid, nneigh)| if nneigh == 2 { Some(*nid) } else { None }),
+                    .filter_map(|(nid, nneigh)| {
+                        if nneigh == 2 && !never_compress_nodes.contains(nid) {
+                            Some(*nid)
+                        } else {
+                            None
+                        }
+                    }),
             );
             if vertex_queue.is_empty() {
                 break;
@@ -644,6 +656,17 @@ impl Graph2 {
                 let mut others = self.remove_vertex(nid).unwrap();
                 let nid_b = others.pop().unwrap();
                 let nid_a = others.pop().unwrap();
+
+                if self.contains_edge(nid_a, nid_b) {
+                    // There's already an edge from a ↔ b, so don't another.
+                    // we need to undo what we did here
+                    self.add_edge(nid, nid_a);
+                    self.add_edge(nid, nid_b);
+
+                    // don't look at this node again
+                    never_compress_nodes.insert(nid);
+                    continue;
+                }
 
                 let mut inter_store = inter_store.lock().unwrap();
                 tmp_inters.truncate(0);
@@ -658,6 +681,8 @@ impl Graph2 {
                 inter_store.insert_undirected((nid_a, nid_b), &tmp_inters);
 
                 self.add_edge(nid_a, nid_b);
+
+                // potential shortcut
                 vertex_queue.push(nid_a);
                 vertex_queue.push(nid_b);
             }
