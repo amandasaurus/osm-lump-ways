@@ -180,7 +180,7 @@ where
 pub type SmallNidVec = SmallVec<[i64; 1]>;
 pub type SmallI32Vec = SmallVec<[i32; 1]>;
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Graph2 {
     // key is vertex id
     edges: BTreeMap<i64, SmallNidVec>,
@@ -222,6 +222,10 @@ impl Graph2 {
 
     pub fn vertexes_w_num_neighbours(&self) -> impl Iterator<Item = (&i64, usize)> {
         self.edges.iter().map(|(nid, neigh)| (nid, neigh.len()))
+    }
+
+    pub fn vertexes_w_num_neighbours_par(&self) -> impl ParallelIterator<Item = (&i64, usize)> {
+        self.edges.par_iter().map(|(nid, neigh)| (nid, neigh.len()))
     }
 
     pub fn edges_iter(&self) -> impl Iterator<Item = (&i64, &i64)> {
