@@ -628,33 +628,36 @@ impl Graph2 {
         &mut self,
         inter_store: &mut Arc<Mutex<InterStore>>,
         remove_old_inters: bool,
+        never_remove_vertexes: impl Fn(i64) -> bool + Sync,
     ) {
         let num_orig_vertexes = self.num_vertexes();
 
         // these nodes have 2 neighbours, but shouldn't be removed.
-        let mut never_compress_nodes = HashSet::new();
+        let mut vertexes_already_excluded = HashSet::new();
 
         // temp needed buffers
         let mut vertex_queue: Vec<i64> = Vec::new();
         let mut tmp_inters = Vec::new();
 
         loop {
-            vertex_queue.extend(
-                self.vertexes_w_num_neighbours()
-                    .filter_map(|(nid, nneigh)| {
-                        if nneigh == 2 && !never_compress_nodes.contains(nid) {
-                            Some(*nid)
-                        } else {
-                            None
-                        }
-                    }),
-            );
+            vertex_queue.par_extend(self.vertexes_w_num_neighbours_par().filter_map(
+                |(nid, nneigh)| {
+                    if nneigh == 2
+                        && !vertexes_already_excluded.contains(nid)
+                        && !never_remove_vertexes(*nid)
+                    {
+                        Some(*nid)
+                    } else {
+                        None
+                    }
+                },
+            ));
             if vertex_queue.is_empty() {
                 break;
             }
 
             while let Some(nid) = vertex_queue.pop() {
-                if self.num_neighbors(&nid) != Some(2) {
+                if self.num_neighbors(&nid) != Some(2) || never_remove_vertexes(nid) {
                     continue;
                 }
                 let mut others = self.remove_vertex(nid).unwrap();
@@ -668,7 +671,7 @@ impl Graph2 {
                     self.add_edge(nid, nid_b);
 
                     // don't look at this node again
-                    never_compress_nodes.insert(nid);
+                    vertexes_already_excluded.insert(nid);
                     continue;
                 }
 

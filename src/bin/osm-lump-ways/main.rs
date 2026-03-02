@@ -572,7 +572,7 @@ fn main() -> Result<()> {
     way_groups
         .par_iter_mut()
         .for_each_with(inter_store.clone(), |inter_store, wg| {
-            wg.graph.compress_graph(inter_store, true);
+            wg.graph.compress_graph(inter_store, true, |_| false);
         });
     let inter_store = Arc::try_unwrap(inter_store).unwrap().into_inner().unwrap();
     let new_num_vertexes = way_groups
