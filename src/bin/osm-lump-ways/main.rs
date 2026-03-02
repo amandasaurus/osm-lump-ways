@@ -571,7 +571,7 @@ fn main() -> Result<()> {
     let inter_store = Arc::new(Mutex::new(inter_store));
     way_groups
         .par_iter_mut()
-        .for_each_with(inter_store.clone(), |mut inter_store, wg| {
+        .for_each_with(inter_store.clone(), |inter_store, wg| {
             wg.graph.compress_graph(inter_store, true);
         });
     let inter_store = Arc::try_unwrap(inter_store).unwrap().into_inner().unwrap();
