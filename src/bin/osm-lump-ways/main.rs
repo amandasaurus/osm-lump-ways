@@ -822,6 +822,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn do_frames(
     frames_filepath: &PathBuf,
     frames_group_min_length_m: Option<f64>,
@@ -939,6 +940,7 @@ fn debug_var_size(name: &str, size: usize) {
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn do_betweenness(
     betweenness_filepath: &PathBuf,
     betweenness_min_value: u64,
