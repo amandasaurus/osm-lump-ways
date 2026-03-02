@@ -477,12 +477,9 @@ impl Graph2 {
         &self,
         num: usize,
         nodeid_pos: &impl NodeIdPosition,
-    ) -> Box<[(i64, (OrderedFloat<f64>, OrderedFloat<f64>))]> {
+    ) -> Box<[i64]> {
         if num >= self.num_vertexes() {
-            let all_nodes = self
-                .vertexes()
-                .map(|nid| (*nid, nodeid_pos.get_ord(nid).unwrap()))
-                .collect::<Vec<_>>();
+            let all_nodes = self.vertexes().copied().collect::<Vec<_>>();
             return all_nodes.into_boxed_slice();
         }
 
@@ -497,14 +494,14 @@ impl Graph2 {
         let k = 100;
 
         // Need to quickly check existing nodes, so keep as a hashmap
-        let mut new_nodes = HashMap::with_capacity(num);
+        let mut new_nodes = HashSet::with_capacity(num);
 
         let mut kdtree: KdTree<f64, 2> = KdTree::with_capacity(num);
         let mut rng = &mut rand::rng();
 
         let first = *all_nodes.choose(&mut rng).unwrap();
         let pos = nodeid_pos.get_arr(&first).unwrap();
-        new_nodes.insert(first, (OrderedFloat(pos[0]), OrderedFloat(pos[1])));
+        new_nodes.insert(first);
         kdtree.add(&pos, first.try_into().unwrap());
 
         // Buffer of possible nodes for each iteration.
@@ -518,7 +515,7 @@ impl Graph2 {
                 possible_nodes.extend(
                     all_nodes
                         .sample(&mut rng, k - possible_nodes.len() + 1)
-                        .filter(|nid| !new_nodes.contains_key(nid))
+                        .filter(|nid| !new_nodes.contains(nid))
                         .map(|nid| {
                             let pos = nodeid_pos.get_arr(nid).unwrap();
                             let dist = kdtree.nearest_one::<SquaredEuclidean>(&pos).distance;
@@ -535,7 +532,7 @@ impl Graph2 {
 
             // save it
             kdtree.add(&pos, nid.try_into().unwrap());
-            new_nodes.insert(nid, (OrderedFloat(pos[0]), OrderedFloat(pos[1])));
+            new_nodes.insert(nid);
         }
 
         let new_nodes = new_nodes.into_iter().collect::<Vec<_>>();
@@ -544,7 +541,7 @@ impl Graph2 {
 
     pub fn betweenness_centrality(
         &self,
-        nodes: &[(i64, (OrderedFloat<f64>, OrderedFloat<f64>))],
+        nodes: &[i64],
         nodeid_pos: &impl NodeIdPosition,
         inter_store: &inter_store::InterStore,
         progress_bar: impl Into<Option<ProgressBar>>,
@@ -565,30 +562,36 @@ impl Graph2 {
             ((*nid1, *nid2), edge_len)
         }));
 
-        let res =
+        // The results of the Betweenness Centrality. key = segment (nid1↭nid2), value = the BC
+        // value
+        let bc_res =
             SortedSliceMap::from_iter(self.edges_iter().map(|(&nid1, &nid2)| ((nid1, nid2), 0)));
-        let res = Arc::new(Mutex::new(res));
+        let bc_res = Arc::new(Mutex::new(bc_res));
 
         nodes.par_iter().enumerate().for_each_with(
-            (res.clone(), HashMap::new()),
-            |(res, prev_dist), (i, &node0)| {
-                let nid0 = node0.0;
-                let new_nodes = &nodes[(i + 1)..];
+            (bc_res.clone(), HashMap::new()),
+            |(bc_res, prev_dist), (i, nid0)| {
+                let target_nodes = &nodes[(i + 1)..];
 
-                dij::dij_single(nid0, self, &edge_lengths, prev_dist);
+                // ↓ Calculate the shortest path to everywhere
+                dij::dij_single(*nid0, self, &edge_lengths, prev_dist);
 
-                let mut new_segs: Vec<((i64, i64), u64)> = Vec::with_capacity(new_nodes.len());
-                let mut buf_segs = Vec::with_capacity(new_nodes.len());
+                // Now generate all the paths
+                let mut new_segs: Vec<((i64, i64), u64)> = Vec::with_capacity(target_nodes.len());
+
+                // Keep track of all the
+                let mut buf_segs: Vec<(u64, i64, _)> = Vec::with_capacity(target_nodes.len());
 
                 buf_segs.extend(
-                    new_nodes
+                    target_nodes
                         .iter()
-                        .map(|nid_n| (prev_dist[&nid_n.0].1, nid_n.0, 1)),
+                        .copied()
+                        .map(|nid_n| (prev_dist[&nid_n].1, nid_n, 1)),
                 );
                 buf_segs.par_sort_by_key(|(dist, nid, _acc)| (*dist, *nid));
 
                 while let Some((_dist, nid_b, acc)) = buf_segs.pop() {
-                    if nid_b == nid0 {
+                    if &nid_b == nid0 {
                         continue;
                     }
                     let (nid_a, new_dist) = prev_dist[&nid_b];
@@ -611,17 +614,17 @@ impl Graph2 {
                     }
                 }
 
-                let mut res = res.lock().unwrap();
+                let mut bc_res = bc_res.lock().unwrap();
                 for ((nid_a, nid_b), val) in new_segs.into_iter() {
-                    *res.get_mut(&(nid_a, nid_b)).unwrap() += val;
+                    *bc_res.get_mut(&(nid_a, nid_b)).unwrap() += val;
                 }
                 if let Some(progress_bar) = &progress_bar {
-                    progress_bar.inc(new_nodes.len() as u64);
+                    progress_bar.inc(target_nodes.len() as u64);
                 }
             },
         );
 
-        Arc::try_unwrap(res).unwrap().into_inner().unwrap()
+        Arc::try_unwrap(bc_res).unwrap().into_inner().unwrap()
     }
 
     pub fn compress_graph(
