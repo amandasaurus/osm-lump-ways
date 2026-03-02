@@ -6,6 +6,7 @@ use indicatif_log_bridge::LogWrapper;
 use log::{debug, error, info, trace, warn};
 use ordered_float::OrderedFloat;
 use osm_lump_ways::inter_store;
+use osm_lump_ways::utils::min_max;
 use osmio::OSMObjBase;
 use osmio::prelude::*;
 use rayon::prelude::*;
@@ -361,7 +362,7 @@ fn main() -> Result<()> {
     ways_added.finish_and_clear();
     input_bar.finish_and_clear();
     let graphs = Arc::try_unwrap(graphs).unwrap().into_inner().unwrap();
-    let inter_store = Arc::try_unwrap(inter_store).unwrap().into_inner().unwrap();
+    let mut inter_store = Arc::try_unwrap(inter_store).unwrap().into_inner().unwrap();
 
     let assemble_nids_needed = progress_bars
         .add(ProgressBar::new_spinner().with_style(
@@ -568,7 +569,7 @@ fn main() -> Result<()> {
         .par_iter()
         .map(|wg| wg.graph.num_vertexes())
         .sum::<usize>();
-    let inter_store = Arc::new(Mutex::new(inter_store));
+    let inter_store = Arc::new(Mutex::new(&mut inter_store));
     way_groups
         .par_iter_mut()
         .for_each_with(inter_store.clone(), |inter_store, wg| {
@@ -619,7 +620,7 @@ fn main() -> Result<()> {
             &progress_bars,
             &style,
             &nodeid_pos,
-            &inter_store,
+            inter_store,
         )?;
     }
 
@@ -638,7 +639,7 @@ fn main() -> Result<()> {
             &progress_bars,
             &style,
             &nodeid_pos,
-            &inter_store,
+            inter_store,
         )?;
     }
 
@@ -947,7 +948,7 @@ fn do_betweenness(
     progress_bars: &MultiProgress,
     style: &ProgressStyle,
     nodeid_pos: &impl NodeIdPosition,
-    inter_store: &inter_store::InterStore,
+    inter_store: &mut inter_store::InterStore,
 ) -> Result<()> {
     let _started_betweenness_calculation = Instant::now();
     info!(
@@ -1003,50 +1004,102 @@ fn do_betweenness(
         }
     });
 
+    let inter_store_lock = Arc::new(Mutex::new(inter_store));
+
     way_groups
         .par_iter()
-        .for_each_with(obj_to_write_tx.clone(), |obj_to_write_tx, wg| {
+        .map_with(inter_store_lock.clone(), |inter_store_lock, wg| {
             let graph = &wg.graph;
             let mut nodes =
                 graph.random_sample_vertexes(betweenness_max_nodes as usize, nodeid_pos);
             nodes.par_sort();
-            let bc_values = graph.betweenness_centrality(
-                &nodes,
-                nodeid_pos,
-                inter_store,
-                betweenness_bar.clone(),
+
+            let mut graph = graph.clone();
+
+            let orig_nvert = graph.num_vertexes();
+            graph.remove_spikes(|nid| nodes.binary_search(&nid).is_ok());
+            assert!(
+                nodes.par_iter().all(|nid| graph.contains_vertex(*nid)),
+                "Removed a node that we need"
+            );
+            let postspike_nvert = graph.num_vertexes();
+            debug!(
+                "Spike removal removed {} leaving {}",
+                orig_nvert - postspike_nvert,
+                postspike_nvert
+            );
+            graph.compress_graph(inter_store_lock, false, |nid| {
+                nodes.binary_search(&nid).is_ok()
+            });
+            let postcomp_nvert = graph.num_vertexes();
+            debug!(
+                "#2 Compression removed {} leaving {}",
+                postspike_nvert - postcomp_nvert,
+                postcomp_nvert
+            );
+            debug!(
+                "In total the graph has been reduced from to {} to {} which is {}% the size",
+                orig_nvert,
+                postcomp_nvert,
+                postcomp_nvert * 100 / orig_nvert
             );
 
-            let max_betweenness_value =
-                *bc_values.iter().map(|(_nids, value)| value).max().unwrap();
+            assert!(nodes.par_iter().all(|nid| graph.contains_vertex(*nid)));
 
-            graph.edges_par_iter().for_each(move |(&nid1, &nid2)| {
-                let val = *bc_values
-                    .get(&(nid1, nid2))
-                    .or_else(|| bc_values.get(&(nid2, nid1)))
-                    .unwrap();
-                let fraction = (val as f64) / (max_betweenness_value as f64);
+            (nodes, graph, wg)
+        })
+        .map_with(
+            inter_store_lock.clone(),
+            |inter_store_lock, (nodes, graph, wg)| {
+                let inter_store = inter_store_lock.lock().unwrap();
+                let bc_values = graph.betweenness_centrality(
+                    &nodes,
+                    nodeid_pos,
+                    &inter_store,
+                    betweenness_bar.clone(),
+                );
 
-                if val < betweenness_min_value || fraction < betweenness_min_fraction {
-                    return;
-                }
-                let mut json_props = wg.json_props.clone();
-                json_props["betweenness_value"] = val.into();
-                json_props["max_betweenness_value"] = max_betweenness_value.into();
-                json_props["betweenness_fraction"] = round(&fraction, 6).into();
+                (nodes, graph, wg, bc_values)
+            },
+        )
+        .for_each_with(
+            (obj_to_write_tx.clone(), inter_store_lock.clone()),
+            |(obj_to_write_tx, inter_store_lock), (_nodes, graph, wg, bc_values)| {
+                let max_betweenness_value =
+                    *bc_values.iter().map(|(_nids, value)| value).max().unwrap();
 
-                obj_to_write_tx
-                    .send((
-                        json_props,
-                        inter_store
-                            .expand_undirected(nid1, nid2)
-                            .map(|nid| nodeid_pos.get(&nid).unwrap())
-                            .collect::<Vec<_>>(),
-                    ))
-                    .unwrap();
-            });
-            all_wg_bar.inc(1);
-        });
+                graph.edges_par_iter().for_each_with(
+                    inter_store_lock.clone(),
+                    |_inter_store_, (&nid1, &nid2)| {
+                        let val = *bc_values.get(&min_max(nid1, nid2)).unwrap();
+                        if val < betweenness_min_value {
+                            return;
+                        }
+                        let fraction = (val as f64) / (max_betweenness_value as f64);
+
+                        if fraction < betweenness_min_fraction {
+                            return;
+                        }
+                        let mut json_props = wg.json_props.clone();
+                        json_props["betweenness_value"] = val.into();
+                        json_props["max_betweenness_value"] = max_betweenness_value.into();
+                        json_props["betweenness_fraction"] = round(&fraction, 6).into();
+
+                        let inter_store = inter_store_lock.lock().unwrap();
+                        obj_to_write_tx
+                            .send((
+                                json_props,
+                                inter_store
+                                    .expand_undirected(nid1, nid2)
+                                    .map(|nid| nodeid_pos.get(&nid).unwrap())
+                                    .collect::<Vec<_>>(),
+                            ))
+                            .unwrap();
+                    },
+                );
+                all_wg_bar.inc(1);
+            },
+        );
     drop(obj_to_write_tx);
 
     writer_thread.join().unwrap();

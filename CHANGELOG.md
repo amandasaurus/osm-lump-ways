@@ -6,10 +6,12 @@
 
 ###  `osm-lump-ways`
 
-* Speed up for calculating bewtweenness centrality by compressing the graph
+* Speed up for calculating bewtweenness centrality by:
+  * compressing the graph
+  * removing unneeded “spikes”
 * New option `--min-length N%total`
 * New Attribute: `length_m_fraction_longest` what fraction this group is
-      compared to the longest group
+  compared to the longest group
 * Latest timestamp in the file will be logged & outputted.
 
 ## v3.7.0 (2026-02-08)

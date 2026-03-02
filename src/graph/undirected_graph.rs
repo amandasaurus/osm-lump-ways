@@ -629,7 +629,7 @@ impl Graph2 {
 
     pub fn compress_graph(
         &mut self,
-        inter_store: &mut Arc<Mutex<InterStore>>,
+        inter_store: &mut Arc<Mutex<&mut InterStore>>,
         remove_old_inters: bool,
         never_remove_vertexes: impl Fn(i64) -> bool + Sync,
     ) {
