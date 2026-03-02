@@ -512,7 +512,7 @@ impl Graph2 {
             while possible_nodes.len() < k {
                 possible_nodes.extend(
                     all_nodes
-                        .choose_multiple(&mut rng, k - possible_nodes.len() + 1)
+                        .sample(&mut rng, k - possible_nodes.len() + 1)
                         .filter(|nid| !new_nodes.contains_key(nid))
                         .map(|nid| {
                             let pos = nodeid_pos.get_arr(nid).unwrap();
