@@ -565,6 +565,7 @@ fn main() -> Result<()> {
     }
     way_groups.shrink_to_fit();
 
+    // Reduce the number of nodes in the graph by compressing nodes with 2 neighbours.
     let old_num_vertexes = way_groups
         .par_iter()
         .map(|wg| wg.graph.num_vertexes())
@@ -582,7 +583,7 @@ fn main() -> Result<()> {
         .sum::<usize>();
     let delta_num_vertexes = old_num_vertexes - new_num_vertexes;
     info!(
-        "Removed {} vertexes ({}%)",
+        "Compressing the graph removed {} vertexes ({}% of total)",
         delta_num_vertexes.to_formatted_string(&Locale::en),
         delta_num_vertexes * 100 / old_num_vertexes,
     );
