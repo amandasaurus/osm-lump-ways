@@ -546,7 +546,6 @@ impl Graph2 {
     ) -> SortedSliceMap<(i64, i64), u64> {
         let progress_bar: Option<ProgressBar> = progress_bar.into();
 
-
         let edge_lengths = SortedSliceMap::from_iter(self.edges_iter().map(|(nid1, nid2)| {
             let edge_len = inter_store
                 .expand_undirected(*nid1, *nid2)
@@ -620,7 +619,11 @@ impl Graph2 {
         Arc::try_unwrap(res).unwrap().into_inner().unwrap()
     }
 
-    pub fn compress_graph(&mut self, inter_store: &mut Arc<Mutex<InterStore>>, remove_old_inters: bool) {
+    pub fn compress_graph(
+        &mut self,
+        inter_store: &mut Arc<Mutex<InterStore>>,
+        remove_old_inters: bool,
+    ) {
         let num_orig_vertexes = self.num_vertexes();
         let mut vertex_queue: Vec<i64> = Vec::new();
         let mut tmp_inters = Vec::new();

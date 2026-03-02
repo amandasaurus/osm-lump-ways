@@ -569,9 +569,11 @@ fn main() -> Result<()> {
         .map(|wg| wg.graph.num_vertexes())
         .sum::<usize>();
     let inter_store = Arc::new(Mutex::new(inter_store));
-    way_groups.par_iter_mut().for_each_with(inter_store.clone(), |mut inter_store, wg| {
-        wg.graph.compress_graph(&mut inter_store, true);
-    });
+    way_groups
+        .par_iter_mut()
+        .for_each_with(inter_store.clone(), |mut inter_store, wg| {
+            wg.graph.compress_graph(inter_store, true);
+        });
     let inter_store = Arc::try_unwrap(inter_store).unwrap().into_inner().unwrap();
     let new_num_vertexes = way_groups
         .par_iter()
@@ -632,7 +634,7 @@ fn main() -> Result<()> {
             args.betweenness_min_value,
             args.betweenness_min_fraction,
             args.betweenness_max_nodes,
-            &way_groups,
+            way_groups,
             &progress_bars,
             &style,
             &nodeid_pos,
@@ -1004,11 +1006,12 @@ fn do_betweenness(
     way_groups
         .par_iter()
         .for_each_with(obj_to_write_tx.clone(), |obj_to_write_tx, wg| {
-			let graph = &wg.graph;
-			let mut nodes = graph.random_sample_vertexes(betweenness_max_nodes as usize, nodeid_pos);
-			nodes.par_sort();
+            let graph = &wg.graph;
+            let mut nodes =
+                graph.random_sample_vertexes(betweenness_max_nodes as usize, nodeid_pos);
+            nodes.par_sort();
             let bc_values = graph.betweenness_centrality(
-				&nodes,
+                &nodes,
                 nodeid_pos,
                 inter_store,
                 betweenness_bar.clone(),
