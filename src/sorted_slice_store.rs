@@ -24,6 +24,7 @@ where
         Self::from_vec(data)
     }
 
+    #[must_use] 
     pub fn from_vec(mut data: Vec<(K, V)>) -> Self {
         data.par_sort_unstable_by(|(k1, _v1), (k2, _v2)| k1.cmp(k2));
         data.dedup_by(|(k1, _v), (k2, _v2)| k1 == k2);
@@ -32,13 +33,16 @@ where
             data: data.into_boxed_slice(),
         }
     }
+    #[must_use] 
     pub fn len(&self) -> usize {
         self.data.len()
     }
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
 
+    #[must_use] 
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &(K, V)> {
         self.data.iter()
     }
@@ -48,9 +52,11 @@ where
     pub fn par_iter_mut(&mut self) -> impl IndexedParallelIterator<Item = &mut (K, V)> {
         self.data.par_iter_mut()
     }
+    #[must_use] 
     pub fn keys(&self) -> impl ExactSizeIterator<Item = &K> {
         self.data.iter().map(|(k, _)| k)
     }
+    #[must_use] 
     pub fn par_iter(&self) -> impl IndexedParallelIterator<Item = &(K, V)>
     where
         K: Sync,
@@ -133,6 +139,7 @@ pub struct SortedSliceSet<T> {
 }
 
 impl<T: Ord + Send> SortedSliceSet<T> {
+    #[must_use] 
     pub fn from_vec(mut data: Vec<T>) -> Self {
         data.par_sort_unstable();
         data.dedup();
@@ -146,10 +153,12 @@ impl<T: Ord + Send> SortedSliceSet<T> {
         let data: Vec<T> = src.collect();
         Self::from_vec(data)
     }
+    #[must_use] 
     pub fn len(&self) -> usize {
         self.data.len()
     }
 
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
@@ -172,6 +181,7 @@ impl<T: Ord + Send> SortedSliceSet<T> {
         self.data.iter()
     }
 
+    #[must_use] 
     pub fn par_iter(&self) -> impl IndexedParallelIterator<Item = &T>
     where
         T: Sync,

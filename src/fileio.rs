@@ -100,6 +100,7 @@ pub enum OutputGeometryFormat {
     GeoJSON,
 }
 
+#[must_use] 
 pub fn format_for_filename(f: &Path) -> OutputFormat {
     if f.extension().unwrap() == "geojsons" {
         OutputFormat::GeoJSONSeq

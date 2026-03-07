@@ -50,6 +50,7 @@ where
         + std::cmp::PartialEq
         + Default,
 {
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             edges: Default::default(),
@@ -150,9 +151,11 @@ where
             / 2
     }
 
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         self.edges.is_empty()
     }
+    #[must_use] 
     pub fn num_vertexes(&self) -> usize {
         self.edges.len()
     }
@@ -187,6 +190,7 @@ pub struct Graph2 {
 }
 
 impl Graph2 {
+    #[must_use] 
     pub fn new() -> Self {
         Default::default()
     }
@@ -213,9 +217,11 @@ impl Graph2 {
         }
     }
 
+    #[must_use] 
     pub fn vertexes(&self) -> impl ExactSizeIterator<Item = &i64> {
         self.edges.keys()
     }
+    #[must_use] 
     pub fn vertexes_par_iter(&self) -> impl ParallelIterator<Item = &i64> {
         self.edges.par_iter().map(|(k, _v)| k)
     }
@@ -224,6 +230,7 @@ impl Graph2 {
         self.edges.iter().map(|(nid, neigh)| (nid, neigh.len()))
     }
 
+    #[must_use] 
     pub fn vertexes_w_num_neighbours_par(&self) -> impl ParallelIterator<Item = (&i64, usize)> {
         self.edges.par_iter().map(|(nid, neigh)| (nid, neigh.len()))
     }
@@ -236,6 +243,7 @@ impl Graph2 {
                 .map(move |other| (nid, other))
         })
     }
+    #[must_use] 
     pub fn edges_par_iter(&self) -> impl ParallelIterator<Item = (&i64, &i64)> {
         self.edges.par_iter().flat_map(|(nid, neighs)| {
             neighs
@@ -266,6 +274,7 @@ impl Graph2 {
         added
     }
 
+    #[must_use] 
     pub fn num_vertexes(&self) -> usize {
         self.edges.len()
     }
@@ -276,16 +285,20 @@ impl Graph2 {
             .sum::<usize>()
             / 2
     }
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         self.edges.is_empty()
     }
 
+    #[must_use] 
     pub fn first_vertex(&self) -> Option<&i64> {
         self.edges.first_key_value().map(|(k, _v)| k)
     }
+    #[must_use] 
     pub fn contains_vertex(&self, vertex: i64) -> bool {
         self.edges.contains_key(&vertex)
     }
+    #[must_use] 
     pub fn contains_edge(&self, v1: i64, v2: i64) -> bool {
         self.edges
             .get(&v1)

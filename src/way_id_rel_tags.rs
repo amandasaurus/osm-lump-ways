@@ -55,10 +55,12 @@ impl WayIdToRelationTags {
     }
 
     /// True iff this way is in this list
+    #[must_use] 
     pub fn contains_wid(&self, wid: i64) -> bool {
         self.wid_to_rid.contains_key(&wid)
     }
 
+    #[must_use] 
     pub fn summary(&self) -> String {
         format!(
             "{} relations, {} ways, {} relation tags",

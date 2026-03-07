@@ -1,3 +1,4 @@
+#[must_use] 
 pub fn format_duration_human(duration: &std::time::Duration) -> String {
     let sec_f = duration.as_secs_f32();
     if sec_f < 60. {
@@ -26,6 +27,7 @@ pub fn format_duration_human(duration: &std::time::Duration) -> String {
     }
 }
 
+#[must_use] 
 pub fn format_duration(d: std::time::Duration) -> String {
     if d.as_secs_f32() < 60. {
         format!("{:>.1}sec", d.as_secs_f32())

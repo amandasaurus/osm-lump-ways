@@ -29,6 +29,7 @@ impl<V> BTreeMapSplitKey<V>
 where
     V: Sync,
 {
+    #[must_use] 
     pub fn new() -> Self {
         BTreeMapSplitKey {
             inner: BTreeMap::new(),
@@ -45,12 +46,14 @@ where
             .into_iter()
             .flat_map(|(k0, i2)| i2.into_iter().map(move |(k1, v)| (join_key(&[k0, k1]), v)))
     }
+    #[must_use] 
     pub fn par_iter(&self) -> impl ParallelIterator<Item = (i64, &V)> {
         self.inner
             .par_iter()
             .flat_map(|(k0, i2)| i2.par_iter().map(|(k1, v)| (join_key(&[*k0, *k1]), v)))
     }
 
+    #[must_use] 
     pub fn get(&self, key: &i64) -> Option<&V> {
         let k = split_key(key);
         self.inner.get(&k[0]).and_then(|i2| i2.get(&k[1]))
@@ -64,12 +67,14 @@ where
             .iter()
             .flat_map(|(k0, i2)| i2.keys().map(|k1| join_key(&[*k0, *k1])))
     }
+    #[must_use] 
     pub fn contains_key(&self, key: &i64) -> bool {
         let k = split_key(key);
         self.inner
             .get(&k[0])
             .is_some_and(|i2| i2.contains_key(&k[1]))
     }
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }

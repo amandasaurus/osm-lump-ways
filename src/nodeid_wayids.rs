@@ -42,6 +42,7 @@ pub trait NodeIdWayIds: Debug + Send + Sync {
 }
 
 /// Some standard struct for doing this.
+#[must_use] 
 pub fn default() -> impl NodeIdWayIds {
     //Box::new(NodeIdWayIdsMultiMap::new())
     NodeIdWayIdsAuto::new()
