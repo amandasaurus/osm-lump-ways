@@ -367,7 +367,7 @@ pub fn obj_pass_filters(
 }
 
 /// If the string haystack starts with one of those prefixes (checked in order), then return
-/// Some((that_prefix, the_rest)). Else None.
+/// `Some((that_prefix`, `the_rest`)). Else None.
 fn split_prefix<'a>(haystack: &'a str, prefixes: &'a [&'a str]) -> Option<(&'a str, &'a str)> {
     for prefix in prefixes {
         if let Some(suffix) = haystack.strip_prefix(prefix) {

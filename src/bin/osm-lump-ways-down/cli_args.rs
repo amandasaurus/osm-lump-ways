@@ -22,9 +22,9 @@ fn parse_int_human(input: &str) -> Result<usize, String> {
     }
 }
 
-/// Group OSM ways based on shared tags into GeoJSON MultiLineStrings
+/// Group OSM ways based on shared tags into `GeoJSON` `MultiLineStrings`
 ///
-/// Reads an OSM PBF file, and groups all connected ways together into a MultiLineString
+/// Reads an OSM PBF file, and groups all connected ways together into a `MultiLineString`
 ///
 /// Use `-f`/-`-tag-filter` to only include ways which match that tag filter
 /// `-g`/`--tag-group-k` to group ways by connectiveness *and* whether that tag key is equal.
@@ -37,7 +37,7 @@ pub struct Args {
     #[arg(short, long, value_name = "FILENAME.osm.pbf")]
     pub input_filename: PathBuf,
 
-    /// Calculated Frames to this file. Only GeoJSONSeq output supported.
+    /// Calculated Frames to this file. Only `GeoJSONSeq` output supported.
     /// Respects the --save-as-linestrings and --frames-group-min-length-m options
     #[arg(long, value_name = "OUTPUT.geojsons")]
     pub output_frames: Option<PathBuf>,
@@ -54,7 +54,7 @@ pub struct Args {
 
     /// Filter input ways by these tags
     ///
-    /// Can be specified many times. All values ANDed together. (i.e. way must match all)
+    /// Can be specified many times. All values `ANDed` together. (i.e. way must match all)
     /// Example
     ///   • `-f key` / `-f ∃key`  way has this tag
     ///   • `-f ~key_regex` / `-f ∃~key_regex`  There is a key, which matches this regex
@@ -106,7 +106,7 @@ pub struct Args {
     #[arg(long, value_name = "NUMBER")]
     pub min_length_m: Option<f64>,
 
-    /// Only include (in the output) lines which have a dist_to_nearer greater than or equal to
+    /// Only include (in the output) lines which have a `dist_to_nearer` greater than or equal to
     /// this
     #[arg(long, value_name = "NUMBER", requires = "incl_dist_to_longer")]
     pub min_dist_to_longer_m: Option<f64>,
@@ -159,7 +159,7 @@ pub struct Args {
     #[arg(long, action=clap::ArgAction::SetTrue, default_value = "false", aliases=["incl-way-ids", "include-wayids", "include-way-ids"], conflicts_with="split_into_single_paths")]
     pub incl_wayids: bool,
 
-    /// Rather than save one MultiLineString per group, save it as many smaller linestrings,
+    /// Rather than save one `MultiLineString` per group, save it as many smaller linestrings,
     /// duplication of properties etc
     #[arg(long, default_value = "false")]
     pub save_as_linestrings: bool,
@@ -176,7 +176,7 @@ pub struct Args {
     pub loops: Option<PathBuf>,
 
     /// Whether to include a string list of all the consituant nids for each loop. For very long
-    /// loops, this can make a large GeoJSON file, which some tools (e.g. `ogr2ogr`) refuse to deal
+    /// loops, this can make a large `GeoJSON` file, which some tools (e.g. `ogr2ogr`) refuse to deal
     /// with.
     #[arg(long, requires = "loops", conflicts_with = "loops_no_incl_nids")]
     pub loops_incl_nids: bool,
@@ -214,7 +214,7 @@ pub struct Args {
     pub ends_membership: Vec<tagfilter::TagFilter>,
 
     /// For each end point point, for each way which is included, record the value of this OSM tag
-    /// on that end point as the GeoJSON property `tag:$TAG`. If the upstreams, or grouped
+    /// on that end point as the `GeoJSON` property `tag:$TAG`. If the upstreams, or grouped
     /// upstreams are calculated, that will be included in the `end_tag:X` property
     ///
     /// e.g. `--ends-tag NAME` will add the value of the `name` tag from each OSM way which ends at a
@@ -228,7 +228,7 @@ pub struct Args {
     /// • `timestamp`: unix epoch timestamp of data age (integer)
     /// • `iso_timestamp`: ISO8601/RFC3339 string of data age same second as timestamp. (string)
     /// • `upstream_m`: Total upstream to this end, in metres (float)
-    /// • `upstream_m_rank`: What's the rank of that upstream, 1 = the biggest upstream_m.
+    /// • `upstream_m_rank`: What's the rank of that upstream, 1 = the biggest `upstream_m`.
     /// (integer)
     /// • `nid`: OSM Node id
     /// • `lat`: Latitude of the point
@@ -255,7 +255,7 @@ pub struct Args {
     pub upstreams: Option<PathBuf>,
 
     /// The upstreams file will only include segments which have at least this much of an
-    /// upstream_m value. If unset, all segments will be included.
+    /// `upstream_m` value. If unset, all segments will be included.
     /// This helps reduce the file size
     #[arg(long, value_name = "NUMBER", requires = "upstreams")]
     pub upstreams_min_upstream_m: Option<f64>,
@@ -264,8 +264,8 @@ pub struct Args {
     #[arg(long, default_value = "false")]
     pub upstream_output_ends_full: bool,
 
-    /// Include an extra property from_upstream_m_N for every occurance of this argument, with the
-    /// from_upstream_m value rounded to the nearest multiple of N.
+    /// Include an extra property `from_upstream_m_N` for every occurance of this argument, with the
+    /// `from_upstream_m` value rounded to the nearest multiple of N.
     /// e.g. `--upstream-from-upstream-multiple 100` will cause `from_upstream_m_100` value to be
     /// the `upstream_m` value, but rounded to the nearest multiple of 100.
     #[arg(long, requires = "upstreams", verbatim_doc_comment)]
@@ -315,7 +315,7 @@ pub struct Args {
     #[arg(long, default_value = "false")]
     pub relation_tags_overwrite: bool,
 
-    /// If using relation_tags_overwrite, only relation members with this role will be used.
+    /// If using `relation_tags_overwrite`, only relation members with this role will be used.
     #[arg(long, requires = "relation_tags_overwrite", value_name = "ROLE_NAME")]
     pub relation_tags_role: Vec<String>,
 

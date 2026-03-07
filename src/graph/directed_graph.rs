@@ -20,7 +20,7 @@ pub trait DirectedGraphTrait<V, E>: Send + Sync + Sized {
             None
         }
     }
-    /// Returns (a, to_vertex) where a is an in neighbour of to_vertex
+    /// Returns (a, `to_vertex`) where a is an in neighbour of `to_vertex`
     fn in_edges(&self, vertex: i64) -> impl Iterator<Item = (i64, i64)> {
         self.in_neighbours(vertex).map(move |nid0| (nid0, vertex))
     }
@@ -36,7 +36,7 @@ pub trait DirectedGraphTrait<V, E>: Send + Sync + Sized {
         }
     }
 
-    /// Returns (from_vertex, b) where b is an out neighbour of from_vertex
+    /// Returns (`from_vertex`, b) where b is an out neighbour of `from_vertex`
     fn out_edges(&self, vertex: i64) -> impl Iterator<Item = (i64, i64)> {
         self.out_neighbours(vertex).map(move |nid2| (vertex, nid2))
     }
@@ -323,7 +323,7 @@ pub trait DirectedGraphTrait<V, E>: Send + Sync + Sized {
 
     fn add_vertex_w_prop(&mut self, vertex: i64, vprop: V);
 
-    /// Returns (from_vertex, b, E) where b is an out neighbour of from_vertex
+    /// Returns (`from_vertex`, b, E) where b is an out neighbour of `from_vertex`
     fn out_edges_w_prop<'a>(&'a self, from_vertex: i64) -> impl Iterator<Item = (i64, i64, &'a E)>
     where
         E: 'a;
@@ -690,7 +690,7 @@ where
             });
     }
 
-    /// Returns (from_vertex, b, E) where b is an out neighbour of from_vertex
+    /// Returns (`from_vertex`, b, E) where b is an out neighbour of `from_vertex`
     fn out_edges_w_prop<'a>(&'a self, from_vertex: i64) -> impl Iterator<Item = (i64, i64, &'a E)>
     where
         E: 'a,
@@ -701,7 +701,7 @@ where
                 .map(move |(nid2, eprop)| (from_vertex, *nid2, eprop))
         })
     }
-    /// Returns (from_vertex, b, E) where b is an out neighbour of from_vertex
+    /// Returns (`from_vertex`, b, E) where b is an out neighbour of `from_vertex`
     fn out_edges_w_prop_mut<'a>(
         &'a mut self,
         from_vertex: i64,

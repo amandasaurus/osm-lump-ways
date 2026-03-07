@@ -48,7 +48,7 @@ pub fn default() -> impl NodeIdWayIds {
     NodeIdWayIdsAuto::new()
 }
 
-/// Very simple BTreeMaps of nodeids:wayids
+/// Very simple `BTreeMaps` of nodeids:wayids
 #[derive(Debug, GetSize, Default)]
 pub struct NodeIdWayIdsMultiMap {
     /// A node which is in exactly 1 way. Store the way id that it's in
@@ -154,7 +154,7 @@ pub struct NodeIdWayIdsBucketWayIndex {
     /// For each wayid, a vartyint delta encoded sorted list of all the nodeids it's in.
     ways: BTreeMap<i32, Vec<u8>>,
 
-    /// nodeid<<WAY_INDEX_BUCKET_SHIFT is the key
+    /// nodeid<<`WAY_INDEX_BUCKET_SHIFT` is the key
     /// value is unique list of wayids that have one of those nodeids
     nodeid_bucket_wayid: BTreeMap<i32, Vec<i32>>,
 

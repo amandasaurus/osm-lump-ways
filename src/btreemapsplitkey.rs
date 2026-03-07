@@ -1,4 +1,4 @@
-//! This is a BTreeMap<i64, V>, but it stores it in several levels of BTreeMap, by splitting the
+//! This is a `BTreeMap`<i64, V>, but it stores it in several levels of `BTreeMap`, by splitting the
 //! i64 key.
 //! Goal: Reduce memory usage of struct, by storing less of the key.
 //! End result: ~5% memory reduction of total programme. Not very impressive.

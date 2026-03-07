@@ -17,8 +17,8 @@ pub enum SplitPathsMethod {
     LongestPath,
 }
 
-/// Does a single Dijkstra search from start_idx to all vertexes.
-/// The results are in the prev_dist variable, hashmap for each other vertex in the graph, with the
+/// Does a single Dijkstra search from `start_idx` to all vertexes.
+/// The results are in the `prev_dist` variable, hashmap for each other vertex in the graph, with the
 /// previous node to go to (if applicable) and the total distance along the path By passing in as a
 /// &mut argument, the allocated memory can be reused between runs
 pub fn dij_single(
@@ -53,7 +53,7 @@ pub fn dij_single(
     }
 }
 
-/// Does a single A* search from start_idx to a set of other vertexes
+/// Does a single A* search from `start_idx` to a set of other vertexes
 pub(crate) fn paths_one_to_many<'a>(
     start: (i64, (OrderedFloat<f64>, OrderedFloat<f64>)),
     targets: &'a [(i64, (OrderedFloat<f64>, OrderedFloat<f64>))],
@@ -80,7 +80,7 @@ pub(crate) fn paths_one_to_many<'a>(
         .map(move |target| path_one_to_one(start, *target, nodeid_pos, edges, edge_lengths))
 }
 
-/// Does a single A* search from start_idx to another
+/// Does a single A* search from `start_idx` to another
 pub(crate) fn path_one_to_one<'a>(
     start: (i64, (OrderedFloat<f64>, OrderedFloat<f64>)),
     target: (i64, (OrderedFloat<f64>, OrderedFloat<f64>)),

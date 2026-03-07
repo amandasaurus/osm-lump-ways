@@ -1,6 +1,6 @@
 #![allow(unused_imports)]
 //! Kosaraju Algorithm to find Strongly Connected Components
-//! https://en.wikipedia.org/wiki/Kosaraju%27s_algorithm
+//! <https://en.wikipedia.org/wiki/Kosaraju%27s_algorithm>
 use super::*;
 use crate::graph::{DirectedGraph, DirectedGraphTrait};
 use indicatif::ProgressDrawTarget;

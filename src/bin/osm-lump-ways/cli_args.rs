@@ -7,9 +7,9 @@ use osm_lump_ways::tagfilter;
 use osm_lump_ways::taggrouper;
 use osm_lump_ways::way_group::MinLengthFilter;
 
-/// Group OSM ways based on shared tags into GeoJSON MultiLineStrings
+/// Group OSM ways based on shared tags into `GeoJSON` `MultiLineStrings`
 ///
-/// Reads an OSM PBF file, and groups all connected ways together into a MultiLineString
+/// Reads an OSM PBF file, and groups all connected ways together into a `MultiLineString`
 ///
 /// Use `-f`/-`-tag-filter` to only include ways which match that tag filter
 /// `-g`/`--tag-group-k` to group ways by connectiveness *and* whether that tag key is equal.
@@ -24,12 +24,12 @@ pub struct Args {
 
     /// Output filename. If `--split-files-by-group` specified, include `%s` for where to place the
     /// group.
-    /// Filename .geojson will be GeoJSON, .geojsons will be GeoJSONSeq which is faster for
+    /// Filename .geojson will be `GeoJSON`, .geojsons will be `GeoJSONSeq` which is faster for
     /// tippecanoe to read
     #[arg(short, long, value_name = "OUTPUT.geojson[s]")]
     pub output_filename: String,
 
-    /// Calculated Frames to this file. Only GeoJSONSeq output supported.
+    /// Calculated Frames to this file. Only `GeoJSONSeq` output supported.
     /// Respects the --save-as-linestrings and --frames-group-min-length-m options
     #[arg(long, value_name = "OUTPUT.geojsons")]
     pub output_frames: Option<PathBuf>,
@@ -46,7 +46,7 @@ pub struct Args {
 
     /// Filter input ways by these tags
     ///
-    /// Can be specified many times. All values ANDed together. (i.e. way must match all)
+    /// Can be specified many times. All values `ANDed` together. (i.e. way must match all)
     /// Example
     ///   • `-f key` / `-f ∃key`  way has this tag
     ///   • `-f ~key_regex` / `-f ∃~key_regex`  There is a key, which matches this regex
@@ -111,7 +111,7 @@ pub struct Args {
     #[arg(long, value_name = "NUMBER")]
     pub max_length_m: Option<f64>,
 
-    /// Only include (in the output) lines which have a dist_to_nearer greater than or equal to
+    /// Only include (in the output) lines which have a `dist_to_nearer` greater than or equal to
     /// this
     #[arg(long, value_name = "NUMBER", requires = "incl_dist_to_longer")]
     pub min_dist_to_longer_m: Option<f64>,
@@ -184,7 +184,7 @@ pub struct Args {
     #[arg(long, action=clap::ArgAction::SetTrue, default_value = "false", aliases=["incl-way-ids", "include-wayids", "include-way-ids"], conflicts_with="split_into_single_paths")]
     pub incl_wayids: bool,
 
-    /// Rather than save one MultiLineString per group, save it as many smaller linestrings,
+    /// Rather than save one `MultiLineString` per group, save it as many smaller linestrings,
     /// duplication of properties etc
     #[arg(long, default_value = "false")]
     pub save_as_linestrings: bool,
@@ -231,7 +231,7 @@ pub struct Args {
     )]
     pub betweenness_min_value: u64,
 
-    /// The output will only include lines with at least this betweenness_fraction
+    /// The output will only include lines with at least this `betweenness_fraction`
     #[arg(
         long,
         value_name = "NUMBER",
