@@ -322,7 +322,7 @@ fn main() -> Result<()> {
         &input_bar,
         &progress_bars,
         &relation_tags,
-    )?;
+    );
 
     let g: DirectedGraph<VertexProperty, EdgeProperty> = DirectedGraph::new();
     let g = Arc::new(Mutex::new(g));
@@ -1252,7 +1252,7 @@ fn do_read_nids_in_ne2_ways(
     input_bar: &ProgressBar,
     progress_bars: &MultiProgress,
     relation_tags: &WayIdToRelationTags,
-) -> Result<SortedSliceSet<i64>> {
+) -> SortedSliceSet<i64> {
     // how many vertexes are there per node id? (which do we need to keep)
     info!("Reading file, to calculate which nids we need to keep");
     let nid2nways = Arc::new(Mutex::new(HashMap::<i64, u8>::new()));
@@ -1296,7 +1296,7 @@ fn do_read_nids_in_ne2_ways(
     // nodes. We contract the graph as we build it, and we know we can always contract any nids not
     // in this list. This allows us to keep the in-memory size of the graph small
 
-    Ok(nids_in_ne2_ways)
+    nids_in_ne2_ways
 }
 
 fn read_node_positions(

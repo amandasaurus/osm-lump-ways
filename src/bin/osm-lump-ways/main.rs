@@ -638,7 +638,7 @@ fn main() -> Result<()> {
             &style,
             &nodeid_pos,
             inter_store,
-        )?;
+        );
     }
 
     let split_into_lines = progress_bars.add(
@@ -945,7 +945,7 @@ fn do_betweenness(
     style: &ProgressStyle,
     nodeid_pos: &impl NodeIdPosition,
     inter_store: &mut inter_store::InterStore,
-) -> Result<()> {
+) {
     let _started_betweenness_calculation = Instant::now();
     info!(
         "Calculating betweenness centrality for {} way groups, with {} max nodes per group",
@@ -1099,8 +1099,6 @@ fn do_betweenness(
     drop(obj_to_write_tx);
 
     writer_thread.join().unwrap();
-
-    Ok(())
 }
 
 fn update_length_m_fraction_total(way_groups: &mut [WayGroup]) {
