@@ -15,7 +15,7 @@ pub(crate) fn init(
     csv_stats_file: &PathBuf,
     args: &cli_args::Args,
 ) -> csv::Writer<BufWriter<File>> {
-    info!("Writing CSV ends stats to file {csv_stats_file:?}");
+    info!("Writing CSV ends stats to file {}", csv_stats_file.display());
     let mut headers = vec![
         "timestamp",
         "iso_datetime",

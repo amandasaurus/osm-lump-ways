@@ -6,7 +6,7 @@ use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 
 pub(crate) fn init(metrics_path: &PathBuf) -> BufWriter<File> {
-    info!("Writing metrics to file {metrics_path:?}");
+    info!("Writing metrics to file {}", metrics_path.display());
     let mut metrics = std::io::BufWriter::new(std::fs::File::create(metrics_path).unwrap());
     writeln!(
         metrics,

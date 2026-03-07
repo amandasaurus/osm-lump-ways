@@ -6,7 +6,7 @@ use std::io::BufWriter;
 use std::path::PathBuf;
 
 pub(crate) fn init(csv_stats_file: &PathBuf) -> csv::Writer<BufWriter<File>> {
-    info!("Writing CSV stats to file {csv_stats_file:?}");
+    info!("Writing CSV stats to file {}", csv_stats_file.display());
     if !csv_stats_file.exists() {
         let mut wtr = csv::Writer::from_writer(std::fs::File::create(csv_stats_file).unwrap());
         wtr.write_record(["timestamp", "iso_datetime", "area", "metric", "value"])

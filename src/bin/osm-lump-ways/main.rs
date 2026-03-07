@@ -169,7 +169,7 @@ fn main() -> Result<()> {
         anyhow::ensure!(a > b);
     }
 
-    info!("Input file: {:?}", &args.input_filename);
+    info!("Input file: {}", &args.input_filename.display());
     if args.tag_filter.is_empty() {
         match args.tag_filter_func {
             Some(ref tff) => {
@@ -915,9 +915,9 @@ fn do_frames(
         &OutputFormat::GeoJSONSeq,
     )?;
     info!(
-        "Calculated & wrote {} frames to {:?} in {}",
+        "Calculated & wrote {} frames to {} in {}",
         num_written.to_formatted_string(&Locale::en),
-        frames_filepath,
+        frames_filepath.display(),
         formatting::format_duration(started_frames.elapsed())
     );
 
@@ -992,9 +992,9 @@ fn do_betweenness(
             )
             .unwrap();
             info!(
-                "Calculated & wrote {} betweenness centrality edges to {:?} in {}",
+                "Calculated & wrote {} betweenness centrality edges to {} in {}",
                 total_written.to_formatted_string(&Locale::en),
-                betweenness_filepath,
+                betweenness_filepath.display(),
                 formatting::format_duration(started_betweenness_calculation.elapsed())
             );
         }
