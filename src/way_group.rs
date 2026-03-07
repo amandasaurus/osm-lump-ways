@@ -24,7 +24,7 @@ pub struct WayGroup {
 }
 
 impl WayGroup {
-    #[must_use] 
+    #[must_use]
     pub fn new(graph: Graph2, group: Box<[Option<String>]>) -> Self {
         let root_nodeid = *graph.first_vertex().unwrap();
         WayGroup {
@@ -43,12 +43,12 @@ impl WayGroup {
             .sum::<f64>();
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn num_nodes(&self) -> usize {
         self.graph.num_vertexes()
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn filename(&self, output_filename: &str, split_files_by_group: bool) -> String {
         if !split_files_by_group {
             output_filename.to_string()

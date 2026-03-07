@@ -3,7 +3,7 @@
 //! A small amount of nodes are in exactly 2 nodes (This saves about 10% space)
 use super::*;
 use std::collections::BTreeMap;
-use std::fmt::Debug;
+use std::fmt::{Debug, Write};
 
 /// Something which stores which nodeids are in which wayid
 pub trait NodeIdWayIds: Debug + Send + Sync {
@@ -42,7 +42,7 @@ pub trait NodeIdWayIds: Debug + Send + Sync {
 }
 
 /// Some standard struct for doing this.
-#[must_use] 
+#[must_use]
 pub fn default() -> impl NodeIdWayIds {
     //Box::new(NodeIdWayIdsMultiMap::new())
     NodeIdWayIdsAuto::new()
@@ -124,26 +124,32 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
 
     fn detailed_size(&self) -> String {
         let mut output = String::new();
-        output.push_str(&format!(
-            "Size of nodeid_wayids: {} = {} bytes.\nnum_nodes: {} = {}.\nbytes/node={:>.2}\n",
+        writeln!(
+            output,
+            "Size of nodeid_wayids: {} = {} bytes.\nnum_nodes: {} = {}.\nbytes/node={:>.2}",
             self.get_size(),
             self.get_size().to_formatted_string(&Locale::en),
             self.len(),
             self.len().to_formatted_string(&Locale::en),
             self.get_size() as f64 / self.len() as f64,
-        ));
-        output.push_str(&format!(
-            "Size of nodeid_wayids.singles: {} = {} bytes, {} nodes\n",
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "Size of nodeid_wayids.singles: {} = {} bytes, {} nodes",
             self.singles.get_size(),
             self.singles.get_size().to_formatted_string(&Locale::en),
             self.singles.len().to_formatted_string(&Locale::en)
-        ));
-        output.push_str(&format!(
-            "Size of nodeid_wayids.multiples: {} = {} bytes, {} nodes\n",
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "Size of nodeid_wayids.multiples: {} = {} bytes, {} nodes",
             self.multiples.get_size(),
             self.multiples.get_size().to_formatted_string(&Locale::en),
             self.multiples.len().to_formatted_string(&Locale::en),
-        ));
+        )
+        .unwrap();
         output
     }
 }
@@ -274,23 +280,28 @@ impl NodeIdWayIds for NodeIdWayIdsBucketWayIndex {
     }
     fn detailed_size(&self) -> String {
         let mut output = String::new();
-        output.push_str(&format!(
-            "Size of nodeid_wayids: {} = {} bytes.\nnum_nodes: {} = {}.\nbytes/node={:>.2}\n",
+        writeln!(
+            output,
+            "Size of nodeid_wayids: {} = {} bytes.\nnum_nodes: {} = {}.\nbytes/node={:>.2}",
             self.get_size(),
             self.get_size().to_formatted_string(&Locale::en),
             self.len(),
             self.len().to_formatted_string(&Locale::en),
             self.get_size() as f64 / self.len() as f64,
-        ));
-        output.push_str(&format!(
-            "Size of self.ways: {} = {} bytes num_ways: {} = {} \n",
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "Size of self.ways: {} = {} bytes num_ways: {} = {}",
             self.ways.get_size(),
             self.ways.get_size().to_formatted_string(&Locale::en),
             self.ways.len(),
             self.ways.len().to_formatted_string(&Locale::en),
-        ));
-        output.push_str(&format!(
-            "Size of self.nodeid_bucket_wayid: {} = {} bytes num_ways: {} = {} \n",
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "Size of self.nodeid_bucket_wayid: {} = {} bytes num_ways: {} = {}",
             self.nodeid_bucket_wayid.get_size(),
             self.nodeid_bucket_wayid
                 .get_size()
@@ -299,7 +310,8 @@ impl NodeIdWayIds for NodeIdWayIdsBucketWayIndex {
             self.nodeid_bucket_wayid
                 .len()
                 .to_formatted_string(&Locale::en),
-        ));
+        )
+        .unwrap();
         output
     }
 

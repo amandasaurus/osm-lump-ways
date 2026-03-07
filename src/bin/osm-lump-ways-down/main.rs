@@ -1798,8 +1798,9 @@ fn do_write_upstreams(
                     .map(|tg| tg.stream_level)
                     .map(|sl| if sl == u64::MAX { None } else { Some(sl) })
                     .into();
-                props["stream_level_code_str"] =
-                    tag_group_info.map(tag_group::TagGroupInfo::stream_level_code_str).into();
+                props["stream_level_code_str"] = tag_group_info
+                    .map(tag_group::TagGroupInfo::stream_level_code_str)
+                    .into();
                 props["stream_level_code"] = tag_group_info
                     .map(|tg| tg.stream_level_code.as_ref())
                     .into();

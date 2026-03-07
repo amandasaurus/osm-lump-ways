@@ -8,16 +8,16 @@ use std::iter;
 pub struct InterStore(HashMap<(i64, i64), Box<[u8]>>);
 
 impl InterStore {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         InterStore::default()
     }
-    #[must_use] 
+    #[must_use]
     pub fn contains_undirected(&self, from: &i64, to: &i64) -> bool {
         let (from, to) = min_max(from, to);
         self.0.contains_key(&(*from, *to))
     }
-    #[must_use] 
+    #[must_use]
     pub fn contains_directed(&self, from: &i64, to: &i64) -> bool {
         self.0.contains_key(&(*from, *to))
     }

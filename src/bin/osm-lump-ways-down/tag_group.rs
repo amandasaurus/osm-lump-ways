@@ -663,7 +663,11 @@ fn flow_type(
 //}
 
 fn assert_sanity_check(tag_group_info: &[TagGroupInfo]) {
-    assert!(tag_group_info.par_iter().all(TagGroupInfo::has_stream_level));
+    assert!(
+        tag_group_info
+            .par_iter()
+            .all(TagGroupInfo::has_stream_level)
+    );
     assert!(
         tag_group_info
             .par_iter()

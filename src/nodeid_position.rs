@@ -69,7 +69,7 @@ pub trait NodeIdPosition: std::fmt::Debug + std::marker::Send + std::marker::Syn
 }
 
 /// A default good value
-#[must_use] 
+#[must_use]
 pub fn default() -> impl NodeIdPosition {
     //NodeIdPositionMap::new()
     NodeIdPositionBucket::with_bucket(3)
@@ -122,16 +122,14 @@ impl NodeIdPosition for NodeIdPositionMap {
     }
 
     fn detailed_size(&self) -> String {
-        let mut output = String::new();
-        output.push_str(&format!(
+        format!(
             "Size of nodeid_pos (NodeIdPositionMap): {} = {} bytes.\nnum_nodes: {} = {}.\nbytes/node = {:>.2}\n",
             self.get_size(),
             self.get_size().to_formatted_string(&Locale::en),
             self.len(),
             self.len().to_formatted_string(&Locale::en),
             self.get_size() as f64 / self.len() as f64,
-        ));
-        output
+        )
     }
 }
 
@@ -345,8 +343,7 @@ impl NodeIdPosition for NodeIdPositionBucket {
     }
 
     fn detailed_size(&self) -> String {
-        let mut output = String::new();
-        output.push_str(&format!(
+        format!(
             "Size of nodeid_pos (NodeIdPositionBucket): {} = {} bytes.\nnum_nodes: {} = {}.\nbytes/node = {:>.2}\ninner bucket_len {} = {}\nbucket_shift = {}",
             self.get_size(),
             self.get_size().to_formatted_string(&Locale::en),
@@ -356,8 +353,7 @@ impl NodeIdPosition for NodeIdPositionBucket {
             self.inner.len(),
             self.inner.len().to_formatted_string(&Locale::en),
             self.bucket_shift(),
-        ));
-        output
+        )
     }
 
     fn finished_inserting(&mut self) {
