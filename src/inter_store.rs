@@ -10,7 +10,7 @@ pub struct InterStore(HashMap<(i64, i64), Box<[u8]>>);
 impl InterStore {
     #[must_use] 
     pub fn new() -> Self {
-        Default::default()
+        InterStore::default()
     }
     #[must_use] 
     pub fn contains_undirected(&self, from: &i64, to: &i64) -> bool {

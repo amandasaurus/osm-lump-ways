@@ -293,7 +293,7 @@ fn main() -> Result<()> {
     );
     let rdr = input_bar.wrap_read(input_fp);
     let mut reader = osmio::stringpbf::PBFReader::new(rdr);
-    let graphs: HashMap<Box<[Option<String>]>, Graph2> = Default::default();
+    let graphs: HashMap<Box<[Option<String>]>, Graph2> = HashMap::default();
     let graphs = Arc::new(Mutex::new(graphs));
     let inter_store = inter_store::InterStore::new();
     let inter_store = Arc::new(Mutex::new(inter_store));

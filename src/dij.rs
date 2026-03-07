@@ -103,7 +103,7 @@ pub(crate) fn path_one_to_one<'a>(
         start_pos,
     ));
 
-    let mut this_luft_dist = Default::default();
+    let mut this_luft_dist = OrderedFloat::default();
     let mut neighbor_pos_raw = Default::default();
     let mut neighbor_pos = Default::default();
     let mut this_path_dist;
@@ -233,7 +233,7 @@ pub fn a_star_directed_single<'a>(
         start_pos,
     ));
 
-    let mut this_luft_dist = Default::default();
+    let mut this_luft_dist = OrderedFloat::default();
     let mut neighbor_pos_raw = Default::default();
     let mut neighbor_pos = Default::default();
     let mut this_path_dist;

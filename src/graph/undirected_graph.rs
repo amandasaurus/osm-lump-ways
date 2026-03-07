@@ -53,7 +53,7 @@ where
     #[must_use] 
     pub fn new() -> Self {
         Self {
-            edges: Default::default(),
+            edges: BTreeMap::default(),
         }
     }
 
@@ -61,11 +61,11 @@ where
         self.edges
             .entry(*i)
             .or_default()
-            .insert(*j, (val, Default::default()));
+            .insert(*j, (val, SmallVec::default()));
         self.edges
             .entry(*j)
             .or_default()
-            .insert(*i, (val, Default::default()));
+            .insert(*i, (val, SmallVec::default()));
     }
 
     pub fn remove_vertex(&mut self, v: &V) {
@@ -192,7 +192,7 @@ pub struct Graph2 {
 impl Graph2 {
     #[must_use] 
     pub fn new() -> Self {
-        Default::default()
+        Graph2::default()
     }
 
     pub fn add_edge(&mut self, vertex1: i64, vertex2: i64) -> bool {

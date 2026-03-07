@@ -416,7 +416,7 @@ where
     E: Send + Default + Clone + Sync + Debug,
 {
     fn new() -> Self {
-        Default::default()
+        DirectedGraph::default()
     }
     fn num_in_neighbours(&self, vertex: i64) -> Option<usize> {
         self.edges.get(&vertex).map(|v| v.ins.len())
