@@ -672,7 +672,7 @@ fn main() -> Result<()> {
         .reduce(HashMap::new, |mut acc, curr| {
             trace!("Merging files down again");
             for (filename, wgs) in curr.into_iter() {
-                acc.entry(filename).or_default().extend(wgs.into_iter())
+                acc.entry(filename).or_default().extend(wgs.into_iter());
             }
             acc
         });
@@ -895,7 +895,7 @@ fn do_frames(
                 .into_inner()
                 .to_formatted_string(&Locale::en),
             skipped_way_groups_length_sum.into_inner(),
-        )
+        );
     }
     frames_bar.finish_and_clear();
     frames_all_nodes_bar.finish_and_clear();

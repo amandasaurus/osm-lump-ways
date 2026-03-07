@@ -36,7 +36,7 @@ impl WayIdToRelationTags {
                     // If this wid already has a rid, then overwrite it iff we currenty have more
                     // members
                     if nmembers >= *self.rid_to_nmembers.get(rid).unwrap() {
-                        *rid = rel.id()
+                        *rid = rel.id();
                     }
                 })
                 // Not seen before → simple insert

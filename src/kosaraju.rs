@@ -78,7 +78,7 @@ pub(crate) fn kosaraju_it<V, E>(
         while let Some(curr) = stack.pop() {
             if let std::collections::btree_map::Entry::Vacant(e) = components.entry(curr) {
                 e.insert(root);
-                stack.extend(g.in_neighbours(curr))
+                stack.extend(g.in_neighbours(curr));
             }
         }
     }

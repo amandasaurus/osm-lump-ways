@@ -780,7 +780,7 @@ fn main() -> Result<()> {
                 .map(|nid| nodeid_pos.get(&nid).unwrap())
                 .tuple_windows::<(_, _)>()
                 .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
-                .sum::<f64>()
+                .sum::<f64>();
         });
 
     // Calculate the upstream for every node and edge.
@@ -1005,7 +1005,7 @@ fn main() -> Result<()> {
             .filter(|membs| membs.par_iter().any(|m| *m))
             .count();
         if num_nodes_attributed == 0 {
-            warn!("No end nodes got an end attribute.")
+            warn!("No end nodes got an end attribute.");
         } else {
             info!(
                 "{} of {} ({:.1}%) end points got an attribute for way membership",
