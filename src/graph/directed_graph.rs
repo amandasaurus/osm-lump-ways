@@ -583,9 +583,8 @@ where
         let from_v1 = &mut self.edges.entry(vertex1).or_default().outs;
         if from_v1.iter().any(|(vid, _eprop)| vid == &vertex2) {
             return true;
-        } else {
-            from_v1.push((vertex2, E::default()));
         }
+        from_v1.push((vertex2, E::default()));
 
         // assume we never get inconsistant
         let other = self.edges.entry(vertex2).or_default();
