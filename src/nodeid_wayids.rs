@@ -365,7 +365,7 @@ impl NodeIdWayIdsAuto {
                 new_bucket.insert(nid, wid);
             }
 
-            let converstion_duration = std::time::Instant::now() - started_conversion;
+            let converstion_duration = started_conversion.elapsed();
             debug!("New object: {}", new_bucket.detailed_size());
             debug!(
                 "It took {} sec to convert to bucket index",
