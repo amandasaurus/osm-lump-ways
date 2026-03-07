@@ -173,7 +173,7 @@ fn main() -> Result<()> {
     if args.tag_filter.is_empty() {
         match args.tag_filter_func {
             Some(ref tff) => {
-                info!("Tag filter function in operation: {:?}", tff);
+                info!("Tag filter function in operation: {tff:?}");
             }
             _ => {
                 info!("No tag filtering in operation. All ways in the file will be used.");
@@ -283,10 +283,7 @@ fn main() -> Result<()> {
     let latest_timestamp = latest_timestamp.into_inner();
     let latest_timestamp_iso =
         osmio::TimestampFormat::EpochNunber(latest_timestamp).to_iso_string();
-    info!(
-        "Latest timestamp in this file is {} / {}",
-        latest_timestamp, latest_timestamp_iso
-    );
+    info!("Latest timestamp in this file is {latest_timestamp} / {latest_timestamp_iso}");
 
     let input_fp = std::fs::File::open(&args.input_filename)?;
     let input_bar = progress_bars.add(
@@ -599,7 +596,7 @@ fn main() -> Result<()> {
         json_props["length_km_int"] = ((wg.length_m / 1000.).round() as i64).into();
 
         for (i, group) in wg.group.iter().enumerate() {
-            json_props[format!("tag_group_{}", i)] = group.as_ref().cloned().into();
+            json_props[format!("tag_group_{i}")] = group.as_ref().cloned().into();
         }
         json_props["tag_groups"] = wg.group.to_vec().into();
         json_props["num_nodes"] = wg.graph.num_vertexes().into();
@@ -766,10 +763,7 @@ fn main() -> Result<()> {
                         &output_format,
                     )
                     .with_context(|| {
-                        format!(
-                            "Writing {} features to filename {:?}",
-                            num_features, filename
-                        )
+                        format!("Writing {num_features} features to filename {filename:?}")
                     })?;
                     info!(
                         "Wrote {} feature(s) to {}",
@@ -780,7 +774,7 @@ fn main() -> Result<()> {
                     total_files_written.fetch_add(1, atomic_Ordering::SeqCst);
                 }
                 Err(e) => {
-                    warn!("Couldn't open filename {:?}: {}", filename, e);
+                    warn!("Couldn't open filename {filename:?}: {e}");
                 }
             }
             Ok(()) as Result<()>
@@ -840,8 +834,7 @@ fn do_frames(
     info!(
         "Calculating, for each way group, all the frames (lines through the middle){}",
         frames_group_min_length_m.map_or("".to_string(), |min| format!(
-            ", and only including way groups longer than {:.3e}",
-            min
+            ", and only including way groups longer than {min:.3e}"
         ))
     );
     let frames_all_nodes_bar = progress_bars.add(

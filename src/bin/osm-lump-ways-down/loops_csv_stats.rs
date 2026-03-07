@@ -41,7 +41,7 @@ pub(crate) fn write_boundary(
         latest_timestamp_iso.to_string(),
         boundary.to_string(),
         "loops_length_m".to_string(),
-        format!("{:.1}", len),
+        format!("{len:.1}"),
     ])?;
     Ok(())
 }

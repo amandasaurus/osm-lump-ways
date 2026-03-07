@@ -113,7 +113,7 @@ impl NodeIdPosition for NodeIdPositionMap {
                     Lon::from_inner(*lng).degrees(),
                 )
             })
-            .ok_or_else(|| anyhow::anyhow!("Couldn't get node position for nid {}", node_id))
+            .ok_or_else(|| anyhow::anyhow!("Couldn't get node position for nid {node_id}"))
     }
 
     fn len(&self) -> usize {

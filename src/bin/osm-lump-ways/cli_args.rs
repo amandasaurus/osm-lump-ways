@@ -260,7 +260,7 @@ where
 {
     if let Some(filename) = arg_val.strip_prefix('@') {
         let val = std::fs::read_to_string(filename)
-            .map_err(|e| format!("Couldn't read filename {}: {}", filename, e))?;
+            .map_err(|e| format!("Couldn't read filename {filename}: {e}"))?;
         T::from_str(&val)
     } else {
         let res = T::from_str(arg_val);
@@ -270,8 +270,7 @@ where
         {
             //let original_error = res.unwrap_err();
             Err(format!(
-                "Unable to parse {:?}. However that is a filename. Did you mean @{} ? Original Error: {}",
-                arg_val, arg_val, original_error
+                "Unable to parse {arg_val:?}. However that is a filename. Did you mean @{arg_val} ? Original Error: {original_error}"
             ))
         } else {
             res

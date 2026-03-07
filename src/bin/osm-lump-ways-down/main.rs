@@ -396,7 +396,7 @@ fn main() -> Result<()> {
 
 
                     assert!(i != 0);
-                    assert!(nodes[0] != nodes[i], "Duplicate nodes in this way={:?} curr nodes={:?} i={}", w, nodes, i);
+                    assert!(nodes[0] != nodes[i], "Duplicate nodes in this way={w:?} curr nodes={nodes:?} i={i}");
                     g.add_edge(nodes[0], nodes[i]);
 
                     if let Some(ref mut tagvalues_to_edges) = tagvalues_to_edges {
@@ -428,10 +428,7 @@ fn main() -> Result<()> {
     let latest_timestamp = latest_timestamp.into_inner();
     let latest_timestamp_iso =
         osmio::TimestampFormat::EpochNunber(latest_timestamp).to_iso_string();
-    info!(
-        "Latest timestamp is {} / {}",
-        latest_timestamp, latest_timestamp_iso
-    );
+    info!("Latest timestamp is {latest_timestamp} / {latest_timestamp_iso}");
     obj_reader.finish_and_clear();
     ways_added.finish_and_clear();
     nodes_added.finish_and_clear();
@@ -570,14 +567,14 @@ fn main() -> Result<()> {
                 if !(!args.loops_incl_nids & args.loops_no_incl_nids) {
                     props["nodes"] = all_nodes
                         .into_iter()
-                        .map(|nid| format!("n{}", nid))
+                        .map(|nid| format!("n{nid}"))
                         .collect::<Vec<_>>()
                         .join(",")
                         .into();
                 }
 
                 for (i, boundary) in these_boundaries.iter().enumerate() {
-                    props[format!("area_{}", i)] = boundary.to_string().into();
+                    props[format!("area_{i}")] = boundary.to_string().into();
                 }
                 props["areas_s"] = format!(",{},", these_boundaries.join(",")).into();
                 props["areas"] = these_boundaries.into();
@@ -982,7 +979,7 @@ fn main() -> Result<()> {
                                         // There are mulitple ways that go through here, so join
                                         // do semicolon style concatination.
                                         Some(old_end_tag_value) => {
-                                            Some(format!("{};{}", old_end_tag_value, way_tag_value))
+                                            Some(format!("{old_end_tag_value};{way_tag_value}"))
                                         }
                                     }
                                 }
@@ -1060,7 +1057,7 @@ fn main() -> Result<()> {
                 let mut props = serde_json::json!({"upstream_m": round(&len, 1), "nid": nid});
                 if !ends_membership_filters.is_empty() {
                     for (end_attr_filter, res) in ends_membership_filters.iter().zip(mbms.iter()) {
-                        props[format!("is_in:{}", end_attr_filter)] = (*res).into();
+                        props[format!("is_in:{end_attr_filter}")] = (*res).into();
                     }
                     props["is_in_count"] = mbms.iter().filter(|m| **m).count().into();
                 }
@@ -1071,7 +1068,7 @@ fn main() -> Result<()> {
                         .zip(end_tags.into_iter())
                         .filter(|(_k, v)| v.is_some())
                     {
-                        props[format!("tag:{}", tag_key)] = tag_value.clone().into();
+                        props[format!("tag:{tag_key}")] = tag_value.clone().into();
                     }
                 }
                 (props, pos)
@@ -1663,7 +1660,7 @@ fn do_group_by_ends(
                 .zip(end_point_tag_values[end_idx as usize].iter())
             {
                 if let Some(tag_value) = tag_value {
-                    props[format!("end_tag:{}", tag_key)] = tag_value.clone().into();
+                    props[format!("end_tag:{tag_key}")] = tag_value.clone().into();
                 }
             }
         }
@@ -1799,7 +1796,7 @@ fn do_write_upstreams(
             )| {
                 // Round the upstream to only output 1 decimal place
                 let mut props = serde_json::json!({});
-                props["nids"] = format!("{},{}", from_nid, to_nid).into();
+                props["nids"] = format!("{from_nid},{to_nid}").into();
                 props["from_upstream_m"] = round(&from_upstream_len, 1).into();
                 props["to_upstream_m"] = round(&to_upstream_len, 1).into();
                 props["flow_tag_group"] = flow_tag_group.into();
@@ -1817,7 +1814,7 @@ fn do_write_upstreams(
                     .into();
 
                 for mult in args.upstreams_from_upstream_multiple.iter() {
-                    props[format!("from_upstream_m_{}", mult)] =
+                    props[format!("from_upstream_m_{mult}")] =
                         round_mult(&from_upstream_len, *mult).into();
                 }
                 props["end_upstream_m"] = round(
@@ -1834,7 +1831,7 @@ fn do_write_upstreams(
                         .zip(end_point_tag_values[end_idx].iter())
                     {
                         if let Some(tag_value) = tag_value {
-                            props[format!("end_tag:{}", tag_key)] = tag_value.clone().into();
+                            props[format!("end_tag:{tag_key}")] = tag_value.clone().into();
                         }
                     }
                 }
@@ -1982,7 +1979,7 @@ fn do_waterway_grouped(
             if tg.stream_level < u64::MAX {
                 props["stream_level"] = tg.stream_level.into();
             }
-            assert!(!tg.stream_level_code.is_empty(), "{:?}", tg);
+            assert!(!tg.stream_level_code.is_empty(), "{tg:?}");
             if !tg.stream_level_code.is_empty() {
                 props["stream_level_code_str"] = tg.stream_level_code_str().into();
                 props["stream_level_code"] = tg.stream_level_code.as_ref().into();
@@ -2017,7 +2014,7 @@ fn do_waterway_grouped(
                 .map(|line| {
                     inter_store
                         .expand_line_directed(line)
-                        .map(|nid| nodeid_pos.get(&nid).unwrap_or_else(|_| panic!("TagGroupInfo {:?}", tg)))
+                        .map(|nid| nodeid_pos.get(&nid).unwrap_or_else(|_| panic!("TagGroupInfo {tg:?}")))
                         .collect::<Vec<_>>()
                 })
                 .collect();
@@ -2060,7 +2057,7 @@ fn do_waterway_grouped(
                         .filter(|seg| g.edge_property_unchecked(*seg).taggroupid == *dist_tg_idx)
                         .map(|seg| seg_to_distrib_json(&seg, seg.0, false))
                         .collect::<Vec<_>>();
-                    assert!(!confluences.is_empty(), "Can't find confluence with a distributary main: {:?} & dist: {:?}", tg, dist_tg);
+                    assert!(!confluences.is_empty(), "Can't find confluence with a distributary main: {tg:?} & dist: {dist_tg:?}");
                     serde_json::json!({
                         "tag_group_value": dist_tg.tagid.map(|t| tag_group_value[t as usize].clone()),
                         "min_nid": dist_tg.min_nid,
@@ -2081,7 +2078,7 @@ fn do_waterway_grouped(
                         .filter(|seg| g.edge_property_unchecked(*seg).taggroupid == *dist_tg_idx)
                         .map(|seg| seg_to_distrib_json(&seg, seg.0, false))
                         .collect::<Vec<_>>();
-                    assert!(!confluences.is_empty(), "Can't find confluence with a distributary main: {:?} & dist: {:?}", tg, dist_tg);
+                    assert!(!confluences.is_empty(), "Can't find confluence with a distributary main: {tg:?} & dist: {dist_tg:?}");
                     serde_json::json!({
                         "tag_group_value": dist_tg.tagid.map(|t| tag_group_value[t as usize].clone()),
                         "min_nid": dist_tg.min_nid,
@@ -2112,7 +2109,7 @@ fn do_waterway_grouped(
                     .filter(|seg| g.edge_property_unchecked(*seg).taggroupid == *trib_tg_idx)
                     .map(|seg| seg_to_distrib_json(&seg, seg.1, true))
                     .collect::<Vec<_>>();
-                assert!(!confluences.is_empty(), "Can't find confluence with a tributaries main: {:?} & trib: {:?} taggroupid {} trib_tg_idx {}", tg, trib_tg, taggroupid, trib_tg_idx);
+                assert!(!confluences.is_empty(), "Can't find confluence with a tributaries main: {tg:?} & trib: {trib_tg:?} taggroupid {taggroupid} trib_tg_idx {trib_tg_idx}");
                 serde_json::json!({
                     "tag_group_value": trib_tg.tagid.map(|t| tag_group_value[t as usize].clone()),
                     "min_nid": trib_tg.min_nid,
@@ -2133,8 +2130,7 @@ fn do_waterway_grouped(
                         .filter(|seg| g.edge_property_unchecked(*seg).taggroupid == taggroupid)
                         .map(|seg| seg_to_distrib_json(&seg, seg.0, false))
                         .collect::<Vec<_>>();
-                    assert!(!confluences.is_empty(), "Can't find a single confluence nid with a parent river.\nthis group = {tg:?}\naffected parent river = {parentid}\n{parent:?}",
-                         tg=tg, parentid=parent_tg_idx, parent=parent_tg,
+                    assert!(!confluences.is_empty(), "Can't find a single confluence nid with a parent river.\nthis group = {tg:?}\naffected parent river = {parent_tg_idx}\n{parent_tg:?}",
                     );
 
                     //taggroupid {} = {:?}\ntrib_tg_idx {}\nmain tg: {:?}\nparent_river: {:?} ", taggroupid, tag_group_info[taggroupid as usize], parent_tg_idx, tg, parent_tg);

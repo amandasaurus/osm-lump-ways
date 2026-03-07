@@ -27,18 +27,18 @@ pub enum TagFilter {
 impl std::fmt::Display for TagFilter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TagFilter::HasK(k) => write!(f, "∃{}", k),
-            TagFilter::HasReK(k) => write!(f, "∃~{}", k),
-            TagFilter::HasKLeftRightBoth(k) => write!(f, "∃(lrb){}", k),
-            TagFilter::NotHasKLeftRightBoth(k) => write!(f, "∄(lrb){}", k),
-            TagFilter::NotHasK(k) => write!(f, "∄{}", k),
-            TagFilter::NotHasReK(k) => write!(f, "∄~{}", k),
-            TagFilter::KV(k, v) => write!(f, "{}={}", k, v),
-            TagFilter::KneV(k, v) => write!(f, "{}≠{}", k, v),
+            TagFilter::HasK(k) => write!(f, "∃{k}"),
+            TagFilter::HasReK(k) => write!(f, "∃~{k}"),
+            TagFilter::HasKLeftRightBoth(k) => write!(f, "∃(lrb){k}"),
+            TagFilter::NotHasKLeftRightBoth(k) => write!(f, "∄(lrb){k}"),
+            TagFilter::NotHasK(k) => write!(f, "∄{k}"),
+            TagFilter::NotHasReK(k) => write!(f, "∄~{k}"),
+            TagFilter::KV(k, v) => write!(f, "{k}={v}"),
+            TagFilter::KneV(k, v) => write!(f, "{k}≠{v}"),
             TagFilter::KinV(k, vs) => write!(f, "{}∈{}", k, vs.join(",")),
             TagFilter::KnotInV(k, vs) => write!(f, "{}∉{}", k, vs.join(",")),
             TagFilter::HasKnotInV(k, vs) => write!(f, "∃{}∉{}", k, vs.join(",")),
-            TagFilter::KreV(k, r) => write!(f, "{}~{}", k, r),
+            TagFilter::KreV(k, r) => write!(f, "{k}~{r}"),
             TagFilter::Or(tfs) => write!(
                 f,
                 "{}",
@@ -64,7 +64,7 @@ impl std::fmt::Display for TagFilter {
 
 impl PartialEq for TagFilter {
     fn eq(&self, other: &TagFilter) -> bool {
-        format!("{:?}", self) == format!("{:?}", other)
+        format!("{self:?}") == format!("{other:?}")
     }
 }
 
@@ -75,13 +75,13 @@ impl TagFilter {
             TagFilter::HasReK(kre) => o.tags().any(|(k, _v)| kre.is_match(k)),
             TagFilter::HasKLeftRightBoth(k) => {
                 o.has_tag(k)
-                    || o.has_tag(format!("{}:both", k))
-                    || (o.has_tag(format!("{}:left", k)) && o.has_tag(format!("{}:right", k)))
+                    || o.has_tag(format!("{k}:both"))
+                    || (o.has_tag(format!("{k}:left")) && o.has_tag(format!("{k}:right")))
             }
             TagFilter::NotHasKLeftRightBoth(k) => {
                 !(o.has_tag(k)
-                    || o.has_tag(format!("{}:both", k))
-                    || (o.has_tag(format!("{}:left", k)) && o.has_tag(format!("{}:right", k))))
+                    || o.has_tag(format!("{k}:both"))
+                    || (o.has_tag(format!("{k}:left")) && o.has_tag(format!("{k}:right"))))
             }
             TagFilter::NotHasK(k) => !o.has_tag(k),
             TagFilter::NotHasReK(kre) => !o.tags().any(|(k, _v)| kre.is_match(k)),
@@ -117,8 +117,7 @@ impl std::str::FromStr for TagFilter {
         let s = s.trim();
         if s.starts_with('"') || s.ends_with('"') {
             warn!(
-                "Input string {} starts and/or ends with a double quote. Have you accidentally over-quoted? Continuing with that.",
-                s
+                "Input string {s} starts and/or ends with a double quote. Have you accidentally over-quoted? Continuing with that."
             );
         }
         if s.contains('∨') {
@@ -227,7 +226,7 @@ impl std::str::FromStr for TagFilterFuncElement {
             let filter: TagFilter = filter.parse()?;
             Ok(TagFilterFuncElement::FilterMatchThenFalse(filter))
         } else {
-            Err(format!("Unknown Tag Filter Func: {}", s))
+            Err(format!("Unknown Tag Filter Func: {s}"))
         }
     }
 }
@@ -237,8 +236,8 @@ impl std::fmt::Display for TagFilterFuncElement {
         match self {
             TagFilterFuncElement::AlwaysTrue => write!(f, "T"),
             TagFilterFuncElement::AlwaysFalse => write!(f, "F"),
-            TagFilterFuncElement::FilterMatchThenTrue(flt) => write!(f, "{}→T", flt),
-            TagFilterFuncElement::FilterMatchThenFalse(flt) => write!(f, "{}→F", flt),
+            TagFilterFuncElement::FilterMatchThenTrue(flt) => write!(f, "{flt}→T"),
+            TagFilterFuncElement::FilterMatchThenFalse(flt) => write!(f, "{flt}→F"),
         }
     }
 }
@@ -278,7 +277,7 @@ impl std::str::FromStr for TagFilterFunc {
             None => (None, s.to_string()),
             Some(filename) => {
                 let contents = std::fs::read_to_string(filename)
-                    .map_err(|e| format!("Couldn't read filename {}: {}", filename, e))?;
+                    .map_err(|e| format!("Couldn't read filename {filename}: {e}"))?;
                 (Some(Path::new(filename)), contents)
             }
         };
@@ -301,8 +300,7 @@ impl std::str::FromStr for TagFilterFunc {
                         .unwrap();
                     std::fs::read_to_string(incl_path).unwrap_or_else(|_| {
                         panic!(
-                            "Error in include in tagfilter function: Couldn't read filename {:?}",
-                            filename
+                            "Error in include in tagfilter function: Couldn't read filename {filename:?}"
                         )
                     })
                 })

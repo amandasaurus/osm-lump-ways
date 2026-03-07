@@ -33,13 +33,11 @@ pub(crate) fn write_boundary(
 ) -> Result<()> {
     writeln!(
         metrics,
-        "waterwaymap_loops_count{{area=\"{}\"}} {} {}",
-        boundary, count, latest_timestamp
+        "waterwaymap_loops_count{{area=\"{boundary}\"}} {count} {latest_timestamp}"
     )?;
     writeln!(
         metrics,
-        "waterwaymap_loops_length_m{{area=\"{}\"}} {} {}",
-        boundary, len, latest_timestamp
+        "waterwaymap_loops_length_m{{area=\"{boundary}\"}} {len} {latest_timestamp}"
     )?;
 
     Ok(())

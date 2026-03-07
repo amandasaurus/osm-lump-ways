@@ -38,8 +38,7 @@ pub(crate) fn init(
         let first_row = rdr.headers().unwrap();
         if first_row != headers {
             warn!(
-                "Differnet headers. Expected {:?} got {:?}. Are you using a different set (or order) of --ends-tag ? Continuing anyway, and writing the columns we expect.",
-                headers, first_row
+                "Differnet headers. Expected {headers:?} got {first_row:?}. Are you using a different set (or order) of --ends-tag ? Continuing anyway, and writing the columns we expect."
             );
         }
     }

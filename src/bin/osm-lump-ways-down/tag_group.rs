@@ -242,7 +242,7 @@ pub fn calc_tag_group(
         let group = g.edge_property_unchecked(*seg).taggroupid;
         // TODO need to include last segment?
         if !g.contains_edge(seg.0, seg.1) {
-            warn!("No upstream for {:?}", seg);
+            warn!("No upstream for {seg:?}");
         }
         tag_group_info[group as usize].upstream_m += g.edge_property_unchecked(*seg).upstream_m;
     }

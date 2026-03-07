@@ -18,7 +18,7 @@ fn parse_int_human(input: &str) -> Result<usize, String> {
     {
         Ok(res * 1_000_000)
     } else {
-        Err(format!("Unable to parse {:?}", input))
+        Err(format!("Unable to parse {input:?}"))
     }
 }
 

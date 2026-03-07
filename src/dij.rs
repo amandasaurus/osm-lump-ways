@@ -115,8 +115,7 @@ pub(crate) fn path_one_to_one<'a>(
         if curr_id == target_idx {
             assert!(
                 best_dist_prev.contains_key(&target_idx),
-                "Something went wrong with nid {}",
-                target_idx
+                "Something went wrong with nid {target_idx}"
             );
             // finished
             break;
@@ -189,8 +188,7 @@ pub(crate) fn path_one_to_one<'a>(
     }
     assert!(
         best_dist_prev.contains_key(&target_idx),
-        "Something went wrong with nid {}",
-        target_idx
+        "Something went wrong with nid {target_idx}"
     );
 
     let mut contracted_path = Vec::new();
@@ -245,8 +243,7 @@ pub fn a_star_directed_single<'a>(
         if curr_id == target_idx {
             assert!(
                 best_dist_prev.contains_key(&target_idx),
-                "Something went wrong with nid {}",
-                target_idx
+                "Something went wrong with nid {target_idx}"
             );
             // finished
             break;
