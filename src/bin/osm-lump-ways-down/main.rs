@@ -1652,7 +1652,7 @@ fn do_group_by_ends(
             "end_upstream_m": round(&g.vertex_property_unchecked(&end_nid).upstream_m, 1),
             "from_upstream_m": round(&from_upstream_m, 1),
             "to_upstream_m": round(&to_upstream_m, 1),
-            "avg_upstream_m": round(&((to_upstream_m+from_upstream_m)/2.), 1),
+            "avg_upstream_m": round(&f64::midpoint(to_upstream_m, from_upstream_m), 1),
         });
         if !ends_tags.is_empty() {
             for (tag_key, tag_value) in ends_tags
