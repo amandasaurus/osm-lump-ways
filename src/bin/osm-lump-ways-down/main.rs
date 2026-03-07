@@ -527,7 +527,7 @@ fn main() -> Result<()> {
     {
         let mut wanted_nodeids: HashSet<i64> =
             HashSet::with_capacity(cycles.par_iter().map(|cycle| cycle.len()).sum());
-        for cycle in cycles.iter() {
+        for cycle in &cycles {
             wanted_nodeids.extend(cycle.iter().flat_map(|seg| seg.iter()));
         }
 
@@ -586,7 +586,7 @@ fn main() -> Result<()> {
 
         if loops_csv_stats.is_some() || loops_metrics.is_some() {
             let mut per_boundary: BTreeMap<&str, (u64, f64)> = BTreeMap::new();
-            for cycle in cycles_output.iter() {
+            for cycle in &cycles_output {
                 let boundaries = cycle.0["areas"].as_array().unwrap();
                 let this_len = multilinestring_length(&cycle.1);
                 per_boundary.entry("planet").or_default().0 += 1;
@@ -679,7 +679,7 @@ fn main() -> Result<()> {
     g.assert_consistancy();
     info_memory_used!();
     info!("Contracting the graph");
-    for (vertex, replacement) in node_id_replaces.iter() {
+    for (vertex, replacement) in &node_id_replaces {
         assert!(vertex != replacement);
         g.contract_vertex(vertex, replacement);
     }
@@ -843,7 +843,7 @@ fn main() -> Result<()> {
             // now update num_outs_per_group with the total
             // Allocate inflow that goes to the same group
             let mut outflow_per_group: SmallVec<[(Option<u32>, f64); 2]> = SmallVec::new();
-            for (group, num_outs) in num_outs_per_group.iter() {
+            for (group, num_outs) in &num_outs_per_group {
                 let inflow = inflow_per_group
                     .iter()
                     .position(|(grp, _inflow)| grp == group)
@@ -853,12 +853,12 @@ fn main() -> Result<()> {
 
             // Any inflow groups without an outflow group are allocated equally to all the outflow
             // groups
-            for (in_group, inflow) in inflow_per_group.iter() {
+            for (in_group, inflow) in &inflow_per_group {
                 if !outflow_per_group
                     .iter()
                     .any(|(out_group, _)| out_group == in_group)
                 {
-                    for (_out_group, outflow) in outflow_per_group.iter_mut() {
+                    for (_out_group, outflow) in &mut outflow_per_group {
                         *outflow += inflow / (out_edges.len() as f64);
                     }
                 }
@@ -1483,7 +1483,7 @@ fn do_group_by_ends(
             }
 
             // include this point in every line so far
-            for (_line_end, _last_nid, line_points) in lines_to_here.iter_mut() {
+            for (_line_end, _last_nid, line_points) in &mut lines_to_here {
                 line_points.push(nid);
             }
 
@@ -1813,7 +1813,7 @@ fn do_write_upstreams(
                     .map(|i| tag_group_value[i as usize].as_str())
                     .into();
 
-                for mult in args.upstreams_from_upstream_multiple.iter() {
+                for mult in &args.upstreams_from_upstream_multiple {
                     props[format!("from_upstream_m_{mult}")] =
                         round_mult(&from_upstream_len, *mult).into();
                 }
@@ -2189,7 +2189,7 @@ fn calc_through_path_length(
     sink_nids: &[i64],
 ) -> f64 {
     let mut g = graph::DirectedGraph::new();
-    for line in lines.iter() {
+    for line in lines {
         for seg in line.windows(2) {
             g.add_edge(seg[0], seg[1]);
         }

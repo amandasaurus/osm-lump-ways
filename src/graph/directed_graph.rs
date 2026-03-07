@@ -271,7 +271,7 @@ pub trait DirectedGraphTrait<V, E>: Send + Sync + Sized {
             self.num_vertexes(),
         );
         let mut components: HashMap<i64, HashSet<i64>> = HashMap::new();
-        for (v, root_v) in component_for_vertex.iter() {
+        for (v, root_v) in &component_for_vertex {
             components
                 .entry(*root_v)
                 .or_insert_with(|| std::iter::once(*root_v).collect())
@@ -561,7 +561,7 @@ where
                 .retain(|in_v| in_v != vertex);
             self.add_edge_w_prop(*replacement, out_v, eprop);
         }
-        for in_v in old.ins.iter() {
+        for in_v in &old.ins {
             if let Some(eprop) = self.remove_edge(in_v, vertex) {
                 self.add_edge_w_prop(*in_v, *replacement, eprop);
             }
@@ -769,7 +769,7 @@ where
     }
 
     fn assert_consistancy(&self) {
-        for (nid1, v) in self.edges.iter() {
+        for (nid1, v) in &self.edges {
             // no self loops
             assert!(!v.ins.contains(nid1));
             assert!(
@@ -780,7 +780,7 @@ where
             );
 
             // if there's an in, there's an out
-            for in_v in v.ins.iter() {
+            for in_v in &v.ins {
                 assert!(
                     self.edges.contains_key(in_v),
                     "Node {nid1} has an in edge from {in_v}, but there is no data for that vertex {in_v}"
@@ -796,7 +796,7 @@ where
                 );
             }
             // if there's an out, there's an in
-            for (out_v, _eprop) in v.outs.iter() {
+            for (out_v, _eprop) in &v.outs {
                 assert!(
                     self.edges.contains_key(out_v),
                     "Node {nid1} has an out edge to {out_v}, but there is no data for that vertex {out_v}"
@@ -821,10 +821,10 @@ where
     /// Any & all edges connected to this vertex are deleted.
     fn remove_vertex(&mut self, vertex: &i64) -> Option<V> {
         let (vprop, ins, outs) = self.edges.remove(vertex)?.into_parts();
-        for in_v in ins.iter() {
+        for in_v in &ins {
             self.delete_edge(in_v, vertex);
         }
-        for (out_v, _eprop) in outs.iter() {
+        for (out_v, _eprop) in &outs {
             self.delete_edge(vertex, out_v);
         }
         Some(vprop)

@@ -238,14 +238,14 @@ where
                 .keys()
                 .cloned()
                 .collect::<Vec<_>>();
-            for col in headers.iter() {
+            for col in &headers {
                 wtr.write_field(col)?;
             }
             wtr.write_field("geom")?;
             wtr.write_record(None::<&[u8]>)?;
         }
 
-        for col in headers.iter() {
+        for col in &headers {
             wtr.write_field(props[&col].to_string())?;
         }
         buf.clear();
