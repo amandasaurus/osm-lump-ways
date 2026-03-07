@@ -411,7 +411,7 @@ fn main() -> Result<()> {
 
 
                 //g.add_edge_chain_contractable(w.nodes(), &|nid| nids_in_ne2_ways.binary_search(nid).is_err());
-                if let Some(t) = w.timestamp().as_ref().map(|t| t.to_epoch_number()) {
+                if let Some(t) = w.timestamp().as_ref().map(osmio::TimestampFormat::to_epoch_number) {
                     latest_timestamp.fetch_max(t, atomic_Ordering::SeqCst);
                 }
         });
@@ -514,7 +514,7 @@ fn main() -> Result<()> {
         cycles.len().to_formatted_string(&Locale::en),
         cycles
             .par_iter()
-            .map(|c| c.len())
+            .map(std::vec::Vec::len)
             .sum::<usize>()
             .to_formatted_string(&Locale::en),
     );
@@ -526,7 +526,7 @@ fn main() -> Result<()> {
         && (args.loops.is_some() || loops_csv_stats.is_some() || loops_metrics.is_some())
     {
         let mut wanted_nodeids: HashSet<i64> =
-            HashSet::with_capacity(cycles.par_iter().map(|cycle| cycle.len()).sum());
+            HashSet::with_capacity(cycles.par_iter().map(std::vec::Vec::len).sum());
         for cycle in &cycles {
             wanted_nodeids.extend(cycle.iter().flat_map(|seg| seg.iter()));
         }
@@ -754,7 +754,7 @@ fn main() -> Result<()> {
 
     let mut ends_membership_filters: SmallVec<[tagfilter::TagFilter; 3]> =
         args.ends_membership.clone().into();
-    ends_membership_filters.sort_by_key(|tf| tf.to_string());
+    ends_membership_filters.sort_by_key(std::string::ToString::to_string);
     if !ends_membership_filters.is_empty() {
         end_point_memberships.resize(
             end_points.len(),
@@ -904,7 +904,7 @@ fn main() -> Result<()> {
                 ends_membership_filters.len(),
                 ends_membership_filters
                     .iter()
-                    .map(|f| f.to_string())
+                    .map(std::string::ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(", ")
             );
@@ -1805,7 +1805,7 @@ fn do_write_upstreams(
                     .map(|sl| if sl == u64::MAX { None } else { Some(sl) })
                     .into();
                 props["stream_level_code_str"] =
-                    tag_group_info.map(|tg| tg.stream_level_code_str()).into();
+                    tag_group_info.map(tag_group::TagGroupInfo::stream_level_code_str).into();
                 props["stream_level_code"] = tag_group_info
                     .map(|tg| tg.stream_level_code.as_ref())
                     .into();

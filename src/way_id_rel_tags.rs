@@ -51,7 +51,7 @@ impl WayIdToRelationTags {
             .get(&wid)
             .and_then(|rid| self.rid_to_tags.get(rid))
             .and_then(|tags| tags.get(key))
-            .map(|v| v.as_str())
+            .map(std::string::String::as_str)
     }
 
     /// True iff this way is in this list

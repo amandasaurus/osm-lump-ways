@@ -6,7 +6,7 @@ impl std::str::FromStr for TagGrouper {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(TagGrouper(s.split(',').map(|s| s.to_string()).collect()))
+        Ok(TagGrouper(s.split(',').map(std::string::ToString::to_string).collect()))
     }
 }
 impl std::fmt::Display for TagGrouper {

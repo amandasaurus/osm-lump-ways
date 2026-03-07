@@ -91,7 +91,7 @@ where
         self.inner.entry(k[0]).or_default().entry(k[1])
     }
     pub fn len(&self) -> usize {
-        self.inner.values().map(|v| v.len()).sum()
+        self.inner.values().map(std::collections::BTreeMap::len).sum()
     }
 }
 

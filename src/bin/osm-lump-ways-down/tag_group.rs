@@ -55,7 +55,7 @@ impl TagGroupInfo {
     pub fn stream_level_code_str(&self) -> String {
         self.stream_level_code
             .iter()
-            .map(|x| x.to_string())
+            .map(std::string::ToString::to_string)
             .join(".")
     }
 
@@ -663,7 +663,7 @@ fn flow_type(
 //}
 
 fn assert_sanity_check(tag_group_info: &[TagGroupInfo]) {
-    assert!(tag_group_info.par_iter().all(|tg| tg.has_stream_level()));
+    assert!(tag_group_info.par_iter().all(TagGroupInfo::has_stream_level));
     assert!(
         tag_group_info
             .par_iter()

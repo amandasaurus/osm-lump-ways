@@ -255,7 +255,7 @@ fn main() -> Result<()> {
                 nid2nways.entry(*n).and_modify(|v| {*v=v.saturating_add(2);}).or_insert(2);
             }
 
-            if let Some(t) = w.timestamp().as_ref().map(|t| t.to_epoch_number()) {
+            if let Some(t) = w.timestamp().as_ref().map(osmio::TimestampFormat::to_epoch_number) {
                 latest_timestamp.fetch_max(t, atomic_Ordering::SeqCst);
             }
         });
@@ -311,7 +311,7 @@ fn main() -> Result<()> {
             let group = group.into_boxed_slice();
             (w, group)
         })
-        .filter(|(_w, group)| args.incl_unset_group || !group.iter().any(|x| x.is_none()))
+        .filter(|(_w, group)| args.incl_unset_group || !group.iter().any(std::option::Option::is_none))
         .for_each_with((graphs.clone(), inter_store.clone()), |(graphs, inter_store), (w, group)| {
             let mut graphs = graphs.lock().unwrap();
             let graph = graphs.entry(group).or_default();
@@ -645,7 +645,7 @@ fn main() -> Result<()> {
         ProgressBar::new(
             way_groups
                 .par_iter()
-                .map(|wg| wg.num_nodes())
+                .map(osm_lump_ways::way_group::WayGroup::num_nodes)
                 .sum::<usize>() as u64,
         )
         .with_message("Splitting into single lines")

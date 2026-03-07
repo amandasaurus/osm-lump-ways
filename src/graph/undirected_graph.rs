@@ -131,13 +131,13 @@ where
 
     /// Number of neighbours for this vertex.
     pub fn num_neighbors(&self, i: &V) -> usize {
-        self.edges.get(i).map_or(0, |es| es.len())
+        self.edges.get(i).map_or(0, std::collections::BTreeMap::len)
     }
 
     pub fn len(&self) -> usize {
         self.edges
             .values()
-            .map(|from_i| from_i.len())
+            .map(std::collections::BTreeMap::len)
             .sum::<usize>()
             / 2
     }
@@ -145,7 +145,7 @@ where
     pub fn num_edges(&self) -> usize {
         self.edges
             .values()
-            .map(|from_i| from_i.len())
+            .map(std::collections::BTreeMap::len)
             .sum::<usize>()
             / 2
     }
@@ -250,7 +250,7 @@ impl Graph2 {
     }
 
     pub fn num_neighbors(&self, vertex: &i64) -> Option<usize> {
-        self.edges.get(vertex).map(|others| others.len())
+        self.edges.get(vertex).map(smallvec::SmallVec::len)
     }
 
     pub fn add_edge_chain(&mut self, vertexes: &[i64]) -> bool {
@@ -272,7 +272,7 @@ impl Graph2 {
     pub fn num_edges(&self) -> usize {
         self.edges
             .values()
-            .map(|from_i| from_i.len())
+            .map(smallvec::SmallVec::len)
             .sum::<usize>()
             / 2
     }

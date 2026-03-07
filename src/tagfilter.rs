@@ -43,7 +43,7 @@ impl std::fmt::Display for TagFilter {
                 f,
                 "{}",
                 tfs.iter()
-                    .map(|tf| tf.to_string())
+                    .map(std::string::ToString::to_string)
                     .collect::<Vec<_>>()
                     .join("∨")
             ),
@@ -51,7 +51,7 @@ impl std::fmt::Display for TagFilter {
                 f,
                 "{}",
                 tfs.iter()
-                    .map(|tf| tf.to_string())
+                    .map(std::string::ToString::to_string)
                     .collect::<Vec<_>>()
                     .join("∧")
             ),
@@ -123,13 +123,13 @@ impl std::str::FromStr for TagFilter {
         if s.contains('∨') {
             let tfs = s
                 .split('∨')
-                .map(|tf| tf.parse::<TagFilter>())
+                .map(str::parse::<TagFilter>)
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(TagFilter::Or(tfs))
         } else if s.contains('∧') {
             let tfs = s
                 .split('∧')
-                .map(|tf| tf.parse::<TagFilter>())
+                .map(str::parse::<TagFilter>)
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(TagFilter::And(tfs))
         } else if let Some((incl_type, idstr)) =
@@ -322,9 +322,9 @@ impl std::str::FromStr for TagFilterFunc {
 
         let tffs = s
             .split(';')
-            .map(|src| src.trim())
+            .map(str::trim)
             .filter(|s| !s.is_empty())
-            .map(|tff| tff.parse::<TagFilterFuncElement>())
+            .map(str::parse::<TagFilterFuncElement>)
             .collect::<Result<Vec<_>, _>>()?;
         Ok(TagFilterFunc(tffs))
     }
@@ -335,7 +335,7 @@ impl std::fmt::Display for TagFilterFunc {
         let parts = self
             .0
             .iter()
-            .map(|tff| tff.to_string())
+            .map(std::string::ToString::to_string)
             .collect::<Vec<String>>();
         write!(f, "{}", parts.join(";"))
     }
@@ -346,7 +346,7 @@ impl TagFilterFunc {
         self.0
             .iter()
             .map(|tff| tff.result(o))
-            .find(|res| res.is_some())
+            .find(std::option::Option::is_some)
             .flatten()
     }
 }

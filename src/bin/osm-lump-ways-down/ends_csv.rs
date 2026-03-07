@@ -25,7 +25,7 @@ pub(crate) fn init(
         "lat",
         "lng",
     ];
-    headers.extend(args.ends_tag.iter().map(|s| s.as_str()));
+    headers.extend(args.ends_tag.iter().map(std::string::String::as_str));
 
     if !csv_stats_file.exists() {
         let mut wtr = csv::Writer::from_writer(std::fs::File::create(csv_stats_file).unwrap());
@@ -67,7 +67,7 @@ pub(crate) fn write_ends<'a>(
     let mut end_points_w_meta = end_points_w_meta
         .map(|(nid, _mbms, end_tags, len)| (nid, end_tags, len))
         .filter(|(_nid, end_tags, _len)| {
-            !args.ends_csv_only_tagged || end_tags.iter().any(|t| t.is_some())
+            !args.ends_csv_only_tagged || end_tags.iter().any(std::option::Option::is_some)
         })
         .filter(|&(_nid, _end_tags, len)| args.ends_csv_min_length_m.is_none_or(|min| len >= min))
         .filter(|&(_nid, _end_tags, len)| len > 1.)
