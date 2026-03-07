@@ -544,11 +544,8 @@ where
             "Replacement vertex {replacement} doesn't exist"
         );
 
-        let mut old = match self.edges.remove(vertex) {
-            None => {
-                return;
-            }
-            Some(old) => old,
+        let Some(mut old) = self.edges.remove(vertex) else {
+            return;
         };
 
         self.set_vertex_property(replacement, old.vprop);

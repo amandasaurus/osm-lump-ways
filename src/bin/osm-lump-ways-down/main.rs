@@ -1461,13 +1461,7 @@ fn do_group_by_ends(
                 result.1.reverse();
                 return Some(result);
             }
-            let &nid = match nid_iter.next() {
-                None => {
-                    // finished all the nodes
-                    return None;
-                }
-                Some(x) => x,
-            };
+            let &nid = nid_iter.next()?;
             let this_end_idx = g.vertex_property_unchecked(&nid).assigned_end_idx;
 
             // which in progress lines are there for this node
