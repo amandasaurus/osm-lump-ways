@@ -199,21 +199,18 @@ impl Graph2 {
         if vertex1 == vertex2 {
             return false;
         }
-        match self.edges.get_mut(&vertex1) {
-            Some(others) => {
-                if others.contains(&vertex2) {
-                    true
-                } else {
-                    others.push(vertex2);
-                    self.edges.entry(vertex2).or_default().push(vertex1);
-                    false
-                }
-            }
-            _ => {
-                self.edges.insert(vertex1, smallvec![vertex2]);
+        if let Some(others) = self.edges.get_mut(&vertex1) {
+            if others.contains(&vertex2) {
+                true
+            } else {
+                others.push(vertex2);
                 self.edges.entry(vertex2).or_default().push(vertex1);
                 false
             }
+        } else {
+            self.edges.insert(vertex1, smallvec![vertex2]);
+            self.edges.entry(vertex2).or_default().push(vertex1);
+            false
         }
     }
 

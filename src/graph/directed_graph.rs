@@ -156,22 +156,19 @@ pub trait DirectedGraphTrait<V, E>: Send + Sync + Sized {
                 let mut ins = self
                     .in_neighbours(curr_point)
                     .filter(|i| !seen_vertexes.contains(i));
-                match ins.next() {
-                    Some(nxt) => {
-                        // any other out neighbours of this point need to be visited later
-                        frontier.extend(
-                            ins.filter(|n| incl_nid(n))
-                                .map(|in_nid| (in_nid, Some(curr_latlng))),
-                        );
+                if let Some(nxt) = ins.next() {
+                    // any other out neighbours of this point need to be visited later
+                    frontier.extend(
+                        ins.filter(|n| incl_nid(n))
+                            .map(|in_nid| (in_nid, Some(curr_latlng))),
+                    );
 
-                        curr_point = nxt;
-                        continue;
-                    }
-                    _ => {
-                        // no more neighbours here
-                        curr_path.reverse();
-                        return Some(curr_path);
-                    }
+                    curr_point = nxt;
+                    continue;
+                } else {
+                    // no more neighbours here
+                    curr_path.reverse();
+                    return Some(curr_path);
                 }
             }
         })
