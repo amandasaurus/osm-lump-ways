@@ -818,6 +818,9 @@ fn calc_river_relationship(
     taggroups: &[TagGroupInfo],
     rr: &(u64, u64),
 ) -> Option<(RiverRelationship, u64, u64)> {
+    use FlowType::*;
+    use RiverRelationship::*;
+
     // need to be mut to swap later
     let &(mut a_id, mut b_id) = rr;
     let mut a = &taggroups[a_id as usize];
@@ -835,8 +838,6 @@ fn calc_river_relationship(
     let mut possible_res: SmallVec<[(RiverRelationship, u64, u64); 2]> = smallvec![];
 
     // do this exactly twice, with some reversing code at the end of the loop (i.e the middle)
-    use FlowType::*;
-    use RiverRelationship::*;
     for _step in [0, 1] {
         //dbg!(step, a_id, b_id);
         if confluences.iter().all(|c| c == &(In, Out)) {
