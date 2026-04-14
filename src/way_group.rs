@@ -29,8 +29,8 @@ impl WayGroup {
         let root_nodeid = *graph.first_vertex().unwrap();
         WayGroup {
             graph,
-            root_nodeid,
             group,
+            root_nodeid,
             ..Default::default()
         }
     }
