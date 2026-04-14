@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Internal code refactoring (to pass clippy pedantic)
+
 ## v3.8.0 (2026-02-02)
 
 * New tag filter `∃(lrb)KEY` (for `KEY:left`/`KEY:right`/…), and `∄(lrb)…`.
