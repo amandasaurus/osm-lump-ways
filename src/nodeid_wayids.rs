@@ -189,7 +189,7 @@ impl NodeIdWayIdsBucketWayIndex {
         let old_num_nodes = nodeids.len();
         let wayid: i32 = wayid.try_into().expect("way id is too large for i32");
         nodeids.push(new_nodeid);
-        nodeids.sort();
+        nodeids.sort_unstable();
         nodeids.dedup();
         self.num_nodes = self.num_nodes + nodeids.len() - old_num_nodes;
 
@@ -199,7 +199,7 @@ impl NodeIdWayIdsBucketWayIndex {
             .entry(new_nodeid_bucket)
             .or_default();
         bucket_wayids.push(wayid);
-        bucket_wayids.sort();
+        bucket_wayids.sort_unstable();
         bucket_wayids.dedup();
 
         let nodeid_bytes = vartyint::write_many_delta_new(&nodeids);
@@ -211,7 +211,7 @@ impl NodeIdWayIdsBucketWayIndex {
         nodeids.reserve(new_nodeids.len());
         let old_num_nodes = nodeids.len();
         nodeids.extend(new_nodeids);
-        nodeids.sort();
+        nodeids.sort_unstable();
         nodeids.dedup();
         self.num_nodes = self.num_nodes + nodeids.len() - old_num_nodes;
 
@@ -228,7 +228,7 @@ impl NodeIdWayIdsBucketWayIndex {
                 .entry(new_nodeid_bucket)
                 .or_default();
             bucket_wayids.push(wayid);
-            bucket_wayids.sort();
+            bucket_wayids.sort_unstable();
             bucket_wayids.dedup();
         }
     }

@@ -586,7 +586,7 @@ where
         // assume we never get inconsistant
         let other = self.edges.entry(vertex2).or_default();
         other.ins.push(vertex1);
-        other.ins.sort();
+        other.ins.sort_unstable();
         false
     }
 
