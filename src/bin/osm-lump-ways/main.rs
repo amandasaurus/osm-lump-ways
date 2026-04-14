@@ -1062,9 +1062,10 @@ fn do_betweenness(
         )
         .for_each_with(
             (obj_to_write_tx.clone(), inter_store_lock.clone()),
-            |(obj_to_write_tx, inter_store_lock), (_nodes, graph, wg, bc_values)| {
+            |(obj_to_write_tx, inter_store_lock), (nodes, graph, wg, bc_values)| {
                 let max_betweenness_value =
                     *bc_values.iter().map(|(_nids, value)| value).max().unwrap();
+                let max_possible_betweenness_value = (nodes.len() * (nodes.len() - 1) / 2) as f64;
 
                 graph.edges_par_iter().for_each_with(
                     inter_store_lock.clone(),
@@ -1074,6 +1075,7 @@ fn do_betweenness(
                             return;
                         }
                         let fraction = (val as f64) / (max_betweenness_value as f64);
+                        let fraction_max = (val as f64) / (max_possible_betweenness_value as f64);
 
                         if fraction < betweenness_min_fraction {
                             return;
@@ -1082,6 +1084,7 @@ fn do_betweenness(
                         json_props["betweenness_value"] = val.into();
                         json_props["max_betweenness_value"] = max_betweenness_value.into();
                         json_props["betweenness_fraction"] = round(&fraction, 6).into();
+                        json_props["betweenness_fraction_max"] = round(&fraction_max, 6).into();
 
                         let inter_store = inter_store_lock.lock().unwrap();
                         obj_to_write_tx
