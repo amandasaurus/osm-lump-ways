@@ -327,14 +327,15 @@ impl NodeIdPosition for NodeIdPositionBucket {
                 "Node {nid} does not have a position"
             );
 
-            *output_el = bucket_latlngs_i32s[local_index]
-                .map(|(lat_i32, lng_i32)| {
+            *output_el = bucket_latlngs_i32s[local_index].map_or_else(
+                || panic!("unable to get position for nid {nid}"),
+                |(lat_i32, lng_i32)| {
                     (
                         Lat::from_inner(lat_i32).degrees(),
                         Lon::from_inner(lng_i32).degrees(),
                     )
-                })
-                .unwrap_or_else(|| panic!("unable to get position for nid {nid}"));
+                },
+            );
         }
     }
 

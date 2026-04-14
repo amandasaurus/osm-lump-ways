@@ -156,8 +156,7 @@ fn main() -> Result<()> {
                     record.file().unwrap_or("N/A"),
                     record
                         .line()
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| "N/A".to_string()),
+                        .map_or_else(|| "N/A".to_string(), |s| s.to_string()),
                     record.args()
                 )
             }
