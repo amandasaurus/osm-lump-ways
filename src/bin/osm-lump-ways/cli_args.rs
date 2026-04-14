@@ -17,6 +17,7 @@ use osm_lump_ways::way_group::MinLengthFilter;
 /// `--only-longest-n-per-file NUM` Only output the longest `NUM` ways groups.
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Args {
     /// Input PBF filename
     #[arg(short, long, value_name = "FILENAME.osm.pbf")]
