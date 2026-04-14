@@ -431,7 +431,7 @@ fn main() -> Result<()> {
         if graphs.len() > 1 {
             format!(" There are {} groups", graphs.len())
         } else {
-            "".to_string()
+            String::new()
         }
     );
     let grouping = progress_bars.add(
@@ -834,7 +834,7 @@ fn do_frames(
     let started_frames = Instant::now();
     info!(
         "Calculating, for each way group, all the frames (lines through the middle){}",
-        frames_group_min_length_m.map_or("".to_string(), |min| format!(
+        frames_group_min_length_m.map_or(String::new(), |min| format!(
             ", and only including way groups longer than {min:.3e}"
         ))
     );
