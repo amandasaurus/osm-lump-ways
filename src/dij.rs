@@ -21,7 +21,7 @@ pub enum SplitPathsMethod {
 /// The results are in the `prev_dist` variable, hashmap for each other vertex in the graph, with the
 /// previous node to go to (if applicable) and the total distance along the path By passing in as a
 /// &mut argument, the allocated memory can be reused between runs
-pub fn dij_single(
+pub(crate) fn dij_single(
     start_idx: i64,
     edges: &Graph2,
     edge_lengths: &SortedSliceMap<(i64, i64), u64>,
