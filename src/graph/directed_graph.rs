@@ -156,6 +156,8 @@ pub trait DirectedGraphTrait<V, E>: Send + Sync + Sized {
                 let mut ins = self
                     .in_neighbours(curr_point)
                     .filter(|i| !seen_vertexes.contains(i));
+
+                #[allow(clippy::redundant_else)]
                 if let Some(nxt) = ins.next() {
                     // any other out neighbours of this point need to be visited later
                     frontier.extend(
