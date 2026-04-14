@@ -586,6 +586,7 @@ fn main() -> Result<()> {
         delta_num_vertexes * 100 / old_num_vertexes,
     );
 
+    #[allow(clippy::option_as_ref_cloned)]
     way_groups.par_iter_mut().for_each(|wg| {
         let json_props = &mut wg.json_props;
         json_props["root_nodeid"] = wg.root_nodeid.into();
