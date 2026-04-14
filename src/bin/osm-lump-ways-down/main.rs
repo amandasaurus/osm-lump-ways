@@ -864,6 +864,7 @@ fn main() -> Result<()> {
                 }
             }
 
+            #[allow(clippy::float_cmp)]     // we don't care _that_ much
             if curr_upstream
                 != inflow_per_group
                     .iter()

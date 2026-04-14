@@ -207,6 +207,7 @@ fn main() -> Result<()> {
             max_sinuosity >= 1.0,
             "It's impossible to have a sinuosity < 1.0. Exiting now without doing anything."
         );
+        #[allow(clippy::float_cmp)]     // value comes from user
         if max_sinuosity == 1.0 {
             warn!("A max sinuosity of 1.0 will exclude a lot (all?) data");
         }
