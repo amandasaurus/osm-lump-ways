@@ -1400,7 +1400,7 @@ where
     result
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::similar_names)]
 fn do_group_by_ends(
     output_filename: &Path,
     g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
