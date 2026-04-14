@@ -243,7 +243,7 @@ fn main() -> Result<()> {
     reader
         .ways()
         .par_bridge()
-        .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, &args.tag_filter_func))
+        .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, args.tag_filter_func.as_ref()))
         // TODO support grouping by tag value
         .for_each_with(nid2nways.clone(), |nid2nways, w| {
             assert!(w.id() > 0, "This file has a way id < 0. negative ids are not supported in this tool Use osmium sort & osmium renumber to convert this file and run again.");
@@ -302,7 +302,7 @@ fn main() -> Result<()> {
     reader
         .ways()
         .par_bridge()
-        .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, &args.tag_filter_func))
+        .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, args.tag_filter_func.as_ref()))
         .map(|w| {
             let group = args
                 .tag_group_k

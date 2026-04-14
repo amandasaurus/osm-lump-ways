@@ -295,7 +295,7 @@ fn main() -> Result<()> {
         info!("Reading all relations");
         for rel in reader
             .relations()
-            .filter(|r| tagfilter::obj_pass_filters(r, &tag_filter, &args.tag_filter_func))
+            .filter(|r| tagfilter::obj_pass_filters(r, &tag_filter, args.tag_filter_func.as_ref()))
         {
             relation_tags.record_relation(&rel, args.relation_tags_role.as_slice());
         }
@@ -318,7 +318,7 @@ fn main() -> Result<()> {
     let nids_in_ne2_ways = do_read_nids_in_ne2_ways(
         reader,
         &tag_filter,
-        &args.tag_filter_func,
+        args.tag_filter_func.as_ref(),
         &input_bar,
         &progress_bars,
         &relation_tags,
@@ -348,7 +348,7 @@ fn main() -> Result<()> {
         .ways()
         .par_bridge()
         .inspect(|_| obj_reader.inc(1))
-        .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, &args.tag_filter_func) || relation_tags.contains_wid(w.id()))
+        .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, args.tag_filter_func.as_ref()) || relation_tags.contains_wid(w.id()))
         .inspect(|_| ways_added.inc(1))
         // TODO support grouping by tag value
         .for_each_with((g.clone(), inter_store.clone(), tagvalues_to_edges.clone(), Vec::<i64>::new()),
@@ -924,9 +924,9 @@ fn main() -> Result<()> {
             // filter, and have a desired tag
             .map(|w| {
                 let has_end_member_tags =
-                    tagfilter::obj_pass_filters(&w, &ends_membership_filters, &None);
+                    tagfilter::obj_pass_filters(&w, &ends_membership_filters, None);
                 let has_end_point_tags =
-                    tagfilter::obj_pass_filters(&w, &tag_filter, &args.tag_filter_func)
+                    tagfilter::obj_pass_filters(&w, &tag_filter, args.tag_filter_func.as_ref())
                         && args.ends_tag.iter().any(|end_tag| w.has_tag(end_tag));
                 (w, has_end_member_tags, has_end_point_tags)
             })
@@ -1249,7 +1249,7 @@ fn main() -> Result<()> {
 fn do_read_nids_in_ne2_ways(
     mut reader: osmio::pbf::PBFReader<indicatif::ProgressBarIter<File>>,
     tag_filter: &SmallVec<[tagfilter::TagFilter; 3]>,
-    tag_filter_func: &Option<tagfilter::TagFilterFunc>,
+    tag_filter_func: Option<&tagfilter::TagFilterFunc>,
     input_bar: &ProgressBar,
     progress_bars: &MultiProgress,
     relation_tags: &WayIdToRelationTags,

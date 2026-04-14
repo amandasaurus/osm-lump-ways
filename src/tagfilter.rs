@@ -354,7 +354,7 @@ impl TagFilterFunc {
 pub fn obj_pass_filters(
     o: &(impl osmio::OSMObjBase + Sync + Send),
     tag_filters: &SmallVec<[TagFilter; 3]>,
-    tag_filter_func: &Option<TagFilterFunc>,
+    tag_filter_func: Option<&TagFilterFunc>,
 ) -> bool {
     if !tag_filters.is_empty() {
         tag_filters.par_iter().all(|tf| tf.filter(o))
