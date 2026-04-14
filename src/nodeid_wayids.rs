@@ -35,10 +35,10 @@ pub trait NodeIdWayIds: Debug + Send + Sync {
     fn contains_nid(&self, nid: &i64) -> bool;
 
     /// Return all the ways that this node is in.
-    fn ways(&self, nid: &i64) -> Box<dyn Iterator<Item = i64> + '_>;
+    fn ways(&self, nid: i64) -> Box<dyn Iterator<Item = i64> + '_>;
 
     // returns true iff this node id is in >1 way
-    fn nid_is_in_many(&self, nid: &i64) -> bool;
+    fn nid_is_in_many(&self, nid: i64) -> bool;
 }
 
 /// Some standard struct for doing this.
@@ -108,14 +108,14 @@ impl NodeIdWayIds for NodeIdWayIdsMultiMap {
         self.singles.len() + self.multiples.len()
     }
 
-    fn nid_is_in_many(&self, nid: &i64) -> bool {
-        self.multiples.contains_key(nid)
+    fn nid_is_in_many(&self, nid: i64) -> bool {
+        self.multiples.contains_key(&nid)
     }
 
-    fn ways(&self, nid: &i64) -> Box<dyn Iterator<Item = i64> + '_> {
-        if let Some(wid) = self.singles.get(nid) {
+    fn ways(&self, nid: i64) -> Box<dyn Iterator<Item = i64> + '_> {
+        if let Some(wid) = self.singles.get(&nid) {
             Box::new(std::iter::once(*wid))
-        } else if let Some(wids) = self.multiples.get(nid) {
+        } else if let Some(wids) = self.multiples.get(&nid) {
             Box::new(wids.iter().copied())
         } else {
             Box::new(std::iter::empty())
@@ -254,8 +254,7 @@ impl NodeIdWayIdsBucketWayIndex {
         bucket
     }
 
-    fn ways_for_nid(&self, nid: &i64) -> impl Iterator<Item = &i32> + use<'_> {
-        let nid = *nid;
+    fn ways_for_nid(&self, nid: i64) -> impl Iterator<Item = &i32> + use<'_> {
         let bucketid = self.nodeid_bucket(nid);
         self.nodeid_bucket_wayid
             .get(&bucketid)
@@ -339,13 +338,13 @@ impl NodeIdWayIds for NodeIdWayIdsBucketWayIndex {
         }
     }
 
-    fn nid_is_in_many(&self, nid: &i64) -> bool {
+    fn nid_is_in_many(&self, nid: i64) -> bool {
         // Ask for the ways this nid is in, and check there are >1
         self.ways_for_nid(nid).nth(1).is_some()
     }
 
     /// Return all the ways that this node is in.
-    fn ways(&self, nid: &i64) -> Box<dyn Iterator<Item = i64> + '_> {
+    fn ways(&self, nid: i64) -> Box<dyn Iterator<Item = i64> + '_> {
         Box::new(self.ways_for_nid(nid).map(|wid32| (*wid32).into()))
     }
 }
@@ -443,7 +442,7 @@ impl NodeIdWayIds for NodeIdWayIdsAuto {
         }
     }
 
-    fn nid_is_in_many(&self, nid: &i64) -> bool {
+    fn nid_is_in_many(&self, nid: i64) -> bool {
         match self {
             Self::MultiMap(x) => x.nid_is_in_many(nid),
             Self::BucketMap(x) => x.nid_is_in_many(nid),
@@ -451,7 +450,7 @@ impl NodeIdWayIds for NodeIdWayIdsAuto {
     }
 
     /// Return all the ways that this node is in.
-    fn ways(&self, nid: &i64) -> Box<dyn Iterator<Item = i64> + '_> {
+    fn ways(&self, nid: i64) -> Box<dyn Iterator<Item = i64> + '_> {
         match self {
             Self::MultiMap(x) => x.ways(nid),
             Self::BucketMap(x) => x.ways(nid),

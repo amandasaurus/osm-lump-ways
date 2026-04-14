@@ -555,30 +555,30 @@ enum FlowType {
     No,
 }
 impl FlowType {
-    fn out(&self) -> bool {
-        *self == FlowType::Out
+    fn out(self) -> bool {
+        self == FlowType::Out
     }
     #[allow(unused)]
-    fn through(&self) -> bool {
-        *self == FlowType::Through
+    fn through(self) -> bool {
+        self == FlowType::Through
     }
-    fn in_(&self) -> bool {
-        *self == FlowType::In
+    fn in_(self) -> bool {
+        self == FlowType::In
     }
-    fn out_or_through(&self) -> bool {
+    fn out_or_through(self) -> bool {
         match self {
             FlowType::Out | FlowType::Through => true,
             FlowType::In | FlowType::No => false,
         }
     }
-    fn in_or_through(&self) -> bool {
+    fn in_or_through(self) -> bool {
         match self {
             FlowType::In | FlowType::Through => true,
             FlowType::Out | FlowType::No => false,
         }
     }
     #[allow(unused)]
-    fn code(&self) -> char {
+    fn code(self) -> char {
         match self {
             FlowType::In => 'I',
             FlowType::Out => 'O',

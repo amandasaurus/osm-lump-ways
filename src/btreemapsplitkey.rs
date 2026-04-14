@@ -13,14 +13,14 @@ pub struct BTreeMapSplitKey<V> {
 
 const I32_LIMIT: i64 = i32::MAX as i64;
 
-fn split_key(k: &i64) -> [i32; 2] {
+fn split_key(k: i64) -> [i32; 2] {
     [
         (k / I32_LIMIT).try_into().expect("Bad presumption for i32"),
         (k % I32_LIMIT) as i32,
     ]
 }
 
-fn join_key(ks: &[i32; 2]) -> i64 {
+fn join_key(ks: [i32; 2]) -> i64 {
     (ks[0] as i64 * I32_LIMIT) + (ks[1] as i64)
 }
 
@@ -38,37 +38,37 @@ where
     pub fn iter(&self) -> impl Iterator<Item = (i64, &V)> {
         self.inner
             .iter()
-            .flat_map(|(k0, i2)| i2.iter().map(|(k1, v)| (join_key(&[*k0, *k1]), v)))
+            .flat_map(|(k0, i2)| i2.iter().map(|(k1, v)| (join_key([*k0, *k1]), v)))
     }
     #[allow(clippy::should_implement_trait)]
     pub fn into_iter(self) -> impl Iterator<Item = (i64, V)> {
         self.inner
             .into_iter()
-            .flat_map(|(k0, i2)| i2.into_iter().map(move |(k1, v)| (join_key(&[k0, k1]), v)))
+            .flat_map(|(k0, i2)| i2.into_iter().map(move |(k1, v)| (join_key([k0, k1]), v)))
     }
     #[must_use]
     pub fn par_iter(&self) -> impl ParallelIterator<Item = (i64, &V)> {
         self.inner
             .par_iter()
-            .flat_map(|(k0, i2)| i2.par_iter().map(|(k1, v)| (join_key(&[*k0, *k1]), v)))
+            .flat_map(|(k0, i2)| i2.par_iter().map(|(k1, v)| (join_key([*k0, *k1]), v)))
     }
 
     #[must_use]
-    pub fn get(&self, key: &i64) -> Option<&V> {
+    pub fn get(&self, key: i64) -> Option<&V> {
         let k = split_key(key);
         self.inner.get(&k[0]).and_then(|i2| i2.get(&k[1]))
     }
-    pub fn get_mut(&mut self, key: &i64) -> Option<&mut V> {
+    pub fn get_mut(&mut self, key: i64) -> Option<&mut V> {
         let k = split_key(key);
         self.inner.get_mut(&k[0]).and_then(|i2| i2.get_mut(&k[1]))
     }
     pub fn keys(&self) -> impl Iterator<Item = i64> + '_ {
         self.inner
             .iter()
-            .flat_map(|(k0, i2)| i2.keys().map(|k1| join_key(&[*k0, *k1])))
+            .flat_map(|(k0, i2)| i2.keys().map(|k1| join_key([*k0, *k1])))
     }
     #[must_use]
-    pub fn contains_key(&self, key: &i64) -> bool {
+    pub fn contains_key(&self, key: i64) -> bool {
         let k = split_key(key);
         self.inner
             .get(&k[0])
@@ -78,7 +78,7 @@ where
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
-    pub fn remove(&mut self, key: &i64) -> Option<V> {
+    pub fn remove(&mut self, key: i64) -> Option<V> {
         let k = split_key(key);
         match self.inner.get_mut(&k[0]) {
             Some(i2) => {
@@ -92,7 +92,7 @@ where
         }
     }
     pub fn entry(&mut self, key: i64) -> std::collections::btree_map::Entry<'_, i32, V> {
-        let k = split_key(&key);
+        let k = split_key(key);
         self.inner.entry(k[0]).or_default().entry(k[1])
     }
     pub fn len(&self) -> usize {
