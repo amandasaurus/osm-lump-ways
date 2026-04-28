@@ -1084,7 +1084,7 @@ fn do_betweenness(
                             return;
                         }
                         let fraction = (val as f64) / (max_betweenness_value as f64);
-                        let fraction_max = (val as f64) / (max_possible_betweenness_value as f64);
+                        let fraction_max = (val as f64) / max_possible_betweenness_value;
 
                         if fraction < betweenness_min_fraction {
                             return;
