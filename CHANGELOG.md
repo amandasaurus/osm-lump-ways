@@ -3,6 +3,7 @@
 ## Unreleased
 
 * Internal code refactoring (to pass clippy pedantic)
+* Minor bug fixes
 
 ## v3.8.0 (2026-02-02)
 
