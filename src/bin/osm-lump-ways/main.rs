@@ -349,6 +349,10 @@ fn main() -> Result<()> {
             ways_added.inc(1);
         });
     let num_ways_read = ways_added.position();
+    if num_ways_read == 0 {
+        info!("No ways read. Exiting.");
+        return Ok(());
+    }
     drop(nids_in_ne2_ways);
     info!(
         "Finished reading file and building graph data structure. {} ways read in {}, {:.3e} ways/sec",
@@ -562,6 +566,11 @@ fn main() -> Result<()> {
         );
     }
     way_groups.shrink_to_fit();
+
+    if way_groups.is_empty() {
+        info!("All way_groups have been filtered out. Nothing more to do. Exiting");
+        return Ok(());
+    }
 
     // Reduce the number of nodes in the graph by compressing nodes with 2 neighbours.
     let old_num_vertexes = way_groups
