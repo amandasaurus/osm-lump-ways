@@ -910,7 +910,7 @@ fn main() -> Result<()> {
             );
         }
         if !args.ends_tag.is_empty() {
-            info!("Adding the following tags to each end: {:?}", args.ends_tag,);
+            info!("Adding the following tags to each end: {:?}", args.ends_tag);
         }
         let reader = read_progress::BufReaderWithSize::from_path(&args.input_filename)?;
         let mut reader = osmio::stringpbf::PBFReader::new(reader);
@@ -1065,7 +1065,7 @@ fn main() -> Result<()> {
                     for (tag_key, tag_value) in args
                         .ends_tag
                         .iter()
-                        .zip(end_tags.into_iter())
+                        .zip(end_tags)
                         .filter(|(_k, v)| v.is_some())
                     {
                         props[format!("tag:{tag_key}")] = tag_value.clone().into();
