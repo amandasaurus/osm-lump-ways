@@ -21,16 +21,18 @@ pub struct WayGroup {
     pub json_props: serde_json::Value,
     pub group: Box<[Option<String>]>,
     pub root_nodeid: i64,
+    pub all_wayids: Vec<i64>,
 }
 
 impl WayGroup {
     #[must_use]
-    pub fn new(graph: Graph2, group: Box<[Option<String>]>) -> Self {
+    pub fn new(graph: Graph2, group: Box<[Option<String>]>, all_wayids: Vec<i64>) -> Self {
         let root_nodeid = *graph.first_vertex().unwrap();
         WayGroup {
             graph,
             group,
             root_nodeid,
+            all_wayids,
             ..Default::default()
         }
     }

@@ -40,6 +40,7 @@ use fileio::OutputFormat;
 use osm_lump_ways::fileio;
 use osm_lump_ways::formatting;
 use osm_lump_ways::graph::Graph2;
+use std::collections::HashSet;
 
 fn main() -> Result<()> {
     let args = cli_args::Args::parse();
@@ -313,10 +314,27 @@ fn main() -> Result<()> {
             (w, group)
         })
         .filter(|(_w, group)| args.incl_unset_group || !group.iter().any(std::option::Option::is_none))
-        .for_each_with((graphs.clone(), inter_store.clone()), |(graphs, inter_store), (w, group)| {
-            let mut graphs = graphs.lock().unwrap();
-            let graph = graphs.entry(group).or_default();
-            let mut inter_store = inter_store.lock().unwrap();
+        .for_each_with(
+            (
+                graphs.clone(),
+                inter_store.clone(),
+                group_wayid_nodes.clone(),
+            ),
+            |(graphs, inter_store, group_wayid_nodes), (w, group)| {
+                let group_clone = group.clone();
+
+                let mut graphs = graphs.lock().unwrap();
+                let graph = graphs.entry(group).or_default();
+
+                {
+                    let mut gwn = group_wayid_nodes.lock().unwrap();
+
+                    gwn.entry(group_clone.to_vec())
+                        .or_default()
+                        .insert(w.id(), w.nodes().to_vec());
+                }
+
+                let mut inter_store = inter_store.lock().unwrap();
 
             let mut nodes = w.nodes();
             let _orig_len = nodes.len();
@@ -459,9 +477,35 @@ fn main() -> Result<()> {
                 .into_disconnected_graphs(grouping.clone())
                 .map({
                     let total_groups_found = total_groups_found.clone();
+                    let group_wayid_nodes = group_wayid_nodes.clone();
+
                     move |sub_graph| {
                         total_groups_found.inc(1);
-                        WayGroup::new(sub_graph, group.clone())
+
+                        let subgraph_nodes: HashSet<i64> = sub_graph.vertexes().copied().collect();
+
+                        let mut all_wayids = group_wayid_nodes
+                            .lock()
+                            .unwrap()
+                            .get(group.as_ref())
+                            .map(|waymap| {
+                                waymap
+                                    .iter()
+                                    .filter_map(|(wayid, nodes)| {
+                                        if nodes.iter().any(|nid| subgraph_nodes.contains(nid)) {
+                                            Some(*wayid)
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .collect::<Vec<_>>()
+                            })
+                            .unwrap_or_default();
+
+                        all_wayids.sort_unstable();
+                        all_wayids.dedup();
+
+                        WayGroup::new(sub_graph, group.clone(), all_wayids)
                     }
                 })
         })
@@ -602,6 +646,14 @@ fn main() -> Result<()> {
         }
         json_props["tag_groups"] = wg.group.to_vec().into();
         json_props["num_nodes"] = wg.graph.num_vertexes().into();
+        if args.incl_wayids {
+            json_props["all_wayids"] = wg
+                .all_wayids
+                .iter()
+                .map(|id| format!("w{}", id))
+                .collect::<Vec<_>>()
+                .into();
+        }
     });
 
     update_length_m_fraction_total(&mut way_groups);
