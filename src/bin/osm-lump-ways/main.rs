@@ -128,8 +128,8 @@ fn main() -> Result<()> {
         );
     }
 
-    if args.min_length_m.is_some() {
-        warn!("The argument `--min-length-m` can be replaced with `--min-length`");
+    if let Some(min_length_m) = args.min_length_m {
+        warn!("The argument `--min-length-m` can be replaced with `--min-length`, e.g. --min-length {min_length_m}m");
     }
 
     let output_format = if args.output_filename.ends_with(".geojson") {
