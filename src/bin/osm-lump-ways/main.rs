@@ -683,7 +683,7 @@ fn main() -> Result<()> {
         .reduce(HashMap::new, |mut acc, curr| {
             trace!("Merging files down again");
             for (filename, wgs) in curr.into_iter() {
-                acc.entry(filename).or_default().extend(wgs.into_iter());
+                acc.entry(filename).or_default().extend(wgs);
             }
             acc
         });

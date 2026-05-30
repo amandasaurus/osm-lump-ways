@@ -616,7 +616,7 @@ where
                     new_graph.add_edge_w_prop(vertex, out_v, eprop);
                     vertexes_to_look_at.push(out_v);
                 }
-                vertexes_to_look_at.extend(ins.into_iter());
+                vertexes_to_look_at.extend(ins);
             }
 
             progress_bar.inc(num_vertexes as u64);
