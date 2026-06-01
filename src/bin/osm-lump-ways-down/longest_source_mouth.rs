@@ -18,8 +18,28 @@ use osm_lump_ways::graph;
 use osm_lump_ways::inter_store;
 use osm_lump_ways::nodeid_position;
 
+use osm_lump_ways::nodeid_wayids::NodeIdWayIds;
+
 use super::{EdgeProperty, TagGroupInfo, VertexProperty};
 use serde_json::json;
+
+fn collect_all_wayids(
+    nodeid_wayids: &impl NodeIdWayIds,
+    nids: impl IntoIterator<Item = i64>,
+) -> Vec<String> {
+    let mut wayids = nids
+        .into_iter()
+        .flat_map(|nid| nodeid_wayids.ways(nid))
+        .collect::<Vec<_>>();
+
+    wayids.sort_unstable();
+    wayids.dedup();
+
+    wayids
+        .into_iter()
+        .map(|wayid| format!("w{wayid}"))
+        .collect()
+}
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn do_longest_source_mouth(
@@ -33,6 +53,8 @@ pub(crate) fn do_longest_source_mouth(
     only_named: bool,
     longest_source_mouth_longest_n: Option<usize>,
     longest_source_mouth_unnamed_string: &str,
+    incl_wayids: bool,
+    nodeid_wayids: &impl NodeIdWayIds,
 ) -> Result<()> {
     // Calc all mouth nids
     let mut mouths: Vec<i64> = g
@@ -88,6 +110,8 @@ pub(crate) fn do_longest_source_mouth(
                 tag_group_info,
                 tag_group_value,
                 longest_source_mouth_unnamed_string,
+                incl_wayids,
+                nodeid_wayids,
             )
         });
 
@@ -218,6 +242,8 @@ fn path_group_to_geojson(
     tag_group_info: &[TagGroupInfo],
     tag_group_value: &[String],
     unnnamed_string: &str,
+    incl_wayids: bool,
+    nodeid_wayids: &impl NodeIdWayIds,
 ) -> impl Iterator<Item = (serde_json::Value, Vec<(f64, f64)>)> {
     let names = groups
         .into_iter()
@@ -259,7 +285,7 @@ fn path_group_to_geojson(
         .into_iter()
         .enumerate()
         .map(move |(idx, (taggroupid, name, nids, length_m))| {
-            let props = json!({
+            let mut props = json!({
                 "name": name,
                 "length_m": round(&length_m, 1),
                 "idx": idx,
@@ -275,6 +301,10 @@ fn path_group_to_geojson(
                 "river_system_mouth_source_nids_s": format!("{},{}", mouth_nid, source_nid),
                 "river_system_internal_groupids": all_taggroupids,
             });
+            if incl_wayids {
+                props["all_wayids"] =
+                    collect_all_wayids(nodeid_wayids, nids.iter().copied()).into();
+            }
             let line: Vec<(f64, f64)> = inter_store
                 .expand_line_directed(&nids)
                 .map(|nid| nodeid_pos.get(&nid).unwrap())

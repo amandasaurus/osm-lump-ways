@@ -34,6 +34,9 @@ use smallvec::SmallVec;
 use country_boundaries::{BOUNDARIES_ODBL_360X180, CountryBoundaries, LatLon};
 use ordered_float::OrderedFloat;
 
+use osm_lump_ways::nodeid_wayids;
+use osm_lump_ways::nodeid_wayids::NodeIdWayIds;
+
 use osm_lump_ways::utils::{round, round_mult};
 
 mod cli_args;
@@ -339,6 +342,8 @@ fn main() -> Result<()> {
     let mut reader = osmio::stringpbf::PBFReader::new(rdr);
     let inter_store = inter_store::InterStore::new();
     let inter_store = Arc::new(Mutex::new(inter_store));
+    let nodeid_wayids = nodeid_wayids::default();
+    let nodeid_wayids = Arc::new(Mutex::new(nodeid_wayids));
     let tagvalues_to_edges = Arc::new(Mutex::new(
         HashMap::new() as HashMap<String, HashSet<(i64, i64)>>
     ));
@@ -350,14 +355,25 @@ fn main() -> Result<()> {
         .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, args.tag_filter_func.as_ref()) || relation_tags.contains_wid(w.id()))
         .inspect(|_| ways_added.inc(1))
         // TODO support grouping by tag value
-        .for_each_with((g.clone(), inter_store.clone(), tagvalues_to_edges.clone(), Vec::<i64>::new()),
-            |(g, inter_store, seen_tagvalues, nodes_buf), w| {
+        .for_each_with(
+            (
+                g.clone(),
+                inter_store.clone(),
+                tagvalues_to_edges.clone(),
+                nodeid_wayids.clone(),
+                Vec::<i64>::new(),
+            ),
+            |(g, inter_store, seen_tagvalues, nodeid_wayids, nodes_buf), w| {
                 assert!(w.id() > 0, "This file has a way id < 0. negative ids are not supported in this tool Use osmium sort & osmium renumber to convert this file and run again.");
                 // add the nodes from w to this graph
                 let mut g = g.lock().unwrap();
                 let mut inter_store = inter_store.lock().unwrap();
                 let mut seen_tagvalues = seen_tagvalues.lock().unwrap();
                 nodes_added.inc(w.nodes().len() as u64);
+                nodeid_wayids
+                    .lock()
+                    .unwrap()
+                    .insert_many(w.id(), w.nodes());
 
                 // If we're assigning based on tag, get the hashset where it'll be stored
                 let mut tagvalues_to_edges = args.flow_follows_tag
@@ -436,6 +452,10 @@ fn main() -> Result<()> {
 
     let mut g = Arc::try_unwrap(g).unwrap().into_inner().unwrap();
     let inter_store = Arc::try_unwrap(inter_store).unwrap().into_inner().unwrap();
+    let nodeid_wayids = Arc::try_unwrap(nodeid_wayids)
+        .unwrap()
+        .into_inner()
+        .unwrap();
     let tagvalues_to_edges = Arc::try_unwrap(tagvalues_to_edges)
         .unwrap()
         .into_inner()
@@ -1215,6 +1235,8 @@ fn main() -> Result<()> {
             tag_group_info,
             &tag_group_value,
             args.min_length_m,
+            args.incl_wayids,
+            &nodeid_wayids,
         )?;
     }
 
@@ -1231,6 +1253,8 @@ fn main() -> Result<()> {
             args.longest_source_mouth_only_named,
             args.longest_source_mouth_longest_n,
             &args.longest_source_mouth_unnamed_string,
+            args.incl_wayids,
+            &nodeid_wayids,
         )?;
     }
 
@@ -1863,6 +1887,24 @@ fn do_write_upstreams(
     Ok(())
 }
 
+fn collect_all_wayids(
+    nodeid_wayids: &impl NodeIdWayIds,
+    nids: impl IntoIterator<Item = i64>,
+) -> Vec<String> {
+    let mut wayids = nids
+        .into_iter()
+        .flat_map(|nid| nodeid_wayids.ways(nid))
+        .collect::<Vec<_>>();
+
+    wayids.sort_unstable();
+    wayids.dedup();
+
+    wayids
+        .into_iter()
+        .map(|wayid| format!("w{wayid}"))
+        .collect()
+}
+
 #[allow(clippy::too_many_arguments)]
 fn do_waterway_grouped(
     output_filename: &Path,
@@ -1874,6 +1916,8 @@ fn do_waterway_grouped(
     tag_group_info: &[TagGroupInfo],
     tag_group_value: &[String],
     min_length_m: Option<f64>,
+    incl_wayids: bool,
+    nodeid_wayids: &impl NodeIdWayIds,
 ) -> Result<()> {
     let started_do_waterway_grouped = Instant::now();
     let writing_output_bar = progress_bars.add(
@@ -2023,6 +2067,14 @@ fn do_waterway_grouped(
             ).sum::<f64>();
             // Round the upstream to only output 1 decimal place
             props["cum_length_m"] = round(&cum_length_m, 1).into();
+
+            if incl_wayids {
+                props["all_wayids"] = collect_all_wayids(
+                    nodeid_wayids,
+                    lines.iter().flat_map(|line| line.iter().copied()),
+                )
+                .into();
+}
 
             if let Some(min_length_m) = min_length_m
                 && cum_length_m < min_length_m {
