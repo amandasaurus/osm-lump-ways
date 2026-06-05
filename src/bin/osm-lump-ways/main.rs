@@ -30,6 +30,8 @@ use nodeid_position::NodeIdPosition;
 use osm_lump_ways::dij;
 use osm_lump_ways::haversine::haversine_m_fpair;
 use osm_lump_ways::nodeid_position;
+use osm_lump_ways::nodeid_wayids;
+use osm_lump_ways::nodeid_wayids::NodeIdWayIds;
 use osm_lump_ways::sorted_slice_store::SortedSliceSet;
 use osm_lump_ways::tagfilter;
 use osm_lump_ways::utils::round;
@@ -40,6 +42,24 @@ use fileio::OutputFormat;
 use osm_lump_ways::fileio;
 use osm_lump_ways::formatting;
 use osm_lump_ways::graph::Graph2;
+
+fn collect_all_wayids(
+    nodeid_wayids: &impl NodeIdWayIds,
+    nids: impl IntoIterator<Item = i64>,
+) -> Vec<String> {
+    let mut wayids = nids
+        .into_iter()
+        .flat_map(|nid| nodeid_wayids.ways(nid))
+        .collect::<Vec<_>>();
+
+    wayids.sort_unstable();
+    wayids.dedup();
+
+    wayids
+        .into_iter()
+        .map(|wayid| format!("w{wayid}"))
+        .collect()
+}
 
 fn main() -> Result<()> {
     let args = cli_args::Args::parse();
@@ -298,6 +318,8 @@ fn main() -> Result<()> {
     let graphs = Arc::new(Mutex::new(graphs));
     let inter_store = inter_store::InterStore::new();
     let inter_store = Arc::new(Mutex::new(inter_store));
+    let nodeid_wayids = nodeid_wayids::default();
+    let nodeid_wayids = Arc::new(Mutex::new(nodeid_wayids));
     let started_reading_ways = Instant::now();
     reader
         .ways()
@@ -313,10 +335,17 @@ fn main() -> Result<()> {
             (w, group)
         })
         .filter(|(_w, group)| args.incl_unset_group || !group.iter().any(std::option::Option::is_none))
-        .for_each_with((graphs.clone(), inter_store.clone()), |(graphs, inter_store), (w, group)| {
+        .for_each_with(
+            (graphs.clone(), inter_store.clone(), nodeid_wayids.clone()),
+            |(graphs, inter_store, nodeid_wayids), (w, group)| {
             let mut graphs = graphs.lock().unwrap();
             let graph = graphs.entry(group).or_default();
             let mut inter_store = inter_store.lock().unwrap();
+
+            nodeid_wayids
+                .lock()
+                .unwrap()
+                .insert_many(w.id(), w.nodes());
 
             let mut nodes = w.nodes();
             let _orig_len = nodes.len();
@@ -365,6 +394,11 @@ fn main() -> Result<()> {
     input_bar.finish_and_clear();
     let graphs = Arc::try_unwrap(graphs).unwrap().into_inner().unwrap();
     let mut inter_store = Arc::try_unwrap(inter_store).unwrap().into_inner().unwrap();
+
+    let nodeid_wayids = Arc::try_unwrap(nodeid_wayids)
+        .unwrap()
+        .into_inner()
+        .unwrap();
 
     let assemble_nids_needed = progress_bars
         .add(ProgressBar::new_spinner().with_style(
@@ -611,6 +645,10 @@ fn main() -> Result<()> {
         }
         json_props["tag_groups"] = wg.group.to_vec().into();
         json_props["num_nodes"] = wg.graph.num_vertexes().into();
+        if args.incl_wayids {
+            json_props["all_wayids"] =
+                collect_all_wayids(&nodeid_wayids, wg.graph.vertexes().copied()).into();
+        }
     });
 
     update_length_m_fraction_total(&mut way_groups);
