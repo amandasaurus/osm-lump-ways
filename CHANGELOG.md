@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## v3.9.0 (2026-07-15)
 
 * Internal code refactoring (to pass clippy pedantic)
