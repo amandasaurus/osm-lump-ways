@@ -4,6 +4,7 @@
 
 * Internal code refactoring (to pass clippy pedantic)
 * Minor bug fixes
+* Restore `--incl-wayids` feature for `o-l-w` (PR #9, thanks @jb41997)
 
 ## v3.8.0 (2026-02-02)
 
