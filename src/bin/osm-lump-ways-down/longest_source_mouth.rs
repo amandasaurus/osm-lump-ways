@@ -234,6 +234,7 @@ fn group_path_parts_by_taggroup(
     groups
 }
 
+#[allow(clippy::too_many_arguments)]
 fn path_group_to_geojson(
     groups: Vec<(usize, Box<[i64]>)>,
     g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
