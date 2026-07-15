@@ -109,60 +109,60 @@ mod tests {
 
     #[test]
     fn split1() {
-        assert_eq!(split_key(&0), [0, 0]);
+        assert_eq!(split_key(0), [0, 0]);
     }
     #[test]
     fn split2() {
-        assert_eq!(split_key(&I32_LIMIT), [1, 0]);
+        assert_eq!(split_key(I32_LIMIT), [1, 0]);
     }
     #[test]
     fn split3() {
-        assert_eq!(split_key(&(I32_LIMIT + 1)), [1, 1]);
+        assert_eq!(split_key(I32_LIMIT + 1), [1, 1]);
     }
     #[test]
     fn split4() {
-        assert_eq!(split_key(&(I32_LIMIT + 2)), [1, 2]);
+        assert_eq!(split_key(I32_LIMIT + 2), [1, 2]);
     }
     #[test]
     fn split5() {
-        assert_eq!(split_key(&(I32_LIMIT - 1)), [0, 2147483646]);
+        assert_eq!(split_key(I32_LIMIT - 1), [0, 2147483646]);
     }
     #[test]
     fn split6() {
-        assert_eq!(split_key(&2147483646), [0, 2147483646]);
+        assert_eq!(split_key(2147483646), [0, 2147483646]);
     }
     #[test]
     fn split7() {
-        assert_eq!(split_key(&(2147483646 + 1)), [1, 0]);
+        assert_eq!(split_key(2147483646 + 1), [1, 0]);
     }
 
     #[test]
     fn join1() {
-        assert_eq!(join_key(&[0, 0]), 0);
+        assert_eq!(join_key([0, 0]), 0);
     }
     #[test]
     fn join2() {
-        assert_eq!(join_key(&[1, 0]), 2147483647);
+        assert_eq!(join_key([1, 0]), 2147483647);
     }
     #[test]
     fn join3() {
-        assert_eq!(join_key(&[1, 1]), 2147483648);
+        assert_eq!(join_key([1, 1]), 2147483648);
     }
     #[test]
     fn join4() {
-        assert_eq!(join_key(&[1, 2]), 2147483649);
+        assert_eq!(join_key([1, 2]), 2147483649);
     }
     #[test]
     fn join5() {
-        assert_eq!(join_key(&[0, 2147483646]), 2147483646);
+        assert_eq!(join_key([0, 2147483646]), 2147483646);
     }
 
     #[test]
     fn simple1() {
         let mut x = BTreeMapSplitKey::new();
         *x.entry(0).or_default() = 12;
-        assert_eq!(x.get(&0), Some(&12));
-        assert_eq!(x.get(&1), None);
+        assert_eq!(x.get(0), Some(&12));
+        assert_eq!(x.get(1), None);
         assert_eq!(x.iter().collect::<Vec<_>>(), vec![(0, &12)])
     }
 
@@ -174,7 +174,7 @@ mod tests {
         *x.entry(0).or_default() = 12;
         assert_eq!(x.len(), 1);
         assert!(!x.is_empty());
-        x.remove(&0);
+        x.remove(0);
         assert!(x.is_empty());
         assert_eq!(x.len(), 0);
     }
