@@ -303,7 +303,7 @@ fn main() -> Result<()> {
 
     let latest_timestamp = latest_timestamp.into_inner();
     let latest_timestamp_iso =
-        osmio::TimestampFormat::EpochNunber(latest_timestamp).to_iso_string();
+        osmio::TimestampFormat::EpochNumber(latest_timestamp).to_iso_string();
     info!("Latest timestamp in this file is {latest_timestamp} / {latest_timestamp_iso}");
 
     let input_fp = std::fs::File::open(&args.input_filename)?;

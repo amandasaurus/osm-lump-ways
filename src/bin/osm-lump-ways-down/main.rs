@@ -442,7 +442,7 @@ fn main() -> Result<()> {
     info_memory_used!();
     let latest_timestamp = latest_timestamp.into_inner();
     let latest_timestamp_iso =
-        osmio::TimestampFormat::EpochNunber(latest_timestamp).to_iso_string();
+        osmio::TimestampFormat::EpochNumber(latest_timestamp).to_iso_string();
     info!("Latest timestamp is {latest_timestamp} / {latest_timestamp_iso}");
     obj_reader.finish_and_clear();
     ways_added.finish_and_clear();

@@ -98,7 +98,7 @@ impl TagFilter {
             TagFilter::Or(tfs) => tfs.iter().any(|tf| tf.filter(o)),
             TagFilter::And(tfs) => tfs.iter().all(|tf| tf.filter(o)),
             TagFilter::OSMObj(incl, osm_type, osm_id) => {
-                if o.object_type().name_short().chars().next().unwrap() == *osm_type
+                if o.object_type().name_short() == *osm_type
                     && o.id() == *osm_id
                 {
                     *incl
