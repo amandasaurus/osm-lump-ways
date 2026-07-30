@@ -228,7 +228,7 @@ fn main() -> Result<()> {
         );
     }
 
-    info!("Input file: {}", &args.input_filename.display());
+    info!("Input file: {}", args.input_filename.display());
     if args.tag_filter.is_empty() {
         match args.tag_filter_func {
             Some(ref tff) => {
@@ -384,7 +384,7 @@ fn main() -> Result<()> {
                 // Possibly remove duplicate nodes in a way. IME this happens once in the planet.
                 let mut nodes = if w.nodes().windows(2).any(|w| w[0] == w[1]) {
                     warn!("Way {} has repeating nodes. at: {:?} Removing them for this processing", w.id(), w.nodes().windows(2).enumerate().filter(|(_i, w)| w[0] == w[1]).collect::<Vec<_>>());
-                    nodes_buf.truncate(0);
+                    nodes_buf.clear();
                     nodes_buf.extend(w.nodes().iter().copied());
                     nodes_buf.dedup();
                     nodes_buf
@@ -699,7 +699,7 @@ fn main() -> Result<()> {
     info_memory_used!();
     info!("Contracting the graph");
     for (vertex, replacement) in &node_id_replaces {
-        assert!(vertex != replacement);
+        assert_ne!(vertex, replacement);
         g.contract_vertex(vertex, replacement);
     }
     g.assert_consistancy();

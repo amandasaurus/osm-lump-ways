@@ -31,7 +31,7 @@ pub(crate) fn kosaraju_it<V, E>(
     for v in g.vertexes() {
         calc_components_bar.inc(1);
 
-        stack.truncate(0);
+        stack.clear();
         stack.push((v, false));
 
         while let Some((curr, children_added)) = stack.pop() {
@@ -73,7 +73,7 @@ pub(crate) fn kosaraju_it<V, E>(
         calc_components_bar.inc(1);
         let root = start;
 
-        stack.truncate(0);
+        stack.clear();
         stack.push(start);
         while let Some(curr) = stack.pop() {
             if let std::collections::btree_map::Entry::Vacant(e) = components.entry(curr) {

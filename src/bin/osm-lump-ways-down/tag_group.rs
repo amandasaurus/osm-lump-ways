@@ -153,7 +153,7 @@ pub fn calc_tag_group(
         this_tag_group.end_segments.push(*end_segment);
 
         let curr_group_id = tag_group_info.len() as u64;
-        frontier.truncate(0);
+        frontier.clear();
         frontier.push_back(*end_segment);
         while let Some(seg) = frontier.pop_front() {
             let seg_eprop = g.edge_property_unchecked(seg);
@@ -190,7 +190,7 @@ pub fn calc_tag_group(
     // Hit it with a big hammer, and just loop over the missing and assign them to a matching.
     let mut incomplete_segs = Vec::new();
     let mut possible_taggroupids: SmallVec<[_; 3]> = SmallVec::new();
-    incomplete_segs.truncate(0);
+    incomplete_segs.clear();
     incomplete_segs.extend(
         g.edges_iter_w_prop()
             .filter(|(_nid1, _nid2, eprop)| eprop.taggroupid == u64::MAX)
@@ -295,7 +295,7 @@ pub fn calc_tag_group(
             continue;
         }
         let (rr, a_id, b_id) = rr.unwrap();
-        assert!(a_id != b_id);
+        assert_ne!(a_id, b_id);
         let (a, b) = if a_id < b_id {
             get_two_muts(&mut tag_group_info, a_id as usize, b_id as usize)
         } else {
@@ -498,7 +498,7 @@ pub fn calc_tag_group(
         let tgid = tgid as usize;
         assert!(tag_group_info[tgid].has_stream_level());
         assert!(!tag_group_info[tgid].stream_level_code.is_empty());
-        buf.truncate(0);
+        buf.clear();
         buf.extend(
             tag_group_info[tgid]
                 .confluences

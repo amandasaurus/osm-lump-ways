@@ -206,7 +206,7 @@ impl NodeIdPositionBucket {
                 // now take from the real store to the cache.
                 let bytes: &[u8] = self.inner.entry(bucket_id).or_insert_with(|| vec![0]);
                 cache.0 = bucket_id;
-                cache.1.truncate(0);
+                cache.1.clear();
                 cache.1.reserve(2_usize.pow(bucket_shift as u32));
                 cache.1.extend(bucket_bytes_read(bucket_shift, bytes));
             }
@@ -402,7 +402,7 @@ fn bucket_bytes_read(
 fn bucket_bytes_write(bucket_size: i64, pos: &[Option<(i32, i32)>], output: &mut Vec<u8>) {
     assert_eq!(pos.len(), 2_i32.pow(bucket_size as u32) as usize);
     assert!(bucket_size <= 6); // only support i64
-    output.truncate(0);
+    output.clear();
     output.reserve(8 + 2 * pos.len());
 
     // Node id mask

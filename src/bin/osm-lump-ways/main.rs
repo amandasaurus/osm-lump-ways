@@ -189,7 +189,7 @@ fn main() -> Result<()> {
         anyhow::ensure!(a > b);
     }
 
-    info!("Input file: {}", &args.input_filename.display());
+    info!("Input file: {}", args.input_filename.display());
     if args.tag_filter.is_empty() {
         match args.tag_filter_func {
             Some(ref tff) => {

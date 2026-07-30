@@ -357,7 +357,7 @@ impl Graph2 {
 
             let mut new_graph = Graph2::new();
 
-            frontier.truncate(0);
+            frontier.clear();
             frontier.push(*self.first_vertex().unwrap());
 
             while let Some(nid) = frontier.pop() {
@@ -520,7 +520,7 @@ impl Graph2 {
         while new_nodes.len() < num {
             // We need to exclude nodes we
             // It's quicker to repidly call choose_multiple rather than multiple .choose.
-            possible_nodes.truncate(0);
+            possible_nodes.clear();
             while possible_nodes.len() < k {
                 possible_nodes.extend(
                     all_nodes
@@ -689,7 +689,7 @@ impl Graph2 {
                 }
 
                 let mut inter_store = inter_store.lock().unwrap();
-                tmp_inters.truncate(0);
+                tmp_inters.clear();
                 tmp_inters.extend(inter_store.inters_undirected(&nid_a, &nid));
                 tmp_inters.push(nid);
                 tmp_inters.extend(inter_store.inters_undirected(&nid, &nid_b));

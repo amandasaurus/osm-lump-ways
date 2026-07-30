@@ -599,7 +599,7 @@ where
                 return None;
             }
             let mut new_graph: DirectedGraph<V, E> = DirectedGraph::new();
-            vertexes_to_look_at.truncate(0);
+            vertexes_to_look_at.clear();
             vertexes_to_look_at.push(g.vertexes().next().unwrap());
             let mut num_vertexes = 0;
 
