@@ -100,10 +100,8 @@ e.g. `waterway=put_in\u{3B}egress→F;` is a rule to exclude any tag with key
 
 ## Relations
 
-The programme `osm-lump-ways` ignores relations.
-
-`osm-lump-ways-down` by default ignores relations, unless
-`--relation-tags-overwrite` is used.
+By default both programmes ignore relations, unless `--relation-tags-overwrite`
+is used.
 
 ### `--relation-tags-overwrite`
 
@@ -120,6 +118,14 @@ higher number of members will be used (if equal, the last seen relation in the
 file will be used, which for normal, sorted, OSM files is the highest numbered
 relation). Only one level of way-in-relation membership is included. Relations
 as members in other relations are ignored.
+
+#### Example
+
+In OSM, rivers will have a `name` tag local to that language, e.g. the Rhine
+has a different `name` in German speaking, or Dutch speaking areas. Grouping
+ways by name will split the Rhine. All member ways are in a relation which will
+only have one `name` tag. `--relation-tags-overwrite` will ensure the Rhine
+stays as one.
 
 # Output
 

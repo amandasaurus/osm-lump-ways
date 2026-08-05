@@ -36,6 +36,7 @@ use osm_lump_ways::sorted_slice_store::SortedSliceSet;
 use osm_lump_ways::tagfilter;
 use osm_lump_ways::utils::round;
 use osm_lump_ways::way_group;
+use osm_lump_ways::way_id_rel_tags::WayIdToRelationTags;
 use way_group::{MinLengthFilter, WayGroup};
 
 use fileio::OutputFormat;
@@ -235,6 +236,28 @@ fn main() -> Result<()> {
         }
     }
 
+    let mut relation_tags = WayIdToRelationTags::default();
+    if args.relation_tags_overwrite {
+        let input_fp = std::fs::File::open(&args.input_filename)?;
+        let input_bar = progress_bars.add(
+            ProgressBar::new(input_fp.metadata()?.len())
+                .with_message("Collecting relation tags")
+                .with_style(file_reading_style.clone()),
+        );
+        let rdr = input_bar.wrap_read(input_fp);
+        let mut reader = osmio::stringpbf::PBFReader::new(rdr);
+        info!("Reading all relations");
+        for rel in reader
+            .relations()
+            .filter(|r| tagfilter::obj_pass_filters(r, &tag_filter, args.tag_filter_func.as_ref()))
+        {
+            relation_tags.record_relation(&rel, args.relation_tags_role.as_slice());
+        }
+        input_bar.finish_and_clear();
+        info!("All relations read. {}", relation_tags.summary());
+    }
+    let relation_tags = relation_tags;
+
     // For each group, a hashmap of wayid:nodes in that way
     let group_wayid_nodes: HashMap<Vec<Option<String>>, HashMap<i64, Vec<i64>>> = HashMap::new();
     let group_wayid_nodes = Arc::new(Mutex::new(group_wayid_nodes));
@@ -265,7 +288,7 @@ fn main() -> Result<()> {
     reader
         .ways()
         .par_bridge()
-        .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, args.tag_filter_func.as_ref()))
+        .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, args.tag_filter_func.as_ref()) || relation_tags.contains_wid(w.id()))
         // TODO support grouping by tag value
         .for_each_with(nid2nways.clone(), |nid2nways, w| {
             assert!(w.id() > 0, "This file has a way id < 0. negative ids are not supported in this tool Use osmium sort & osmium renumber to convert this file and run again.");
@@ -326,12 +349,12 @@ fn main() -> Result<()> {
     reader
         .ways()
         .par_bridge()
-        .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, args.tag_filter_func.as_ref()))
+        .filter(|w| tagfilter::obj_pass_filters(w, &tag_filter, args.tag_filter_func.as_ref()) || relation_tags.contains_wid(w.id()))
         .map(|w| {
             let group = args
                 .tag_group_k
                 .par_iter()
-                .map(|tg| tg.get_values(&w))
+                .map(|tg| tg.get_values(&w, &relation_tags))
                 .collect::<Vec<Option<String>>>();
             let group = group.into_boxed_slice();
             (w, group)

@@ -3,6 +3,7 @@
 ## Unreleased
 
 * Upgrade dependencies (incl. `osmio`)
+* `o-l-w` now understands `--relation-tags-overwrite`
 
 ## v3.9.0 (2026-07-15)
 

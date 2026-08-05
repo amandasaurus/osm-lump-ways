@@ -251,6 +251,15 @@ pub struct Args {
         default_value = "2000"
     )]
     pub betweenness_max_nodes: u64,
+
+    /// If a way is in a relation, which matches the tag filters, then apply that relation tags to
+    /// this way
+    #[arg(long, default_value = "false")]
+    pub relation_tags_overwrite: bool,
+
+    /// If using `relation_tags_overwrite`, only relation members with this role will be used.
+    #[arg(long, requires = "relation_tags_overwrite", value_name = "ROLE_NAME")]
+    pub relation_tags_role: Vec<String>,
 }
 
 /// CLI arg parser. If the value starts with @, the rest is assumed to be a filename, the contents
