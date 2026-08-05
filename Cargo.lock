@@ -1155,9 +1155,9 @@ dependencies = [
 
 [[package]]
 name = "osmio"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2117eb5237202679f8836d9e59dfaa22a739400761c62c68049c679f2f7f2c5b"
+checksum = "b76e1c981dc5b3c7107685ef4aa0df3a7d9aea1a7a1e2b151d5ec9293d465c96"
 dependencies = [
  "anyhow",
  "byteorder",
