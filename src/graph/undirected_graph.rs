@@ -11,7 +11,7 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use utils::min_max;
 
-use kiddo::{KdTree, SquaredEuclidean};
+use kiddo::{MutableKdTree, SquaredEuclidean};
 
 use itertools::Itertools;
 use smallvec::smallvec;
@@ -506,13 +506,15 @@ impl Graph2 {
         // Need to quickly check existing nodes, so keep as a hashmap
         let mut new_nodes = HashSet::with_capacity(num);
 
-        let mut kdtree: KdTree<f64, 2> = KdTree::with_capacity(num);
+        let mut kdtree: MutableKdTree<f64, 2> = Default::default();
         let mut rng = &mut rand::rng();
 
         let first = *all_nodes.choose(&mut rng).unwrap();
         let pos = nodeid_pos.get_arr(&first).unwrap();
         new_nodes.insert(first);
-        kdtree.add(&pos, first.try_into().unwrap());
+        kdtree
+            .add(&pos, first.try_into().unwrap())
+            .expect("Unable to add first node to the KD Tree");
 
         // Buffer of possible nodes for each iteration.
         let mut possible_nodes = Vec::with_capacity(k);
@@ -528,7 +530,11 @@ impl Graph2 {
                         .filter(|nid| !new_nodes.contains(nid))
                         .map(|nid| {
                             let pos = nodeid_pos.get_arr(nid).unwrap();
-                            let dist = kdtree.nearest_one::<SquaredEuclidean>(&pos).distance;
+                            let dist = kdtree
+                                .query(&pos)
+                                .nearest_one::<SquaredEuclidean<f64>>()
+                                .execute()
+                                .distance;
 
                             // dist is minus → largest dist is first
                             (OrderedFloat(-dist), *nid, pos)
@@ -541,7 +547,9 @@ impl Graph2 {
             let (_dist, nid, pos) = possible_nodes[0];
 
             // save it
-            kdtree.add(&pos, nid.try_into().unwrap());
+            kdtree
+                .add(&pos, nid.try_into().unwrap())
+                .expect("Unable to add new node to the KDTree");
             new_nodes.insert(nid);
         }
 
