@@ -11,7 +11,7 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use utils::min_max;
 
-use kiddo::{MutableKdTree, SquaredEuclidean};
+use kiddo::{KdTree, MutableKdTree, SquaredEuclidean};
 
 use itertools::Itertools;
 use smallvec::smallvec;
@@ -506,7 +506,7 @@ impl Graph2 {
         // Need to quickly check existing nodes, so keep as a hashmap
         let mut new_nodes = HashSet::with_capacity(num);
 
-        let mut kdtree: MutableKdTree<f64, 2> = Default::default();
+        let mut kdtree: MutableKdTree<f64, 2> = KdTree::default();
         let mut rng = &mut rand::rng();
 
         let first = *all_nodes.choose(&mut rng).unwrap();
