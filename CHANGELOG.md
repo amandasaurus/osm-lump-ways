@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## v3.10.0 (2026-08-13)
 
 * Upgrade dependencies (incl. `osmio`)
