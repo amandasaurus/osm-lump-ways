@@ -121,6 +121,8 @@ struct EdgeProperty {
     tagid: Option<u32>,
 
     taggroupid: u64,
+
+    extra_tags: SortedSliceMap<SmolStr, SmolStr>,
 }
 
 impl Default for EdgeProperty {
@@ -130,6 +132,7 @@ impl Default for EdgeProperty {
             upstream_m: f64::NAN,
             tagid: None,
             taggroupid: u64::MAX,
+            extra_tags: SortedSliceMap::empty(),
         }
     }
 }
