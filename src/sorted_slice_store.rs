@@ -24,6 +24,10 @@ where
         Self::from_vec(data)
     }
 
+    pub fn empty() -> Self {
+        Self { data: Box::new([]) }
+    }
+
     #[must_use]
     pub fn from_vec(mut data: Vec<(K, V)>) -> Self {
         data.par_sort_unstable_by(|(k1, _v1), (k2, _v2)| k1.cmp(k2));
