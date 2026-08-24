@@ -76,9 +76,13 @@ where
     }
 
     pub fn contains_key<Q>(&self, k: &Q) -> bool
-		where K: Borrow<Q>, Q: Eq + Ord + ?Sized
-	{
-        self.data.binary_search_by_key(&k, |(k2, _v)| k2.borrow()).is_ok()
+    where
+        K: Borrow<Q>,
+        Q: Eq + Ord + ?Sized,
+    {
+        self.data
+            .binary_search_by_key(&k, |(k2, _v)| k2.borrow())
+            .is_ok()
     }
 
     pub fn get<Q>(&self, k: &Q) -> Option<&V>
