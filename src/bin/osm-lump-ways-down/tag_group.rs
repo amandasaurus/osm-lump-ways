@@ -44,6 +44,8 @@ pub struct TagGroupInfo {
     pub end_segments: SmallVec<[(i64, i64); 3]>,
 
     pub confluence_distances: SortedSliceMap<(i64, i64), f64>,
+
+    pub extra_tag_values: BTreeMap<SmolStr, BTreeMap<SmolStr, f64>>,
 }
 impl TagGroupInfo {
     fn from_tagid(tagid: Option<u32>) -> Self {
@@ -88,7 +90,8 @@ impl Default for TagGroupInfo {
             tagid: None,
             end_segments: smallvec![],
             min_nid: i64::MAX,
-            confluence_distances: SortedSliceMap::from_iter(std::iter::empty()),
+            confluence_distances: SortedSliceMap::empty(),
+            extra_tag_values: BTreeMap::new(),
         }
     }
 }
@@ -170,6 +173,14 @@ pub fn calc_tag_group(
 
             // save this group id
             this_tag_group.length_m += seg_eprop.length_m;
+            for (k, v) in seg_eprop.extra_tag_values.iter() {
+                *this_tag_group
+                    .extra_tag_values
+                    .entry(k.clone())
+                    .or_default()
+                    .entry(v.clone())
+                    .or_default() += seg_eprop.length_m;
+            }
             g.edge_property_mut(seg).taggroupid = curr_group_id;
             assign_to_group.inc(1);
 

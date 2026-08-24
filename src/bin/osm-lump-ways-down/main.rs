@@ -122,7 +122,7 @@ struct EdgeProperty {
 
     taggroupid: u64,
 
-    extra_tags: SortedSliceMap<SmolStr, SmolStr>,
+    extra_tag_values: SortedSliceMap<SmolStr, SmolStr>,
 }
 
 impl Default for EdgeProperty {
@@ -132,7 +132,7 @@ impl Default for EdgeProperty {
             upstream_m: f64::NAN,
             tagid: None,
             taggroupid: u64::MAX,
-            extra_tags: SortedSliceMap::empty(),
+            extra_tag_values: SortedSliceMap::empty(),
         }
     }
 }
@@ -385,6 +385,28 @@ fn main() -> Result<()> {
                     .and_then(|flow_follows_tag| relation_tags.way_tag_value(w.id(), flow_follows_tag).or(w.tag(flow_follows_tag)))
                     .map(|way_tag_value| seen_tagvalues.entry(way_tag_value.to_string()).or_default());
 
+                let mut extra_tag_values: Vec<(SmolStr, SmolStr)> = vec![];
+                if !args.grouped_waterways_extra_tag_values.is_empty() {
+                    // First push the tags from the relation (if applicable)
+                    extra_tag_values.extend(
+                        relation_tags
+                            .way_tags(w.id())
+                            .filter(|(k, _v)|
+                                    args.grouped_waterways_extra_tag_values.iter().any(|kf| kf.filter(k)))
+                            .map(|(k, v)| (SmolStr::from(k), SmolStr::from(v)))
+                        );
+                    // Now the tags *after* from the way
+                    extra_tag_values.extend(
+                        w.tags()
+                            .filter(|(k, _v)|
+                                    args.grouped_waterways_extra_tag_values.iter().any(|kf| kf.filter(k)))
+                            .map(|(k, v)| (SmolStr::from(k), SmolStr::from(v)))
+                        );
+                    // now dedupe based on k. This keeps the tags from the relation
+                    extra_tag_values.dedup_by(|(k1, _), (k2, _)| k1 == k2);
+                }
+                let extra_tag_values: SortedSliceMap<_,_> = SortedSliceMap::from_vec(extra_tag_values);
+
                 // Possibly remove duplicate nodes in a way. IME this happens once in the planet.
                 let mut nodes = if w.nodes().windows(2).any(|w| w[0] == w[1]) {
                     warn!("Way {} has repeating nodes. at: {:?} Removing them for this processing", w.id(), w.nodes().windows(2).enumerate().filter(|(_i, w)| w[0] == w[1]).collect::<Vec<_>>());
@@ -417,6 +439,9 @@ fn main() -> Result<()> {
                     assert!(i != 0);
                     assert!(nodes[0] != nodes[i], "Duplicate nodes in this way={w:?} curr nodes={nodes:?} i={i}");
                     g.add_edge(nodes[0], nodes[i]);
+                    if !extra_tag_values.is_empty() {
+                        g.edge_property_mut((nodes[0], nodes[i])).extra_tag_values = extra_tag_values.clone();
+                    }
 
                     if let Some(ref mut tagvalues_to_edges) = tagvalues_to_edges {
                         tagvalues_to_edges.insert((nodes[0], nodes[i]));
@@ -2071,6 +2096,18 @@ fn do_waterway_grouped(
             ).sum::<f64>();
             // Round the upstream to only output 1 decimal place
             props["cum_length_m"] = round(&cum_length_m, 1).into();
+
+            if !tg.extra_tag_values.is_empty() {
+                let mut extra_tag_values = serde_json::json!({});
+                for (k, vs) in tg.extra_tag_values.iter() {
+                    let mut these_vs = serde_json::json!({});
+                    for (v, len) in vs.iter() {
+                        these_vs[v.as_str()] = round(&(len/cum_length_m), 7).into();
+                    }
+                    extra_tag_values[k.as_str()] = these_vs;
+                }
+                props["extra_tag_values_fraction"] = extra_tag_values.into()
+            }
 
             if incl_wayids {
                 props["all_wayids"] = collect_all_wayids(
