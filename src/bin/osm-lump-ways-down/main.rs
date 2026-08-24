@@ -30,6 +30,7 @@ use std::sync::{Arc, Mutex};
 
 use num_format::{Locale, ToFormattedString};
 use smallvec::SmallVec;
+use smol_str::SmolStr;
 
 use country_boundaries::{BOUNDARIES_ODBL_360X180, CountryBoundaries, LatLon};
 use ordered_float::OrderedFloat;
@@ -53,7 +54,7 @@ use osm_lump_ways::graph;
 use osm_lump_ways::haversine;
 use osm_lump_ways::inter_store;
 use osm_lump_ways::nodeid_position;
-use osm_lump_ways::sorted_slice_store::SortedSliceSet;
+use osm_lump_ways::sorted_slice_store::{SortedSliceMap, SortedSliceSet};
 use osm_lump_ways::tagfilter;
 use osm_lump_ways::way_id_rel_tags::WayIdToRelationTags;
 
