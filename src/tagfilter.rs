@@ -375,6 +375,43 @@ fn split_prefix<'a>(haystack: &'a str, prefixes: &'a [&'a str]) -> Option<(&'a s
     None
 }
 
+/// Searching for keys
+#[derive(Debug, PartialEq, Clone)]
+pub enum KeyFilter {
+    FullKey(String),
+    StarPrefix(String),
+}
+
+/// Parses from user input
+impl std::str::FromStr for KeyFilter {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, String> {
+        if let Some(key) = s.strip_prefix("rawkey:") {
+            Ok(KeyFilter::FullKey(key.to_string()))
+        } else if let Some(prefix) = s.strip_suffix("*") {
+            Ok(KeyFilter::StarPrefix(prefix.to_string()))
+        } else {
+            Ok(KeyFilter::FullKey(s.to_string()))
+        }
+    }
+}
+
+impl KeyFilter {
+    fn filter(&self, k: &str) -> bool {
+        if let KeyFilter::FullKey(k2) = self
+            && k2 == k
+        {
+            true
+        } else if let KeyFilter::StarPrefix(p) = self
+            && k.starts_with(p)
+        {
+            true
+        } else {
+            false
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
