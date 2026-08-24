@@ -2099,14 +2099,14 @@ fn do_waterway_grouped(
 
             if !tg.extra_tag_values.is_empty() {
                 let mut extra_tag_values = serde_json::json!({});
-                for (k, vs) in tg.extra_tag_values.iter() {
+                for (k, vs) in &tg.extra_tag_values {
                     let mut these_vs = serde_json::json!({});
-                    for (v, len) in vs.iter() {
+                    for (v, len) in vs {
                         these_vs[v.as_str()] = round(&(len/cum_length_m), 7).into();
                     }
                     extra_tag_values[k.as_str()] = these_vs;
                 }
-                props["extra_tag_values_fraction"] = extra_tag_values.into()
+                props["extra_tag_values_fraction"] = extra_tag_values;
             }
 
             if incl_wayids {

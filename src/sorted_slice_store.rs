@@ -24,6 +24,7 @@ where
         Self::from_vec(data)
     }
 
+    #[must_use]
     pub fn empty() -> Self {
         Self { data: Box::new([]) }
     }

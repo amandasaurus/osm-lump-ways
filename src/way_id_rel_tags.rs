@@ -60,7 +60,7 @@ impl WayIdToRelationTags {
             .get(&wid)
             .and_then(|rid| self.rid_to_tags.get(rid))
             .into_iter()
-            .flat_map(|x| x.iter())
+            .flat_map(SortedSliceMap::iter)
     }
 
     /// True iff this way is in this list

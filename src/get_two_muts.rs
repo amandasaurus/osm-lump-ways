@@ -31,7 +31,7 @@ mod test {
     macro_rules! test_fails {
         ( $name:ident, $arr: expr, $i:expr, $j:expr ) => {
             #[test]
-            #[should_panic]
+            #[should_panic = "test failed"]
             fn $name() {
                 let mut arr = $arr;
                 get_two_muts(&mut arr, $i, $j);
