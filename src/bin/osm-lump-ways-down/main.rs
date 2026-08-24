@@ -182,9 +182,9 @@ fn main() -> Result<()> {
     );
 
     let file_reading_style =
-                ProgressStyle::with_template(
-        "{msg}: {percent:>3}% done. eta {eta:>4} {bar:10.blue/brown} {bytes:>7}/{total_bytes:7} {per_sec:>12}",
-            ).unwrap();
+        ProgressStyle::with_template(
+            "{msg}: {percent:>3}% done. eta {eta:>4} {bar:10.blue/brown} {bytes:>7}/{total_bytes:7} {per_sec:>12}",
+        ).unwrap();
 
     if !args.input_filename.is_file() {
         error!(
@@ -253,7 +253,7 @@ fn main() -> Result<()> {
     let style = ProgressStyle::with_template(
         "{msg}: {percent:>3}% done. eta {eta:>4} {bar:12.blue/brown} {pos:>7}/{len:7} {per_sec:>12}",
     )
-    .unwrap();
+        .unwrap();
     let obj_reader = progress_bars.add(ProgressBar::new_spinner().with_style(
         ProgressStyle::with_template("           {human_pos} ways read {per_sec:>20}").unwrap(),
     ));
