@@ -61,6 +61,11 @@ where
     pub fn keys(&self) -> impl ExactSizeIterator<Item = &K> {
         self.data.iter().map(|(k, _)| k)
     }
+
+    #[must_use]
+    pub fn values(&self) -> impl ExactSizeIterator<Item = &V> {
+        self.data.iter().map(|(_, v)| v)
+    }
     #[must_use]
     pub fn par_iter(&self) -> impl IndexedParallelIterator<Item = &(K, V)>
     where
