@@ -53,15 +53,14 @@ impl WayIdToRelationTags {
             .and_then(|tags| tags.get(key))
             .map(std::string::String::as_str)
     }
-    
+
     /// What are the tags for this way from the relations
-    pub fn way_tags(&self, wid: i64) -> impl Iterator<Item=&(String, String)> {
+    pub fn way_tags(&self, wid: i64) -> impl Iterator<Item = &(String, String)> {
         self.wid_to_rid
             .get(&wid)
             .and_then(|rid| self.rid_to_tags.get(rid))
-			.into_iter()
-			.flat_map(|x| x.iter())
-
+            .into_iter()
+            .flat_map(|x| x.iter())
     }
 
     /// True iff this way is in this list
