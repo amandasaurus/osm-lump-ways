@@ -311,6 +311,10 @@ pub struct Args {
     #[arg(long, value_name = "FILENAME")]
     pub grouped_waterways: Option<PathBuf>,
 
+    /// For each grouped group, output whi
+    #[arg(long, requires = "grouped_waterways")]
+    pub grouped_waterways_extra_tag_values: Vec<tagfilter::KeyFilter>,
+
     /// If a way is in a relation, which matches the tag filters, then apply that relation tags to
     /// this way
     #[arg(long, default_value = "false")]
