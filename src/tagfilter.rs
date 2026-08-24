@@ -397,7 +397,7 @@ impl std::str::FromStr for KeyFilter {
 }
 
 impl KeyFilter {
-    fn filter(&self, k: &str) -> bool {
+    pub fn filter(&self, k: &str) -> bool {
         if let KeyFilter::FullKey(k2) = self
             && k2 == k
         {
