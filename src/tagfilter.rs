@@ -380,6 +380,7 @@ fn split_prefix<'a>(haystack: &'a str, prefixes: &'a [&'a str]) -> Option<(&'a s
 pub enum KeyFilter {
     FullKey(String),
     StarPrefix(String),
+    Substring(String),
 }
 
 /// Parses from user input
@@ -388,6 +389,8 @@ impl std::str::FromStr for KeyFilter {
     fn from_str(s: &str) -> Result<Self, String> {
         if let Some(key) = s.strip_prefix("rawkey:") {
             Ok(KeyFilter::FullKey(key.to_string()))
+        } else if let Some(substring) = s.strip_circumfix("*", "*") {
+            Ok(KeyFilter::Substring(substring.to_string()))
         } else if let Some(prefix) = s.strip_suffix("*") {
             Ok(KeyFilter::StarPrefix(prefix.to_string()))
         } else {
@@ -405,6 +408,10 @@ impl KeyFilter {
             true
         } else if let KeyFilter::StarPrefix(p) = self
             && k.starts_with(p)
+        {
+            true
+        } else if let KeyFilter::Substring(subs) = self
+            && k.contains(subs)
         {
             true
         } else {
