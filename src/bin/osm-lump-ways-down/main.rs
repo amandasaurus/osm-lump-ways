@@ -378,7 +378,7 @@ fn main() -> Result<()> {
                 // If we're assigning based on tag, get the hashset where it'll be stored
                 let mut tagvalues_to_edges = args.flow_follows_tag
                     .as_ref()
-                    .and_then(|flow_follows_tag| relation_tags.way_tags(w.id(), flow_follows_tag).or(w.tag(flow_follows_tag)))
+                    .and_then(|flow_follows_tag| relation_tags.way_tag_value(w.id(), flow_follows_tag).or(w.tag(flow_follows_tag)))
                     .map(|way_tag_value| seen_tagvalues.entry(way_tag_value.to_string()).or_default());
 
                 // Possibly remove duplicate nodes in a way. IME this happens once in the planet.

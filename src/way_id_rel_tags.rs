@@ -46,7 +46,7 @@ impl WayIdToRelationTags {
 
     /// For this way id, what is the value of this tag
     /// None meaning the way isn't in the store, or there is no tag for this relation
-    pub fn way_tags(&self, wid: i64, key: &str) -> Option<&str> {
+    pub fn way_tag_value(&self, wid: i64, key: &str) -> Option<&str> {
         self.wid_to_rid
             .get(&wid)
             .and_then(|rid| self.rid_to_tags.get(rid))
@@ -96,10 +96,10 @@ mod tests {
 
         way_id_rel_tags.record_relation(&r, &[]);
 
-        assert!(way_id_rel_tags.way_tags(1, "highway").is_none());
-        assert_eq!(way_id_rel_tags.way_tags(1, "name"), Some("Foo"));
+        assert!(way_id_rel_tags.way_tag_value(1, "highway").is_none());
+        assert_eq!(way_id_rel_tags.way_tag_value(1, "name"), Some("Foo"));
 
-        assert!(way_id_rel_tags.way_tags(2, "highway").is_none());
-        assert!(way_id_rel_tags.way_tags(2, "name").is_none());
+        assert!(way_id_rel_tags.way_tag_value(2, "highway").is_none());
+        assert!(way_id_rel_tags.way_tag_value(2, "name").is_none());
     }
 }
