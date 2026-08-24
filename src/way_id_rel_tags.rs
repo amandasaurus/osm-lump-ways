@@ -46,7 +46,7 @@ impl WayIdToRelationTags {
 
     /// For this way id, what is the value of this tag
     /// None meaning the way isn't in the store, or there is no tag for this relation
-    pub fn way_tag_value(&self, wid: i64, key: &str) -> Option<&str> {
+    pub fn way_tag_value_only(&self, wid: i64, key: &str) -> Option<&str> {
         self.wid_to_rid
             .get(&wid)
             .and_then(|rid| self.rid_to_tags.get(rid))
@@ -55,12 +55,40 @@ impl WayIdToRelationTags {
     }
 
     /// What are the tags for this way from the relations
-    pub fn way_tags(&self, wid: i64) -> impl Iterator<Item = &(String, String)> {
+    pub fn way_tags_only(&self, wid: i64) -> impl Iterator<Item = &(String, String)> {
         self.wid_to_rid
             .get(&wid)
             .and_then(|rid| self.rid_to_tags.get(rid))
             .into_iter()
             .flat_map(SortedSliceMap::iter)
+    }
+
+    pub fn way_tag_value<'a>(
+        &'a self,
+        w: &'a impl osmio::OSMObjBase,
+        key: &str,
+    ) -> Option<&'a str> {
+        self.way_tag_value_only(w.id(), key).or(w.tag(key))
+    }
+
+    pub fn way_tags<'a>(
+        &'a self,
+        w: &'a impl osmio::OSMObjBase,
+    ) -> Box<dyn Iterator<Item = (&'a str, &'a str)> + 'a> {
+        if let Some(r_tags) = self
+            .wid_to_rid
+            .get(&w.id())
+            .and_then(|rid| self.rid_to_tags.get(rid))
+        {
+            Box::new(
+                r_tags
+                    .iter()
+                    .map(|(k, v)| (k.as_str(), v.as_str()))
+                    .chain(w.tags().filter(|(k, _v)| !r_tags.contains_key(*k))),
+            )
+        } else {
+            Box::new(w.tags())
+        }
     }
 
     /// True iff this way is in this list
@@ -103,12 +131,30 @@ mod tests {
         );
         let r = r.build().unwrap();
 
+        let mut w = osmio::obj_types::StringWayBuilder::default();
+        w._id(1);
+        w._tags(vec![("name".into(), "Bar".into()), ("boat".into(), "no".into())].into());
+        let w = w.build().unwrap();
+
         way_id_rel_tags.record_relation(&r, &[]);
 
-        assert!(way_id_rel_tags.way_tag_value(1, "highway").is_none());
-        assert_eq!(way_id_rel_tags.way_tag_value(1, "name"), Some("Foo"));
+        assert!(way_id_rel_tags.way_tag_value_only(1, "highway").is_none());
+        assert_eq!(way_id_rel_tags.way_tag_value_only(1, "name"), Some("Foo"));
+        assert!(way_id_rel_tags.way_tag_value_only(1, "boat").is_none());
 
-        assert!(way_id_rel_tags.way_tag_value(2, "highway").is_none());
-        assert!(way_id_rel_tags.way_tag_value(2, "name").is_none());
+        assert!(way_id_rel_tags.way_tag_value_only(2, "highway").is_none());
+        assert!(way_id_rel_tags.way_tag_value_only(2, "name").is_none());
+
+        assert_eq!(way_id_rel_tags.way_tag_value(&w, "name"), Some("Foo"));
+        assert_eq!(way_id_rel_tags.way_tag_value(&w, "boat"), Some("no"));
+        assert_eq!(way_id_rel_tags.way_tag_value(&w, "waterway"), Some("river"));
+        assert_eq!(way_id_rel_tags.way_tag_value(&w, "highway"), None);
+
+        let mut tags: Vec<_> = way_id_rel_tags.way_tags(&w).collect();
+        tags.sort();
+        assert_eq!(
+            tags,
+            vec![("boat", "no"), ("name", "Foo"), ("waterway", "river")]
+        );
     }
 }

@@ -382,7 +382,7 @@ fn main() -> Result<()> {
                 // If we're assigning based on tag, get the hashset where it'll be stored
                 let mut tagvalues_to_edges = args.flow_follows_tag
                     .as_ref()
-                    .and_then(|flow_follows_tag| relation_tags.way_tag_value(w.id(), flow_follows_tag).or(w.tag(flow_follows_tag)))
+                    .and_then(|flow_follows_tag| relation_tags.way_tag_value(&w, flow_follows_tag))
                     .map(|way_tag_value| seen_tagvalues.entry(way_tag_value.to_string()).or_default());
 
                 let mut extra_tag_values: Vec<(SmolStr, SmolStr)> = vec![];
@@ -390,20 +390,11 @@ fn main() -> Result<()> {
                     // First push the tags from the relation (if applicable)
                     extra_tag_values.extend(
                         relation_tags
-                            .way_tags(w.id())
+                            .way_tags(&w)
                             .filter(|(k, _v)|
                                     args.grouped_waterways_extra_tag_values.iter().any(|kf| kf.filter(k)))
                             .map(|(k, v)| (SmolStr::from(k), SmolStr::from(v)))
                         );
-                    // Now the tags *after* from the way
-                    extra_tag_values.extend(
-                        w.tags()
-                            .filter(|(k, _v)|
-                                    args.grouped_waterways_extra_tag_values.iter().any(|kf| kf.filter(k)))
-                            .map(|(k, v)| (SmolStr::from(k), SmolStr::from(v)))
-                        );
-                    // now dedupe based on k. This keeps the tags from the relation
-                    extra_tag_values.dedup_by(|(k1, _), (k2, _)| k1 == k2);
                 }
                 let extra_tag_values: SortedSliceMap<_,_> = SortedSliceMap::from_vec(extra_tag_values);
 
@@ -2100,6 +2091,10 @@ fn do_waterway_grouped(
             if !tg.extra_tag_values.is_empty() {
                 let mut extra_tag_values = serde_json::json!({});
                 for (k, vs) in &tg.extra_tag_values {
+                    if vs.len() > 1 {
+                        dbg!(&vs);
+                        dbg!(&tg);
+                    }
                     let mut these_vs = serde_json::json!({});
                     for (v, len) in vs {
                         these_vs[v.as_str()] = round(&(len/cum_length_m), 7).into();

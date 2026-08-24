@@ -29,7 +29,7 @@ impl TagGrouper {
         // Try the relation tags
         if o.object_type() == osmio::OSMObjectType::Way && relation_tags.contains_wid(o.id()) {
             for k in &self.0 {
-                if let Some(v) = relation_tags.way_tag_value(o.id(), k) {
+                if let Some(v) = relation_tags.way_tag_value_only(o.id(), k) {
                     return Some(v.to_string());
                 }
             }
