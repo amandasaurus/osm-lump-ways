@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* `o-l-w-d` new feature `--grouped-waterways-extra-tag-values`
+
 ## v3.10.0 (2026-08-13)
 
 * Upgrade dependencies (incl. `osmio`)

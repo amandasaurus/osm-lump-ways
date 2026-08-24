@@ -311,7 +311,8 @@ pub struct Args {
     #[arg(long, value_name = "FILENAME")]
     pub grouped_waterways: Option<PathBuf>,
 
-    /// For each grouped group, output whi
+    /// For each waterway group include a property `extra_tag_values_fraction` with the other tags
+    /// used on ways in this group
     #[arg(long, requires = "grouped_waterways")]
     pub grouped_waterways_extra_tag_values: Vec<tagfilter::KeyFilter>,
 
