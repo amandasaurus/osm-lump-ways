@@ -2091,10 +2091,6 @@ fn do_waterway_grouped(
             if !tg.extra_tag_values.is_empty() {
                 let mut extra_tag_values = serde_json::json!({});
                 for (k, vs) in &tg.extra_tag_values {
-                    if vs.len() > 1 {
-                        dbg!(&vs);
-                        dbg!(&tg);
-                    }
                     let mut these_vs = serde_json::json!({});
                     for (v, len) in vs {
                         these_vs[v.as_str()] = round(&(len/cum_length_m), 7).into();
