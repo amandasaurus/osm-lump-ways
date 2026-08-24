@@ -107,7 +107,7 @@ impl Default for VertexProperty {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone)]
 struct EdgeProperty {
     length_m: f64,
     /// the from value
