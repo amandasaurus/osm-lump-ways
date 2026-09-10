@@ -97,12 +97,21 @@ impl WayIdToRelationTags {
         self.wid_to_rid.contains_key(&wid)
     }
 
+	#[must_use]
+	pub fn num_relations(&self) -> usize {
+		self.rid_to_tags.len()
+	}
+	#[must_use]
+	pub fn num_ways(&self) -> usize {
+		self.wid_to_rid.len()
+	}
+
     #[must_use]
     pub fn summary(&self) -> String {
         format!(
             "{} relations, {} ways, {} relation tags",
-            self.rid_to_tags.len().to_formatted_string(&Locale::en),
-            self.wid_to_rid.len().to_formatted_string(&Locale::en),
+            self.num_relations().to_formatted_string(&Locale::en),
+            self.num_ways().to_formatted_string(&Locale::en),
             self.rid_to_tags
                 .par_iter()
                 .map(|(_, tags)| tags.len())
