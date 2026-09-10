@@ -54,7 +54,7 @@ use osm_lump_ways::graph;
 use osm_lump_ways::haversine;
 use osm_lump_ways::inter_store;
 use osm_lump_ways::nodeid_position;
-use osm_lump_ways::sorted_slice_store::{SortedSliceMap, SortedSliceSet};
+use osm_lump_ways::sorted_slice_store::SortedSliceSet;
 use osm_lump_ways::tagfilter;
 use osm_lump_ways::way_id_rel_tags::WayIdToRelationTags;
 
@@ -122,7 +122,7 @@ struct EdgeProperty {
 
     taggroupid: u64,
 
-    extra_tag_values: SortedSliceMap<SmolStr, SmolStr>,
+    extra_tag_values: SortedSliceSet<(SmolStr, SmolStr)>,
 }
 
 impl Default for EdgeProperty {
@@ -132,7 +132,7 @@ impl Default for EdgeProperty {
             upstream_m: f64::NAN,
             tagid: None,
             taggroupid: u64::MAX,
-            extra_tag_values: SortedSliceMap::empty(),
+            extra_tag_values: SortedSliceSet::empty(),
         }
     }
 }
@@ -399,7 +399,7 @@ fn main() -> Result<()> {
                             .map(|(k, v)| (SmolStr::from(k), SmolStr::from(v)))
                         );
                 }
-                let extra_tag_values: SortedSliceMap<_,_> = SortedSliceMap::from_vec(extra_tag_values);
+                let extra_tag_values = SortedSliceSet::from_vec(extra_tag_values);
 
                 // Possibly remove duplicate nodes in a way. IME this happens once in the planet.
                 let mut nodes = if w.nodes().windows(2).any(|w| w[0] == w[1]) {
