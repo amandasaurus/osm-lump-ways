@@ -390,13 +390,18 @@ fn main() -> Result<()> {
 
                 let mut extra_tag_values: Vec<(SmolStr, SmolStr)> = vec![];
                 if !args.grouped_waterways_extra_tag_values.is_empty() {
-                    // First push the tags from the relation (if applicable)
                     extra_tag_values.extend(
                         relation_tags
-                            .way_tags(&w)
+                            .way_tags_only(w.id())
                             .filter(|(k, _v)|
                                     args.grouped_waterways_extra_tag_values.iter().any(|kf| kf.filter(k)))
                             .map(|(k, v)| (SmolStr::from(k), SmolStr::from(v)))
+                            .chain(w
+                                .tags()
+                                .filter(|(k, _v)|
+                                    args.grouped_waterways_extra_tag_values.iter().any(|kf| kf.filter(k)))
+                                .map(|(k, v)| (SmolStr::from(k), SmolStr::from(v)))
+                            )
                         );
                 }
                 let extra_tag_values = SortedSliceSet::from_vec(extra_tag_values);
