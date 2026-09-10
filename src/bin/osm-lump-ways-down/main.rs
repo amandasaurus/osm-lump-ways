@@ -307,6 +307,9 @@ fn main() -> Result<()> {
         }
         input_bar.finish_and_clear();
         info!("All relations read. {}", relation_tags.summary());
+        if relation_tags.num_relations() > 0 && relation_tags.num_ways() == 0 {
+            warn!("There are {} relations read, but zero ways! This must be a bug. Is your roles OK? {:?}", relation_tags.num_relations(), args.relation_tags_role);
+        }
     }
     let relation_tags = relation_tags;
 
