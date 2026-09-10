@@ -1892,21 +1892,19 @@ fn do_write_upstreams(
 
     let mut f = std::io::BufWriter::new(std::fs::File::create(upstream_filename)?);
 
-    let num_written;
-    if upstream_filename.extension().unwrap() == "geojsons"
+    let num_written = if upstream_filename.extension().unwrap() == "geojsons"
         || upstream_filename.extension().unwrap() == "geojson"
     {
-        num_written = write_geojson_features_directly(
+        write_geojson_features_directly(
             lines,
             &mut f,
             &fileio::format_for_filename(upstream_filename),
-        )?;
+        )?
     } else if upstream_filename.extension().unwrap() == "csv" {
-        num_written =
-            write_csv_features_directly(lines, &mut f, fileio::OutputGeometryFormat::WKT)?;
+        write_csv_features_directly(lines, &mut f, fileio::OutputGeometryFormat::WKT)?
     } else {
         anyhow::bail!("Unsupported output format");
-    }
+    };
 
     info!(
         "Wrote {} features to output file {}",
@@ -2240,24 +2238,23 @@ fn do_waterway_grouped(
 
     let mut f = std::io::BufWriter::new(std::fs::File::create(output_filename)?);
 
-    let num_written;
-    if output_filename.extension().unwrap() == "geojsons"
+    let num_written = if output_filename.extension().unwrap() == "geojsons"
         || output_filename.extension().unwrap() == "geojson"
     {
-        num_written = write_geojson_features_directly(
+        write_geojson_features_directly(
             taggroups_with_geom,
             &mut f,
             &fileio::format_for_filename(output_filename),
-        )?;
+        )?
     } else if output_filename.extension().unwrap() == "csv" {
-        num_written = write_csv_features_directly(
+        write_csv_features_directly(
             taggroups_with_geom,
             &mut f,
             fileio::OutputGeometryFormat::GeoJSON,
-        )?;
+        )?
     } else {
         anyhow::bail!("Unsupported output format");
-    }
+    };
 
     let do_waterway_grouped_duration = started_do_waterway_grouped.elapsed();
     info!(
