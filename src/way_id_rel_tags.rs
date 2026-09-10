@@ -97,14 +97,14 @@ impl WayIdToRelationTags {
         self.wid_to_rid.contains_key(&wid)
     }
 
-	#[must_use]
-	pub fn num_relations(&self) -> usize {
-		self.rid_to_tags.len()
-	}
-	#[must_use]
-	pub fn num_ways(&self) -> usize {
-		self.wid_to_rid.len()
-	}
+    #[must_use]
+    pub fn num_relations(&self) -> usize {
+        self.rid_to_tags.len()
+    }
+    #[must_use]
+    pub fn num_ways(&self) -> usize {
+        self.wid_to_rid.len()
+    }
 
     #[must_use]
     pub fn summary(&self) -> String {
