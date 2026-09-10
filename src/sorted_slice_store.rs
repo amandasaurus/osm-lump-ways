@@ -173,6 +173,10 @@ impl<T: Ord + Send> SortedSliceSet<T> {
     pub fn len(&self) -> usize {
         self.data.len()
     }
+    #[must_use]
+    pub fn empty() -> Self {
+        Self { data: Box::new([]) }
+    }
 
     #[must_use]
     pub fn is_empty(&self) -> bool {
@@ -212,5 +216,16 @@ where
 {
     fn from(v: Vec<T>) -> Self {
         SortedSliceSet::from_vec(v)
+    }
+}
+
+impl<T> Clone for SortedSliceSet<T>
+where
+    T: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+        }
     }
 }
