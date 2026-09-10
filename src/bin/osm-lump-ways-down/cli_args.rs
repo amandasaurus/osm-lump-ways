@@ -314,7 +314,7 @@ pub struct Args {
     /// For each waterway group include a property `extra_tag_values_fraction` with the other tags
     /// used on ways in this group
     #[arg(long, requires = "grouped_waterways")]
-    pub grouped_waterways_extra_tag_values: Vec<tagfilter::KeyFilter>,
+    pub grouped_waterways_extra_tag_values: Option<tagfilter::KeyFilter>,
 
     /// If a way is in a relation, which matches the tag filters, then apply that relation tags to
     /// this way

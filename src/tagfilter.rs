@@ -381,6 +381,7 @@ pub enum KeyFilter {
     FullKey(String),
     StarPrefix(String),
     Substring(String),
+    Multiple(Box<[KeyFilter]>),
 }
 
 /// Parses from user input
@@ -389,6 +390,12 @@ impl std::str::FromStr for KeyFilter {
     fn from_str(s: &str) -> Result<Self, String> {
         if let Some(key) = s.strip_prefix("rawkey:") {
             Ok(KeyFilter::FullKey(key.to_string()))
+        } else if s.contains(',') {
+            let res = s
+                .split(',')
+                .map(KeyFilter::from_str)
+                .collect::<Result<Vec<KeyFilter>, _>>()?;
+            Ok(KeyFilter::Multiple(res.into_boxed_slice()))
         } else if let Some(substring) = s.strip_circumfix("*", "*") {
             Ok(KeyFilter::Substring(substring.to_string()))
         } else if let Some(prefix) = s.strip_suffix("*") {
@@ -412,6 +419,10 @@ impl KeyFilter {
             true
         } else if let KeyFilter::Substring(subs) = self
             && k.contains(subs)
+        {
+            true
+        } else if let KeyFilter::Multiple(kfs) = self
+            && kfs.iter().any(|kf| kf.filter(k))
         {
             true
         } else {

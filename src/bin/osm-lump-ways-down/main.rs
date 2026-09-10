@@ -393,17 +393,15 @@ fn main() -> Result<()> {
                     .map(|way_tag_value| seen_tagvalues.entry(way_tag_value.to_string()).or_default());
 
                 let mut extra_tag_values: Vec<(SmolStr, SmolStr)> = vec![];
-                if !args.grouped_waterways_extra_tag_values.is_empty() {
+                if let Some(tf) = args.grouped_waterways_extra_tag_values.as_ref() {
                     extra_tag_values.extend(
                         relation_tags
                             .way_tags_only(w.id())
-                            .filter(|(k, _v)|
-                                    args.grouped_waterways_extra_tag_values.iter().any(|kf| kf.filter(k)))
+                            .filter(|(k, _v)| tf.filter(k) )
                             .map(|(k, v)| (SmolStr::from(k), SmolStr::from(v)))
                             .chain(w
                                 .tags()
-                                .filter(|(k, _v)|
-                                    args.grouped_waterways_extra_tag_values.iter().any(|kf| kf.filter(k)))
+                                .filter(|(k, _v)| tf.filter(k))
                                 .map(|(k, v)| (SmolStr::from(k), SmolStr::from(v)))
                             )
                         );
