@@ -1,8 +1,9 @@
 /*.fgb
 /*.fgb.zst
 /*.geojson
-/*.geojson.zst
+/*.geojson.*
 /*.geojsons
+/*.geojsons.*
 /*.geojsonseq
 /*.geojsons.gz
 /*.geojsons.zst
@@ -29,5 +30,6 @@
 /stats
 /*.prom
 /*.csv
+/*.csv.*
 flamegraph.svg
 /profile.json
