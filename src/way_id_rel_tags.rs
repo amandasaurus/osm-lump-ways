@@ -44,6 +44,12 @@ impl WayIdToRelationTags {
         }
     }
 
+    /// Return the relation id that this way id is in, if any is recorded.
+    #[must_use]
+    pub fn relation(&self, wid: &i64) -> Option<&i64> {
+        self.wid_to_rid.get(wid)
+    }
+
     /// For this way id, what is the value of this tag
     /// None meaning the way isn't in the store, or there is no tag for this relation
     pub fn way_tag_value_only(&self, wid: i64, key: &str) -> Option<&str> {

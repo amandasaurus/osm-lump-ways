@@ -46,6 +46,10 @@ pub struct TagGroupInfo {
     pub confluence_distances: SortedSliceMap<(i64, i64), f64>,
 
     pub extra_tag_values: BTreeMap<SmolStr, BTreeMap<SmolStr, f64>>,
+
+    // way & relation ids which make up this tag group
+    pub wayids: Vec<i64>,
+    pub relationids: SmallVec<[i64; 1]>,
 }
 impl TagGroupInfo {
     fn from_tagid(tagid: Option<u32>) -> Self {
@@ -92,6 +96,8 @@ impl Default for TagGroupInfo {
             min_nid: i64::MAX,
             confluence_distances: SortedSliceMap::empty(),
             extra_tag_values: BTreeMap::new(),
+            wayids: Vec::new(),
+            relationids: smallvec![],
         }
     }
 }
@@ -180,6 +186,12 @@ pub fn calc_tag_group(
                     .or_default()
                     .entry(v.clone())
                     .or_default() += seg_eprop.length_m;
+            }
+            this_tag_group.wayids.push(seg_eprop.wayid.unwrap());
+            sort_dedup!(this_tag_group.wayids);
+            if let Some(relationid) = seg_eprop.relationid {
+                this_tag_group.relationids.push(relationid);
+                sort_dedup!(this_tag_group.relationids);
             }
             g.edge_property_mut(seg).taggroupid = curr_group_id;
             assign_to_group.inc(1);

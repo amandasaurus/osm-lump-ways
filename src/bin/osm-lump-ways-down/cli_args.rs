@@ -152,12 +152,16 @@ pub struct Args {
     #[arg(long, default_value="false", aliases=["incl-distance-to-longer"])]
     pub incl_dist_to_longer: bool,
 
-    /// Include list of OSM wayids for each feature
-    /// For each way group, include a JSON property `all_wayids`, a list of all the OSM way ids
-    /// that make up this group. Each is a JSON string "w123" (i.e. /^w[0-9]+$/), the same format
+    /// Include list of OSM object ids for each feature
+    /// For each way group, include a JSON property `objids`, a list of all the OSM way & relation ids
+    /// that make up this group. Each is a JSON string "w123" (i.e. /^[rw][0-9]+$/), the same format
     /// `osmium getid` accepts.
     ///
-    #[arg(long, action=clap::ArgAction::SetTrue, default_value = "false", aliases=["incl-way-ids", "include-wayids", "include-way-ids"], conflicts_with="split_into_single_paths")]
+    #[arg(long, action=clap::ArgAction::SetTrue, default_value = "false", aliases=["incl-obj-ids", "include-objids", "include-obj-ids"], conflicts_with="split_into_single_paths")]
+    pub incl_objids: bool,
+
+    /// old deprecated argument
+    #[arg(long, action=clap::ArgAction::SetTrue, hide_short_help=true, hide_long_help=true, default_value = "false", aliases=["incl-way-ids", "include-wayids", "include-way-ids"])]
     pub incl_wayids: bool,
 
     /// Rather than save one `MultiLineString` per group, save it as many smaller linestrings,

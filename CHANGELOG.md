@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+* `--incl-wayids` renamed to `--incl-objids` and output property now `objids`
+  rather than `all_wayids`.
+* `--incl-objids` now includes the relation ids (`"rNNN"`) in the output for
+  `o-l-w-d`.
 * Tools will now write to temp files (`.FILENAME.xxxx`), only when finished
   is the file renamed over.
 * `o-l-w-d` now respects it's `--overwrite` argument. Previously this was ignored.

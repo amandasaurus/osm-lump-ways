@@ -85,6 +85,11 @@ fn main() -> Result<()> {
         std::env!("CARGO_PKG_REPOSITORY"),
     );
 
+    anyhow::ensure!(
+        !args.incl_wayids,
+        "--incl-wayids has been replaced with --incl-objids"
+    );
+
     let style = ProgressStyle::with_template(
         "[{elapsed_precise}] {percent:>3}% done. eta {eta:>4} {bar:10.cyan/blue} {pos:>7}/{len:7} {per_sec:>12} {msg}",
         ).unwrap();
@@ -663,8 +668,8 @@ fn main() -> Result<()> {
         }
         json_props["tag_groups"] = wg.group.to_vec().into();
         json_props["num_nodes"] = wg.graph.num_vertexes().into();
-        if args.incl_wayids {
-            json_props["all_wayids"] =
+        if args.incl_objids {
+            json_props["objids"] =
                 collect_all_wayids(&nodeid_wayids, wg.graph.vertexes().copied()).into();
         }
     });

@@ -126,6 +126,8 @@ struct EdgeProperty {
     taggroupid: u64,
 
     extra_tag_values: SortedSliceSet<(SmolStr, SmolStr)>,
+    wayid: Option<i64>,
+    relationid: Option<i64>,
 }
 
 impl Default for EdgeProperty {
@@ -136,6 +138,8 @@ impl Default for EdgeProperty {
             tagid: None,
             taggroupid: u64::MAX,
             extra_tag_values: SortedSliceSet::empty(),
+            wayid: None,
+            relationid: None,
         }
     }
 }
@@ -234,6 +238,10 @@ fn main() -> Result<()> {
             "The ends CSV file only makes sense with the --ends-tag arguments. Since you have specified no end tags, nothing will be written to the ends CSV file"
         );
     }
+    anyhow::ensure!(
+        !args.incl_wayids,
+        "--incl-wayids has been replaced with --incl-objids"
+    );
 
     info!("Input file: {}", args.input_filename.display());
     if args.tag_filter.is_empty() {
@@ -443,9 +451,12 @@ fn main() -> Result<()> {
                     assert!(i != 0);
                     assert!(nodes[0] != nodes[i], "Duplicate nodes in this way={w:?} curr nodes={nodes:?} i={i}");
                     g.add_edge(nodes[0], nodes[i]);
+					let eprop = g.edge_property_mut((nodes[0], nodes[i]));
                     if !extra_tag_values.is_empty() {
-                        g.edge_property_mut((nodes[0], nodes[i])).extra_tag_values = extra_tag_values.clone();
+                        eprop.extra_tag_values = extra_tag_values.clone();
                     }
+					eprop.wayid = Some(w.id());
+					eprop.relationid = relation_tags.relation(&w.id()).copied();
 
                     if let Some(ref mut tagvalues_to_edges) = tagvalues_to_edges {
                         tagvalues_to_edges.insert((nodes[0], nodes[i]));
@@ -1269,8 +1280,7 @@ fn main() -> Result<()> {
             tag_group_info,
             &tag_group_value,
             args.min_length_m,
-            args.incl_wayids,
-            &nodeid_wayids,
+            args.incl_objids,
         )?;
     }
 
@@ -1287,7 +1297,7 @@ fn main() -> Result<()> {
             args.longest_source_mouth_only_named,
             args.longest_source_mouth_longest_n,
             &args.longest_source_mouth_unnamed_string,
-            args.incl_wayids,
+            args.incl_objids,
             &nodeid_wayids,
         )?;
     }
@@ -1922,24 +1932,6 @@ fn do_write_upstreams(
     Ok(())
 }
 
-fn collect_all_wayids(
-    nodeid_wayids: &impl NodeIdWayIds,
-    nids: impl IntoIterator<Item = i64>,
-) -> Vec<String> {
-    let mut wayids = nids
-        .into_iter()
-        .flat_map(|nid| nodeid_wayids.ways(nid))
-        .collect::<Vec<_>>();
-
-    wayids.sort_unstable();
-    wayids.dedup();
-
-    wayids
-        .into_iter()
-        .map(|wayid| format!("w{wayid}"))
-        .collect()
-}
-
 #[allow(clippy::too_many_arguments)]
 fn do_waterway_grouped(
     args: &cli_args::Args,
@@ -1952,8 +1944,7 @@ fn do_waterway_grouped(
     tag_group_info: &[TagGroupInfo],
     tag_group_value: &[String],
     min_length_m: Option<f64>,
-    incl_wayids: bool,
-    nodeid_wayids: &impl NodeIdWayIds,
+    incl_objids: bool,
 ) -> Result<()> {
     let started_do_waterway_grouped = Instant::now();
     let writing_output_bar = progress_bars.add(
@@ -2116,13 +2107,11 @@ fn do_waterway_grouped(
                 props["extra_tag_values_fraction"] = extra_tag_values;
             }
 
-            if incl_wayids {
-                props["all_wayids"] = collect_all_wayids(
-                    nodeid_wayids,
-                    lines.iter().flat_map(|line| line.iter().copied()),
-                )
-                .into();
-}
+            if incl_objids {
+                props["objids"] = tg.wayids.iter().map(|id| format!("w{id}"))
+					.chain(tg.relationids.iter().map(|id| format!("r{id}")))
+					.collect::<Vec<_>>().into();
+			}
 
             if let Some(min_length_m) = min_length_m
                 && cum_length_m < min_length_m {
