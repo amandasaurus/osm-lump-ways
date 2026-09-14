@@ -166,7 +166,7 @@ mod tests {
         assert_eq!(way_id_rel_tags.way_tag_value(&w, "highway"), None);
 
         let mut tags: Vec<_> = way_id_rel_tags.way_tags(&w).collect();
-        tags.sort();
+        tags.sort_unstable();
         assert_eq!(
             tags,
             vec![("boat", "no"), ("name", "Foo"), ("waterway", "river")]

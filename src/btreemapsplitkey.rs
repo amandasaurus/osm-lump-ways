@@ -163,7 +163,7 @@ mod tests {
         *x.entry(0).or_default() = 12;
         assert_eq!(x.get(0), Some(&12));
         assert_eq!(x.get(1), None);
-        assert_eq!(x.iter().collect::<Vec<_>>(), vec![(0, &12)])
+        assert_eq!(x.iter().collect::<Vec<_>>(), vec![(0, &12)]);
     }
 
     #[test]
