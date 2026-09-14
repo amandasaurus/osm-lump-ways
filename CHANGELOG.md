@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+* Tools will now write to temp files (`.FILENAME.xxxx`), only when finished
+  is the file renamed over.
+* `o-l-w-d` now respects it's `--overwrite` argument. Previously this was ignored.
+
 ## v3.11.0 (2026-09-11)
 
 * `o-l-w-d` new feature `--grouped-waterways-extra-tag-values`

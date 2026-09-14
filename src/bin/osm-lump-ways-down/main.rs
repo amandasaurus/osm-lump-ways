@@ -32,12 +32,15 @@ use num_format::{Locale, ToFormattedString};
 use smallvec::SmallVec;
 use smol_str::SmolStr;
 
+use atomic_write_file::AtomicWriteFile;
+
 use country_boundaries::{BOUNDARIES_ODBL_360X180, CountryBoundaries, LatLon};
 use ordered_float::OrderedFloat;
 
 use osm_lump_ways::nodeid_wayids;
 use osm_lump_ways::nodeid_wayids::NodeIdWayIds;
 
+use osm_lump_ways::auto_atomic_write_file::AutoAtomicWriteFile;
 use osm_lump_ways::utils::{round, round_mult};
 
 mod cli_args;
@@ -677,12 +680,14 @@ fn main() -> Result<()> {
         }
 
         if let Some(ref loops_filename) = args.loops {
-            let mut f = BufWriter::new(File::create(loops_filename)?);
+            let mut f = AutoAtomicWriteFile::new(args.overwrite, loops_filename)?;
             let num_written = write_geojson_features_directly(
                 cycles_output.into_iter(),
                 &mut f,
                 &fileio::format_for_filename(loops_filename),
             )?;
+
+            f.finish()?;
 
             info!(
                 "Wrote {} features to output file {}",
@@ -1124,12 +1129,13 @@ fn main() -> Result<()> {
                 (props, pos)
             });
 
-        let mut f = BufWriter::new(File::create(ends_filename)?);
+        let mut f = AutoAtomicWriteFile::new(args.overwrite, ends_filename)?;
         let num_written = write_geojson_features_directly(
             end_points_output,
             &mut f,
             &fileio::format_for_filename(ends_filename),
         )?;
+        f.finish()?;
         info!(
             "Wrote {} features to output file {}",
             num_written.to_formatted_string(&Locale::en),
@@ -1207,10 +1213,6 @@ fn main() -> Result<()> {
         )
     };
 
-    //let mut f = std::io::BufWriter::new(std::fs::File::create("graph.geojsons")?);
-    //write_debug_geojson(&g, &nodeid_pos, &mut f)?;
-    //drop(f);
-
     let tag_group_data_opt = if args.upstreams.is_some()
         || args.grouped_waterways.is_some()
         || args.longest_source_mouth.is_some()
@@ -1222,6 +1224,7 @@ fn main() -> Result<()> {
 
     if let Some(ref grouped_ends) = args.grouped_ends {
         do_group_by_ends(
+            &args,
             grouped_ends,
             &g,
             &progress_bars,
@@ -1256,6 +1259,7 @@ fn main() -> Result<()> {
     if let Some(ref waterway_grouped_file) = args.grouped_waterways {
         let tag_group_info = tag_group_data_opt.as_ref().unwrap();
         do_waterway_grouped(
+            &args,
             waterway_grouped_file,
             &g,
             &progress_bars,
@@ -1455,6 +1459,7 @@ where
 
 #[allow(clippy::too_many_arguments, clippy::similar_names)]
 fn do_group_by_ends(
+    args: &cli_args::Args,
     output_filename: &Path,
     g: &impl DirectedGraphTrait<VertexProperty, EdgeProperty>,
     progress_bars: &MultiProgress,
@@ -1716,13 +1721,14 @@ fn do_group_by_ends(
     });
 
     let output_format = fileio::format_for_filename(output_filename);
-    let mut f = BufWriter::new(File::create(output_filename)?);
+    let mut f = AutoAtomicWriteFile::new(args.overwrite, output_filename)?;
     let (send, recv) = std::sync::mpsc::channel();
 
     std::thread::spawn({
         move || {
             let _total_written =
                 write_geojson_features_directly(recv.iter(), &mut f, &output_format).unwrap();
+            f.finish().unwrap();
         }
     });
     let mut num_written = 0;
@@ -1890,7 +1896,7 @@ fn do_write_upstreams(
         );
     info_memory_used!();
 
-    let mut f = std::io::BufWriter::new(std::fs::File::create(upstream_filename)?);
+    let mut f = AutoAtomicWriteFile::new(args.overwrite, upstream_filename)?;
 
     let num_written = if upstream_filename.extension().unwrap() == "geojsons"
         || upstream_filename.extension().unwrap() == "geojson"
@@ -1906,6 +1912,7 @@ fn do_write_upstreams(
         anyhow::bail!("Unsupported output format");
     };
 
+    f.finish()?;
     info!(
         "Wrote {} features to output file {}",
         num_written.to_formatted_string(&Locale::en),
@@ -1935,6 +1942,7 @@ fn collect_all_wayids(
 
 #[allow(clippy::too_many_arguments)]
 fn do_waterway_grouped(
+    args: &cli_args::Args,
     output_filename: &Path,
     g: &graph::DirectedGraph<VertexProperty, EdgeProperty>,
     progress_bars: &MultiProgress,
@@ -2236,7 +2244,7 @@ fn do_waterway_grouped(
             Some((props, multilinestrings))
         });
 
-    let mut f = std::io::BufWriter::new(std::fs::File::create(output_filename)?);
+    let mut f = AutoAtomicWriteFile::new(args.overwrite, output_filename)?;
 
     let num_written = if output_filename.extension().unwrap() == "geojsons"
         || output_filename.extension().unwrap() == "geojson"
@@ -2257,6 +2265,7 @@ fn do_waterway_grouped(
     };
 
     let do_waterway_grouped_duration = started_do_waterway_grouped.elapsed();
+    f.finish()?;
     info!(
         "Calculated & wrote {} features to output file {} in {}",
         num_written.to_formatted_string(&Locale::en),

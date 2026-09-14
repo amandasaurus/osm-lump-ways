@@ -116,7 +116,7 @@ pub(crate) fn do_longest_source_mouth(
         });
 
     let output_format = fileio::format_for_filename(output_filename);
-    let mut f = BufWriter::new(File::create(output_filename)?);
+    let mut f = BufWriter::new(AtomicWriteFile::open(output_filename)?);
 
     let num_written = fileio::write_geojson_features_directly(names, &mut f, &output_format)?;
     info!(
@@ -124,6 +124,8 @@ pub(crate) fn do_longest_source_mouth(
         num_written,
         output_filename.display()
     );
+
+    f.into_inner()?.commit()?;
 
     Ok(())
 }

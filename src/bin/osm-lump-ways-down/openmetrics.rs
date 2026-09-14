@@ -1,13 +1,14 @@
 //! Generating Prometheus/OpenMetrics file for loops stats
+use super::AutoAtomicWriteFile;
 use anyhow::Result;
 use log::info;
-use std::fs::File;
-use std::io::{BufWriter, Write};
+use std::io::Write;
 use std::path::PathBuf;
 
-pub(crate) fn init(metrics_path: &PathBuf) -> BufWriter<File> {
+pub(crate) fn init(metrics_path: &PathBuf) -> AutoAtomicWriteFile {
     info!("Writing metrics to file {}", metrics_path.display());
-    let mut metrics = std::io::BufWriter::new(std::fs::File::create(metrics_path).unwrap());
+    // we always overwrite
+    let mut metrics = AutoAtomicWriteFile::new(true, metrics_path).unwrap();
     writeln!(
         metrics,
         "# HELP waterwaymap_loops_count number of cycles/loops in this area"

@@ -40,6 +40,7 @@ use osm_lump_ways::way_id_rel_tags::WayIdToRelationTags;
 use way_group::{MinLengthFilter, WayGroup};
 
 use fileio::OutputFormat;
+use osm_lump_ways::auto_atomic_write_file::AutoAtomicWriteFile;
 use osm_lump_ways::fileio;
 use osm_lump_ways::formatting;
 use osm_lump_ways::graph::Graph2;
@@ -91,14 +92,6 @@ fn main() -> Result<()> {
         ProgressStyle::with_template(
             "[{elapsed_precise}] {percent:>3}% done. eta {eta:>4} {bar:10.cyan/blue} {bytes:>7}/{total_bytes:7} {per_sec:>12} {msg}",
             ).unwrap();
-    //let input_fp = std::fs::File::open(&args.input_filename)?;
-    //let input_bar = progress_bars.add(
-    //    ProgressBar::new(input_fp.metadata()?.len())
-    //        .with_message("Reading input file")
-    //        .with_style(file_reading_style.clone()),
-    //);
-    //let rdr = input_bar.wrap_read(input_fp);
-    //let mut reader = osmio::stringpbf::PBFReader::new(rdr);
 
     if args.split_files_by_group && !args.output_filename.contains("%s") {
         error!("No %s found in output filename ({})", args.output_filename);
@@ -827,30 +820,22 @@ fn main() -> Result<()> {
         .try_for_each(|(filename, features)| {
             debug!("Writing data to file(s)...");
             // Write the files
-            match std::fs::File::create(&filename) {
-                Ok(f) => {
-                    let num_features = features.len();
-                    let mut f = std::io::BufWriter::new(f);
-                    let num_written = fileio::write_geojson_features_directly(
-                        features.into_iter(),
-                        &mut f,
-                        &output_format,
-                    )
-                    .with_context(|| {
-                        format!("Writing {num_features} features to filename {filename:?}")
-                    })?;
-                    info!(
-                        "Wrote {} feature(s) to {}",
-                        num_written.to_formatted_string(&Locale::en),
-                        filename
-                    );
-                    total_features_written.fetch_add(num_written, atomic_Ordering::SeqCst);
-                    total_files_written.fetch_add(1, atomic_Ordering::SeqCst);
-                }
-                Err(e) => {
-                    warn!("Couldn't open filename {filename:?}: {e}");
-                }
-            }
+            let mut f = AutoAtomicWriteFile::new(args.overwrite, &filename)?;
+            let num_features = features.len();
+            let num_written = fileio::write_geojson_features_directly(
+                features.into_iter(),
+                &mut f,
+                &output_format,
+            )
+            .with_context(|| format!("Writing {num_features} features to filename {filename:?}"))?;
+            f.finish()?;
+            info!(
+                "Wrote {} feature(s) to {}",
+                num_written.to_formatted_string(&Locale::en),
+                filename
+            );
+            total_features_written.fetch_add(num_written, atomic_Ordering::SeqCst);
+            total_files_written.fetch_add(1, atomic_Ordering::SeqCst);
             Ok(()) as Result<()>
         })?;
 
@@ -981,13 +966,13 @@ fn do_frames(
             .with_style(style.clone()),
     );
 
-    let f = std::fs::File::create(frames_filepath).unwrap();
-    let mut f = std::io::BufWriter::new(f);
+    let mut f = AutoAtomicWriteFile::new(true, &frames_filepath)?;
     let num_written = fileio::write_geojson_features_directly(
         frames_writing_bar.wrap_iter(frames.into_iter()),
         &mut f,
         &OutputFormat::GeoJSONSeq,
     )?;
+    f.finish()?;
     info!(
         "Calculated & wrote {} frames to {} in {}",
         num_written.to_formatted_string(&Locale::en),
@@ -1052,8 +1037,7 @@ fn do_betweenness(
     let (obj_to_write_tx, obj_to_write_rx) = std::sync::mpsc::sync_channel(10000);
 
     let output_format = fileio::format_for_filename(betweenness_filepath);
-    let f = std::fs::File::create(betweenness_filepath).unwrap();
-    let mut f = std::io::BufWriter::new(f);
+    let mut f = AutoAtomicWriteFile::new(true, betweenness_filepath).unwrap();
 
     let writer_thread = std::thread::spawn({
         let betweenness_filepath = betweenness_filepath.clone();
@@ -1065,6 +1049,7 @@ fn do_betweenness(
                 &output_format,
             )
             .unwrap();
+            f.finish().unwrap();
             info!(
                 "Calculated & wrote {} betweenness centrality edges to {} in {}",
                 total_written.to_formatted_string(&Locale::en),
