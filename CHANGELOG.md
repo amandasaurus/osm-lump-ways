@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## v3.11.0 (2026-09-11)
 
 * `o-l-w-d` new feature `--grouped-waterways-extra-tag-values`
