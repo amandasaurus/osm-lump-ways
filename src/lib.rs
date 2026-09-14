@@ -18,6 +18,7 @@ pub mod nodeid_position;
 pub mod tagfilter;
 pub mod way_group;
 pub use nodeid_position::NodeIdPosition;
+pub mod auto_atomic_write_file;
 pub mod btreemapsplitkey;
 pub mod inter_store;
 pub mod kosaraju;
