@@ -971,7 +971,7 @@ fn do_frames(
             .with_style(style.clone()),
     );
 
-    let mut f = AutoAtomicWriteFile::new(true, &frames_filepath)?;
+    let mut f = AutoAtomicWriteFile::new(true, frames_filepath)?;
     let num_written = fileio::write_geojson_features_directly(
         frames_writing_bar.wrap_iter(frames.into_iter()),
         &mut f,
