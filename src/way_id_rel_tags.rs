@@ -3,44 +3,66 @@ use num_format::{Locale, ToFormattedString};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::collections::HashMap;
 
+#[derive(Debug)]
+struct RelationData {
+    tags: SortedSliceMap<String, String>,
+    nmembers: usize,
+    timestamp: u32,
+}
+
 #[derive(Default, Debug)]
 pub struct WayIdToRelationTags {
     wid_to_rid: HashMap<i64, i64>,
-    rid_to_tags: HashMap<i64, SortedSliceMap<String, String>>,
-
-    /// How many members does this relation id have
-    rid_to_nmembers: HashMap<i64, usize>,
+    relations: HashMap<i64, RelationData>,
 }
 
 impl WayIdToRelationTags {
     pub fn record_relation(&mut self, rel: &impl osmio::Relation, only_roles: &[String]) {
-        // Save number of members
         let nmembers = rel.members().count();
-        self.rid_to_nmembers.insert(rel.id(), nmembers);
 
-        // Save tags
-        self.rid_to_tags.insert(
-            rel.id(),
-            SortedSliceMap::from_iter(rel.tags().map(|(k, v)| (k.to_string(), v.to_string()))),
-        );
-
+        let mut way_passed_filter = false;
         for (_objtype, wid, _role) in rel
             .members()
             .filter(|m| m.0 == osmio::OSMObjectType::Way)
             .filter(|m| only_roles.is_empty() || only_roles.iter().any(|r| r == m.2))
         {
+            way_passed_filter = true;
+
             // Update which relation we use for this wayid
             self.wid_to_rid
                 .entry(wid)
                 .and_modify(|rid| {
                     // If this wid already has a rid, then overwrite it iff we currenty have more
                     // members
-                    if nmembers >= *self.rid_to_nmembers.get(rid).unwrap() {
+                    if let Some(previous_rel) = self.relations.get(rid)
+                        && nmembers >= previous_rel.nmembers
+                    {
                         *rid = rel.id();
                     }
                 })
                 // Not seen before → simple insert
                 .or_insert(rel.id());
+        }
+
+        if way_passed_filter {
+            // If none of the members of this relation are added (e.g. lacking the role), then
+            // don't bother storing this relation
+            let timestamp =
+                u32::try_from(rel.timestamp().as_ref().unwrap().to_epoch_number() - 1_000_000_000)
+                    .unwrap();
+
+            let tags =
+                SortedSliceMap::from_iter(rel.tags().map(|(k, v)| (k.to_string(), v.to_string())));
+
+            // save this relation
+            self.relations.insert(
+                rel.id(),
+                RelationData {
+                    tags,
+                    nmembers,
+                    timestamp,
+                },
+            );
         }
     }
 
@@ -50,12 +72,20 @@ impl WayIdToRelationTags {
         self.wid_to_rid.get(wid)
     }
 
+    /// Returns the timestamp of the relation for this way
+    #[must_use]
+    pub fn relation_timestamp(&self, wid: &i64) -> Option<u32> {
+        self.wid_to_rid
+            .get(wid)
+            .map(|rid| self.relations.get(rid).unwrap().timestamp)
+    }
+
     /// For this way id, what is the value of this tag
     /// None meaning the way isn't in the store, or there is no tag for this relation
     pub fn way_tag_value_only(&self, wid: i64, key: &str) -> Option<&str> {
         self.wid_to_rid
             .get(&wid)
-            .and_then(|rid| self.rid_to_tags.get(rid))
+            .map(|rid| &self.relations.get(rid).unwrap().tags)
             .and_then(|tags| tags.get(key))
             .map(std::string::String::as_str)
     }
@@ -64,7 +94,7 @@ impl WayIdToRelationTags {
     pub fn way_tags_only(&self, wid: i64) -> impl Iterator<Item = &(String, String)> {
         self.wid_to_rid
             .get(&wid)
-            .and_then(|rid| self.rid_to_tags.get(rid))
+            .map(|rid| &self.relations.get(rid).unwrap().tags)
             .into_iter()
             .flat_map(SortedSliceMap::iter)
     }
@@ -84,7 +114,7 @@ impl WayIdToRelationTags {
         if let Some(r_tags) = self
             .wid_to_rid
             .get(&w.id())
-            .and_then(|rid| self.rid_to_tags.get(rid))
+            .map(|rid| &self.relations.get(rid).unwrap().tags)
         {
             Box::new(
                 r_tags
@@ -105,7 +135,7 @@ impl WayIdToRelationTags {
 
     #[must_use]
     pub fn num_relations(&self) -> usize {
-        self.rid_to_tags.len()
+        self.relations.len()
     }
     #[must_use]
     pub fn num_ways(&self) -> usize {
@@ -118,9 +148,9 @@ impl WayIdToRelationTags {
             "{} relations, {} ways, {} relation tags",
             self.num_relations().to_formatted_string(&Locale::en),
             self.num_ways().to_formatted_string(&Locale::en),
-            self.rid_to_tags
+            self.relations
                 .par_iter()
-                .map(|(_, tags)| tags.len())
+                .map(|(_, rd)| rd.tags.len())
                 .sum::<usize>()
                 .to_formatted_string(&Locale::en),
         )
@@ -136,6 +166,9 @@ mod tests {
         let mut way_id_rel_tags = WayIdToRelationTags::default();
         let mut r = osmio::obj_types::StringRelationBuilder::default();
         r._id(1);
+        r._timestamp(osmio::TimestampFormat::ISOString(
+            "2026-01-01T00:00:00Z".to_string(),
+        ));
         r._members(vec![(osmio::OSMObjectType::Way, 1, "".into())]);
         r._tags(
             vec![
