@@ -20,6 +20,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::fs::File;
 use std::io::BufWriter;
 use std::io::Write;
+use std::num::NonZeroU32;
 use std::path::Path;
 use std::time::Instant;
 
@@ -128,6 +129,7 @@ struct EdgeProperty {
     extra_tag_values: SortedSliceSet<(SmolStr, SmolStr)>,
     wayid: Option<i64>,
     relationid: Option<i64>,
+    latest_timestamp: Option<NonZeroU32>,
 }
 
 impl Default for EdgeProperty {
@@ -140,6 +142,7 @@ impl Default for EdgeProperty {
             extra_tag_values: SortedSliceSet::empty(),
             wayid: None,
             relationid: None,
+            latest_timestamp: None,
         }
     }
 }
@@ -328,6 +331,22 @@ fn main() -> Result<()> {
     }
     let relation_tags = relation_tags;
 
+    // Calculate the timestamp of all the nodes.
+    // But only if we're calculating the grouped waterways output
+    let mut nid_timestamps = HashMap::default();
+    if args.grouped_waterways.is_some() {
+        calc_all_nid_timestamps(
+            &args.input_filename,
+            &progress_bars,
+            &file_reading_style,
+            &mut nid_timestamps,
+        )?;
+        info!(
+            "Stored the timestamps of {} nodes",
+            nid_timestamps.len().to_formatted_string(&Locale::en)
+        );
+    }
+
     let boundaries = CountryBoundaries::from_reader(BOUNDARIES_ODBL_360X180)?;
 
     // how many vertexes are there per node id? (which do we need to keep)
@@ -397,6 +416,17 @@ fn main() -> Result<()> {
                     .unwrap()
                     .insert_many(w.id(), w.nodes());
 
+                // what's the timestamp of this way? it's the latest of the relation id,  the way obj & all the nodes in it.
+                let mut seg_latest_timestamp = None;
+                if !nid_timestamps.is_empty() {
+                    let mut temp_latest_ts = w.nodes().par_iter().map(|nid| nid_timestamps.get(nid).unwrap_or_else(|| panic!("For way {wid}, the node {nid} hasn't been seen in the initial file pass", wid=w.id()))).max().unwrap().to_owned();
+                    temp_latest_ts = max(temp_latest_ts, u32::try_from(w.timestamp().as_ref().unwrap().to_epoch_number() - 1_000_000_000).unwrap());
+                    if let Some(ts) = relation_tags.relation_timestamp(&w.id()) {
+                        temp_latest_ts = max(temp_latest_ts, ts);
+                    }
+                    seg_latest_timestamp = Some(NonZeroU32::try_from(temp_latest_ts).unwrap());
+                }
+
                 // If we're assigning based on tag, get the hashset where it'll be stored
                 let mut tagvalues_to_edges = args.flow_follows_tag
                     .as_ref()
@@ -457,6 +487,7 @@ fn main() -> Result<()> {
                     }
                     eprop.wayid = Some(w.id());
                     eprop.relationid = relation_tags.relation(&w.id()).copied();
+                    eprop.latest_timestamp = seg_latest_timestamp;
 
                     if let Some(ref mut tagvalues_to_edges) = tagvalues_to_edges {
                         tagvalues_to_edges.insert((nodes[0], nodes[i]));
@@ -469,11 +500,15 @@ fn main() -> Result<()> {
                 }
 
 
-                //g.add_edge_chain_contractable(w.nodes(), &|nid| nids_in_ne2_ways.binary_search(nid).is_err());
                 if let Some(t) = w.timestamp().as_ref().map(osmio::TimestampFormat::to_epoch_number) {
                     latest_timestamp.fetch_max(t, atomic_Ordering::SeqCst);
                 }
+
         });
+
+    // Free up some memory;
+    drop(nid_timestamps);
+
     let way_reading_duration = start_reading_ways.elapsed();
     info!(
         "Finished reading. {} ways, and {} nodes, read in {}, {} ways/sec",
@@ -2107,6 +2142,12 @@ fn do_waterway_grouped(
                 props["extra_tag_values_fraction"] = extra_tag_values;
             }
 
+            if let Some(ts) = tg.latest_timestamp {
+                let latest_timestamp_epoch = i64::from(u32::from(ts)) + 1_000_000_000;
+                props["latest_timestamp_iso"] = osmio::TimestampFormat::EpochNumber(latest_timestamp_epoch).to_iso_string().into();
+                props["latest_timestamp_epoch"] = latest_timestamp_epoch.into();
+            }
+
             if incl_objids {
                 props["objids"] = tg.wayids.iter().map(|id| format!("w{id}"))
 					.chain(tg.relationids.iter().map(|id| format!("r{id}")))
@@ -2336,6 +2377,47 @@ where
         w,
         &fileio::OutputFormat::GeoJSONSeq,
     )?;
+
+    Ok(())
+}
+
+fn calc_all_nid_timestamps(
+    input_filename: &Path,
+    progress_bars: &MultiProgress,
+    file_reading_style: &ProgressStyle,
+    nid_timestamps: &mut HashMap<i64, u32>,
+) -> Result<()> {
+    let nid_timestamps = Arc::new(Mutex::new(nid_timestamps));
+    let input_fp = std::fs::File::open(input_filename)?;
+    let input_bar = progress_bars.add(
+        ProgressBar::new(input_fp.metadata()?.len())
+            .with_message("Collecting all node timestamps")
+            .with_style(file_reading_style.clone()),
+    );
+    let rdr = input_bar.wrap_read(input_fp);
+    let mut reader = osmio::stringpbf::PBFReader::new(rdr);
+    info!("Reading all nodes");
+    reader
+        .nodes()
+        .par_bridge()
+        .for_each_with(nid_timestamps.clone(), |nid_timestamps, n| {
+            let ts = n.timestamp().clone().map(|ts| ts.clone().to_epoch_number());
+            //anyhow::ensure!(ts.is_some_and(|ts| ts > 1_000_000_000), "This node id={} doesn't have a timestamp or is before 2001-09-11", n.id());
+            let ts = u32::try_from(ts.unwrap() - 1_000_000_000).unwrap();
+
+            nid_timestamps
+                .lock()
+                .unwrap()
+                .entry(n.id())
+                .and_modify(|t0| *t0 = max(*t0, ts))
+                .or_insert(ts);
+        });
+    input_bar.finish_and_clear();
+
+    Arc::try_unwrap(nid_timestamps)
+        .unwrap()
+        .into_inner()
+        .unwrap();
 
     Ok(())
 }

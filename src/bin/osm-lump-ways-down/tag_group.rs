@@ -50,6 +50,7 @@ pub struct TagGroupInfo {
     // way & relation ids which make up this tag group
     pub wayids: Vec<i64>,
     pub relationids: SmallVec<[i64; 1]>,
+    pub latest_timestamp: Option<NonZeroU32>,
 }
 impl TagGroupInfo {
     fn from_tagid(tagid: Option<u32>) -> Self {
@@ -98,6 +99,7 @@ impl Default for TagGroupInfo {
             extra_tag_values: BTreeMap::new(),
             wayids: Vec::new(),
             relationids: smallvec![],
+            latest_timestamp: None,
         }
     }
 }
@@ -193,6 +195,16 @@ pub fn calc_tag_group(
                 this_tag_group.relationids.push(relationid);
                 sort_dedup!(this_tag_group.relationids);
             }
+            this_tag_group.latest_timestamp =
+                match (this_tag_group.latest_timestamp, seg_eprop.latest_timestamp) {
+                    (None, None) => None,
+                    (Some(_a), None) => {
+                        panic!("Can't start having None's for timestamps");
+                    }
+                    (None, Some(b)) => Some(b),
+                    (Some(a), Some(b)) => Some(max(a, b)),
+                };
+
             g.edge_property_mut(seg).taggroupid = curr_group_id;
             assign_to_group.inc(1);
 
