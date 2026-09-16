@@ -125,15 +125,15 @@ mod tests {
     }
     #[test]
     fn split5() {
-        assert_eq!(split_key(I32_LIMIT - 1), [0, 2147483646]);
+        assert_eq!(split_key(I32_LIMIT - 1), [0, 2_147_483_646]);
     }
     #[test]
     fn split6() {
-        assert_eq!(split_key(2147483646), [0, 2147483646]);
+        assert_eq!(split_key(2_147_483_646), [0, 2_147_483_646]);
     }
     #[test]
     fn split7() {
-        assert_eq!(split_key(2147483646 + 1), [1, 0]);
+        assert_eq!(split_key(2147483_646 + 1), [1, 0]);
     }
 
     #[test]

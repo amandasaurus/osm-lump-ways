@@ -451,12 +451,12 @@ fn main() -> Result<()> {
                     assert!(i != 0);
                     assert!(nodes[0] != nodes[i], "Duplicate nodes in this way={w:?} curr nodes={nodes:?} i={i}");
                     g.add_edge(nodes[0], nodes[i]);
-					let eprop = g.edge_property_mut((nodes[0], nodes[i]));
+                    let eprop = g.edge_property_mut((nodes[0], nodes[i]));
                     if !extra_tag_values.is_empty() {
                         eprop.extra_tag_values = extra_tag_values.clone();
                     }
-					eprop.wayid = Some(w.id());
-					eprop.relationid = relation_tags.relation(&w.id()).copied();
+                    eprop.wayid = Some(w.id());
+                    eprop.relationid = relation_tags.relation(&w.id()).copied();
 
                     if let Some(ref mut tagvalues_to_edges) = tagvalues_to_edges {
                         tagvalues_to_edges.insert((nodes[0], nodes[i]));
