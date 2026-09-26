@@ -324,6 +324,7 @@ pub fn calc_tag_group(
 
     for (a_id, b_id) in tgs_that_join.into_iter() {
         let rr = calc_river_relationship(g, &tag_group_info, &(a_id, b_id));
+		dbg!(&rr);
         //dbg!(rr.is_some());
         if rr.is_none() {
             num_unable_to_deduce += 1;
@@ -356,11 +357,11 @@ pub fn calc_tag_group(
                 a.parent_rivers.push(b_id);
                 b.tributaries.push(a_id);
             }
-            RiverRelationship::AIsBranchingDistrubtoryOfB => {
+            RiverRelationship::AIsBranchingDistributoryOfB => {
                 a.parent_rivers.push(b_id);
                 b.branching_distributaries.push(a_id);
             }
-            RiverRelationship::AIsTerminalDistrubtoryOfB => {
+            RiverRelationship::AIsTerminalDistributoryOfB => {
                 a.parent_rivers.push(b_id);
                 b.terminal_distributaries.push(a_id);
             }
@@ -843,8 +844,8 @@ fn dij_flood_fill_downwards(
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
 enum RiverRelationship {
     AIsTributaryOfB,
-    AIsTerminalDistrubtoryOfB,
-    AIsBranchingDistrubtoryOfB,
+    AIsTerminalDistributoryOfB,
+    AIsBranchingDistributoryOfB,
     AIsSideChannelOfB,
 }
 
@@ -876,13 +877,13 @@ fn calc_river_relationship(
     for _step in [0, 1] {
         //dbg!(step, a_id, b_id);
         if confluences.iter().all(|c| c == &(In, Out)) {
-            possible_res.push((AIsTerminalDistrubtoryOfB, a_id, b_id));
+            possible_res.push((AIsTerminalDistributoryOfB, a_id, b_id));
         }
         if confluences.iter().all(|c| c == &(In, Through)) {
             possible_res.push((AIsTributaryOfB, a_id, b_id));
         }
         if confluences.iter().all(|c| c == &(Out, Through)) {
-            possible_res.push((AIsBranchingDistrubtoryOfB, a_id, b_id));
+            possible_res.push((AIsBranchingDistributoryOfB, a_id, b_id));
         }
 
         if is_side_channel_of(a, b, &confluences) {
