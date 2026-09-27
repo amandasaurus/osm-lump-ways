@@ -874,7 +874,7 @@ fn calc_river_relationship(
     // do this exactly twice, with some reversing code at the end of the loop (i.e the middle)
     for _step in [0, 1] {
         //dbg!(step, a_id, b_id);
-        if confluences.iter().all(|c| c == &(In, Out)) {
+        if confluences.iter().all(|c| c == &(Out, In)) {
             possible_res.push((AIsTerminalDistributoryOfB, a_id, b_id));
         }
         if confluences.iter().all(|c| c == &(In, Through)) {
