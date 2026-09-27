@@ -352,16 +352,12 @@ pub fn calc_tag_group(
                 b.side_channels.push(a_id);
             }
             RiverRelationship::AIsTributaryOfB => {
-                a.parent_rivers.push(b_id);
+                a.terminal_distributaries.push(b_id);
                 b.tributaries.push(a_id);
             }
             RiverRelationship::AIsBranchingDistributoryOfB => {
                 a.parent_rivers.push(b_id);
                 b.branching_distributaries.push(a_id);
-            }
-            RiverRelationship::AIsTerminalDistributoryOfB => {
-                a.parent_rivers.push(b_id);
-                b.terminal_distributaries.push(a_id);
             }
         }
     }
@@ -842,7 +838,6 @@ fn dij_flood_fill_downwards(
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
 enum RiverRelationship {
     AIsTributaryOfB,
-    AIsTerminalDistributoryOfB,
     AIsBranchingDistributoryOfB,
     AIsSideChannelOfB,
 }
@@ -874,10 +869,7 @@ fn calc_river_relationship(
     // do this exactly twice, with some reversing code at the end of the loop (i.e the middle)
     for _step in [0, 1] {
         //dbg!(step, a_id, b_id);
-        if confluences.iter().all(|c| c == &(Out, In)) {
-            possible_res.push((AIsTerminalDistributoryOfB, a_id, b_id));
-        }
-        if confluences.iter().all(|c| c == &(In, Through)) {
+        if confluences.iter().all(|c| c == &(In, Through)) ||  confluences.iter().all(|c| c == &(In, Out)) {
             possible_res.push((AIsTributaryOfB, a_id, b_id));
         }
         if confluences.iter().all(|c| c == &(Out, Through)) {
@@ -950,12 +942,19 @@ fn calc_river_relationship(
     //    //dbg!(&a.confluences); dbg!(&b.confluences);
     //    dbg!(&confluences);
     //}
-    if possible_res.is_empty() {
+    if possible_res.len() == 0 {
         debug!(
             "Unable to deduce river connection: {:?}",
             (a_id, b_id, confluences)
         );
-    }
+    } else if possible_res.len() > 1 {
+        warn!(
+            "Multiple possible river relationships: {:?}: {:?}",
+            (a_id, b_id, confluences),
+			possible_res,
+        );
+	}
+
 
     possible_res.pop()
 }
