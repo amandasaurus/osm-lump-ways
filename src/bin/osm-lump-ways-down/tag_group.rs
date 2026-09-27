@@ -324,8 +324,6 @@ pub fn calc_tag_group(
 
     for (a_id, b_id) in tgs_that_join.into_iter() {
         let rr = calc_river_relationship(g, &tag_group_info, &(a_id, b_id));
-		dbg!(&rr);
-        //dbg!(rr.is_some());
         if rr.is_none() {
             num_unable_to_deduce += 1;
             continue;
