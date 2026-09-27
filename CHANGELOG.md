@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## v3.12.0 (2026-09-18)
 
 * `--incl-wayids` renamed to `--incl-objids` and output property now `objids`
