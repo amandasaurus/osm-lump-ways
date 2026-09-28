@@ -1,4 +1,4 @@
-use anyhow::Result;
+    use anyhow::{Result, Context};
 use clap::Parser;
 use get_size::GetSize;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressIterator, ProgressStyle};
@@ -2400,18 +2400,18 @@ fn calc_all_nid_timestamps(
     reader
         .nodes()
         .par_bridge()
-        .for_each_with(nid_timestamps.clone(), |nid_timestamps, n| {
-            let ts = n.timestamp().clone().map(|ts| ts.clone().to_epoch_number());
-            //anyhow::ensure!(ts.is_some_and(|ts| ts > 1_000_000_000), "This node id={} doesn't have a timestamp or is before 2001-09-11", n.id());
-            let ts = u32::try_from(ts.unwrap() - 1_000_000_000).unwrap();
+        .try_for_each_with(nid_timestamps.clone(), |nid_timestamps, n| {
+            let ts = n.timestamp().clone().with_context(|| format!("node id={} does not have a timestamp", n.id()))?.to_epoch_number();
+            anyhow::ensure!(ts > 1_000_000_000, "This node id={} is before 2001-09-11: {}", n.id(), ts);
+            let ts = u32::try_from(ts - 1_000_000_000)?;
 
             nid_timestamps
-                .lock()
-                .unwrap()
+                .lock().unwrap()
                 .entry(n.id())
                 .and_modify(|t0| *t0 = max(*t0, ts))
                 .or_insert(ts);
-        });
+            Ok(())
+        })?;
     input_bar.finish_and_clear();
 
     Arc::try_unwrap(nid_timestamps)
