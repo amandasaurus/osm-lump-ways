@@ -944,7 +944,7 @@ fn calc_river_relationship(
     //    //dbg!(&a.confluences); dbg!(&b.confluences);
     //    dbg!(&confluences);
     //}
-    if possible_res.len() == 0 {
+    if possible_res.is_empty() {
         debug!(
             "Unable to deduce river connection: {:?}",
             (a_id, b_id, confluences)
