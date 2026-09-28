@@ -2401,7 +2401,7 @@ fn calc_all_nid_timestamps(
         .map(|n| {
             let ts = n
                 .timestamp()
-                .clone()
+                .as_ref()
                 .with_context(|| format!("node id={} does not have a timestamp", n.id()))?
                 .to_epoch_number();
             anyhow::ensure!(
