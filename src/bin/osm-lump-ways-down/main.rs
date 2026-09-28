@@ -1,4 +1,4 @@
-    use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use clap::Parser;
 use get_size::GetSize;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressIterator, ProgressStyle};
@@ -333,19 +333,19 @@ fn main() -> Result<()> {
 
     // Calculate the timestamp of all the nodes.
     // But only if we're calculating the grouped waterways output
-    let mut nid_timestamps = HashMap::default();
-    if args.grouped_waterways.is_some() {
-        calc_all_nid_timestamps(
-            &args.input_filename,
-            &progress_bars,
-            &file_reading_style,
-            &mut nid_timestamps,
-        )?;
+    let nid_timestamps = if args.grouped_waterways.is_some() {
+        let started_reading_nid_timestamps = Instant::now();
+        let nid_timestamps =
+            calc_all_nid_timestamps(&args.input_filename, &progress_bars, &file_reading_style)?;
         info!(
-            "Stored the timestamps of {} nodes",
-            nid_timestamps.len().to_formatted_string(&Locale::en)
+            "Stored the timestamps of {} nodes. Read all in {}",
+            nid_timestamps.len().to_formatted_string(&Locale::en),
+            formatting::format_duration(started_reading_nid_timestamps.elapsed()),
         );
-    }
+        nid_timestamps
+    } else {
+        HashMap::new()
+    };
 
     let boundaries = CountryBoundaries::from_reader(BOUNDARIES_ODBL_360X180)?;
 
@@ -2385,9 +2385,7 @@ fn calc_all_nid_timestamps(
     input_filename: &Path,
     progress_bars: &MultiProgress,
     file_reading_style: &ProgressStyle,
-    nid_timestamps: &mut HashMap<i64, u32>,
-) -> Result<()> {
-    let nid_timestamps = Arc::new(Mutex::new(nid_timestamps));
+) -> Result<HashMap<i64, u32>> {
     let input_fp = std::fs::File::open(input_filename)?;
     let input_bar = progress_bars.add(
         ProgressBar::new(input_fp.metadata()?.len())
@@ -2397,27 +2395,27 @@ fn calc_all_nid_timestamps(
     let rdr = input_bar.wrap_read(input_fp);
     let mut reader = osmio::stringpbf::PBFReader::new(rdr);
     info!("Reading all nodes");
-    reader
+    let nid_timestamps: HashMap<i64, u32> = reader
         .nodes()
         .par_bridge()
-        .try_for_each_with(nid_timestamps.clone(), |nid_timestamps, n| {
-            let ts = n.timestamp().clone().with_context(|| format!("node id={} does not have a timestamp", n.id()))?.to_epoch_number();
-            anyhow::ensure!(ts > 1_000_000_000, "This node id={} is before 2001-09-11: {}", n.id(), ts);
+        .map(|n| {
+            let ts = n
+                .timestamp()
+                .clone()
+                .with_context(|| format!("node id={} does not have a timestamp", n.id()))?
+                .to_epoch_number();
+            anyhow::ensure!(
+                ts > 1_000_000_000,
+                "This node id={} is before 2001-09-11: {}",
+                n.id(),
+                ts
+            );
             let ts = u32::try_from(ts - 1_000_000_000)?;
+            Ok((n.id(), ts))
+        })
+        .collect::<Result<HashMap<i64, u32>, _>>()?;
 
-            nid_timestamps
-                .lock().unwrap()
-                .entry(n.id())
-                .and_modify(|t0| *t0 = max(*t0, ts))
-                .or_insert(ts);
-            Ok(())
-        })?;
     input_bar.finish_and_clear();
 
-    Arc::try_unwrap(nid_timestamps)
-        .unwrap()
-        .into_inner()
-        .unwrap();
-
-    Ok(())
+    Ok(nid_timestamps)
 }
