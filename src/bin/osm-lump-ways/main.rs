@@ -29,7 +29,6 @@ mod cli_args;
 use nodeid_position::NodeIdPosition;
 use osm_lump_ways::dij;
 use osm_lump_ways::haversine::haversine_m_fpair;
-use osm_lump_ways::min_length::MinLengthFilter;
 use osm_lump_ways::nodeid_position;
 use osm_lump_ways::nodeid_wayids;
 use osm_lump_ways::nodeid_wayids::NodeIdWayIds;
@@ -566,38 +565,9 @@ fn main() -> Result<()> {
         let min_length_m = if let Some(min_length_m) = args.min_length_m {
             min_length_m
         } else if let Some(mlf) = args.min_length {
-            use MinLengthFilter::*;
-            match mlf {
-                Length(m) => m,
-                PercentLongest(perc) => {
-                    let longest = way_groups
-                        .par_iter()
-                        .map(|wg| OrderedFloat(wg.length_m))
-                        .max()
-                        .unwrap()
-                        .into_inner();
-                    longest * perc
-                }
-                PercentTotal(perc) => {
-                    let total_length = way_groups.par_iter().map(|wg| wg.length_m).sum::<f64>();
-                    total_length * perc
-                }
-                IncludeTotalPercentage(perc) => {
-                    let total_length = way_groups.par_iter().map(|wg| wg.length_m).sum::<f64>();
-                    let desired_total = total_length * perc;
-                    way_groups.par_sort_by_key(|wg| OrderedFloat(-wg.length_m));
-                    let mut cum_total = 0.;
-                    let mut min_length = way_groups[0].length_m;
-                    for val in way_groups.iter().map(|wg| wg.length_m) {
-                        cum_total += val;
-                        if cum_total > desired_total {
-                            min_length = val;
-                            break;
-                        }
-                    }
-                    min_length
-                }
-            }
+			let all_lengths = way_groups.par_iter().map(|wg| wg.length_m);
+			mlf.calc_min_length_m(all_lengths)
+
         } else {
             unreachable!()
         };
