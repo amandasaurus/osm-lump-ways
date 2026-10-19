@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use osm_lump_ways::dij::SplitPathsMethod;
 use osm_lump_ways::tagfilter;
 use osm_lump_ways::taggrouper;
-use osm_lump_ways::way_group::MinLengthFilter;
+use osm_lump_ways::min_length::MinLengthFilter;
 
 /// Group OSM ways based on shared tags into `GeoJSON` `MultiLineStrings`
 ///

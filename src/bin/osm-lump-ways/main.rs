@@ -37,7 +37,8 @@ use osm_lump_ways::tagfilter;
 use osm_lump_ways::utils::round;
 use osm_lump_ways::way_group;
 use osm_lump_ways::way_id_rel_tags::WayIdToRelationTags;
-use way_group::{MinLengthFilter, WayGroup};
+use way_group::WayGroup;
+use osm_lump_ways::min_length::MinLengthFilter;
 
 use fileio::OutputFormat;
 use osm_lump_ways::auto_atomic_write_file::AutoAtomicWriteFile;
