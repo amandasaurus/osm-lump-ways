@@ -1,6 +1,6 @@
 use super::*;
 use crate::inter_store::InterStore;
-use haversine::haversine_m_fpair_ord;
+use distance::distance_m_fpair_ord;
 use ordered_float::OrderedFloat;
 use rand::prelude::*;
 use rayon::prelude::ParallelIterator;
@@ -451,7 +451,7 @@ impl Graph2 {
                         .filter(|n2| *n2 > n1)
                         .map(move |n2| ((n1, p1), (n2, nodeid_pos.get(n2).unwrap())))
                 })
-                .max_by_key(|((_n1, p1), (_n2, p2))| haversine_m_fpair_ord(*p1, *p2));
+                .max_by_key(|((_n1, p1), (_n2, p2))| distance_m_fpair_ord(*p1, *p2));
             let target_pair = target_pair.unwrap();
 
             let src = target_pair.0;
@@ -572,7 +572,7 @@ impl Graph2 {
                 .map(|nid| nodeid_pos.get(&nid).unwrap())
                 .tuple_windows::<(_, _)>()
                 .par_bridge()
-                .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
+                .map(|(p1, p2)| distance::distance_m_fpair(p1, p2))
                 .sum::<f64>();
 
             let edge_len = (edge_len * 100.).round() as u64;

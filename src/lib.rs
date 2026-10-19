@@ -10,8 +10,8 @@ use std::sync::{Arc, Mutex};
 
 use num_format::{Locale, ToFormattedString};
 
-pub mod haversine;
-use haversine::haversine_m;
+pub mod distance;
+use distance::distance_m;
 pub mod dij;
 pub mod graph;
 pub mod nodeid_position;

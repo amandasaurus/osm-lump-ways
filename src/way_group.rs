@@ -8,7 +8,7 @@ use geo::{
 };
 use graph::Graph2;
 use graph::UndirectedAdjGraph;
-use haversine::haversine_m_fpair;
+use distance::distance_m_fpair;
 use inter_store::InterStore;
 use ordered_float::OrderedFloat;
 use sorted_slice_store::SortedSliceSet;
@@ -39,7 +39,7 @@ impl WayGroup {
         self.length_m = self
             .graph
             .edges_par_iter()
-            .map(|(a, b)| haversine_m_fpair(nodeid_pos.get(a).unwrap(), nodeid_pos.get(b).unwrap()))
+            .map(|(a, b)| distance_m_fpair(nodeid_pos.get(a).unwrap(), nodeid_pos.get(b).unwrap()))
             .sum::<f64>();
     }
 

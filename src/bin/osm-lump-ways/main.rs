@@ -28,7 +28,7 @@ mod cli_args;
 
 use nodeid_position::NodeIdPosition;
 use osm_lump_ways::dij;
-use osm_lump_ways::haversine::haversine_m_fpair;
+use osm_lump_ways::distance::distance_m_fpair;
 use osm_lump_ways::nodeid_position;
 use osm_lump_ways::nodeid_wayids;
 use osm_lump_ways::nodeid_wayids::NodeIdWayIds;
@@ -778,7 +778,7 @@ fn main() -> Result<()> {
                     results.extend(coords_iter.map(|coords| {
                         let mut json_props = json_props.clone();
                         if args.split_into_single_paths {
-                            let dist_ends = haversine_m_fpair(coords[0], *coords.last().unwrap());
+                            let dist_ends = distance_m_fpair(coords[0], *coords.last().unwrap());
                             json_props["dist_ends_m"] = dist_ends.into();
                             json_props["dist_ends_m_int"] = (dist_ends.round() as i64).into();
                             json_props["dist_ends_km"] = (dist_ends / 1000.).into();

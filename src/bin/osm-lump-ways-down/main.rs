@@ -37,6 +37,7 @@ use atomic_write_file::AtomicWriteFile;
 
 use country_boundaries::{BOUNDARIES_ODBL_360X180, CountryBoundaries, LatLon};
 use ordered_float::OrderedFloat;
+use std::cmp::Reverse;
 
 use osm_lump_ways::nodeid_wayids;
 use osm_lump_ways::nodeid_wayids::NodeIdWayIds;
@@ -52,11 +53,10 @@ mod tag_group;
 use tag_group::TagGroupInfo;
 
 use graph::{DirectedGraph, DirectedGraphTrait};
-use haversine::haversine_m;
+use distance::distance_m;
 use nodeid_position::NodeIdPosition;
-use osm_lump_ways::dij;
 use osm_lump_ways::graph;
-use osm_lump_ways::haversine;
+use osm_lump_ways::distance;
 use osm_lump_ways::inter_store;
 use osm_lump_ways::nodeid_position;
 use osm_lump_ways::sorted_slice_store::SortedSliceSet;
@@ -880,7 +880,7 @@ fn main() -> Result<()> {
                 .expand_directed(nid1, nid2)
                 .map(|nid| nodeid_pos.get(&nid).unwrap())
                 .tuple_windows::<(_, _)>()
-                .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
+                .map(|(p1, p2)| distance::distance_m_fpair(p1, p2))
                 .sum::<f64>();
         });
 
@@ -1448,7 +1448,7 @@ fn node_group_to_length_m(nids: &[[i64; 2]], pos: &impl NodeIdPosition) -> f64 {
         .map(|seg| {
             let pos0 = pos.get(&seg[0]).unwrap();
             let pos1 = pos.get(&seg[1]).unwrap();
-            haversine_m(pos0.1, pos0.0, pos1.0, pos1.1)
+            distance_m(pos0.1, pos0.0, pos1.0, pos1.1)
         })
         .sum()
 }
@@ -1456,7 +1456,7 @@ fn node_group_to_length_m(nids: &[[i64; 2]], pos: &impl NodeIdPosition) -> f64 {
 fn linestring_length(coords: &[(f64, f64)]) -> f64 {
     coords
         .par_windows(2)
-        .map(|pair| haversine_m(pair[0].1, pair[0].0, pair[1].1, pair[1].0))
+        .map(|pair| distance_m(pair[0].1, pair[0].0, pair[1].1, pair[1].0))
         .sum::<f64>()
 }
 
@@ -1605,7 +1605,7 @@ fn do_group_by_ends(
                     .iter()
                     .position(|(_end_idx, _prev_nid, path)| {
                         if path.len() >= 2 {
-                            haversine::haversine_m_fpair(
+                            distance::distance_m_fpair(
                                 nodeid_pos.get(&path[0]).unwrap(),
                                 nodeid_pos.get(path.last().unwrap()).unwrap(),
                             ) > max_distance_m
@@ -1738,7 +1738,7 @@ fn do_group_by_ends(
                 .expand_directed(path[path.len() - 2], path[path.len() - 1])
                 .map(|nid| nodeid_pos.get(&nid).unwrap())
                 .tuple_windows::<(_, _)>()
-                .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
+                .map(|(p1, p2)| distance::distance_m_fpair(p1, p2))
                 .sum::<f64>();
 
         let points = inter_store
@@ -1848,7 +1848,7 @@ fn do_write_upstreams(
                     .scan(
                         initial_upstream_len,
                         move |curr_upstream_len, ((nid1, p1), (nid2, p2))| {
-                            let this_len = haversine::haversine_m_fpair(p1, p2);
+                            let this_len = distance::distance_m_fpair(p1, p2);
                             let from_upstream_len = *curr_upstream_len;
                             *curr_upstream_len += this_len;
                             Some((
@@ -1997,7 +1997,7 @@ fn do_waterway_grouped(
             .expand_directed(seg.0, seg.1)
             .map(|nid| nodeid_pos.get(&nid).unwrap())
             .tuple_windows::<(_, _)>()
-            .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
+            .map(|(p1, p2)| distance::distance_m_fpair(p1, p2))
             .sum::<f64>()
     };
     let seg_to_distrib_json = |seg: &(i64, i64), nid: i64, incl_len: bool| -> serde_json::Value {
@@ -2073,16 +2073,10 @@ fn do_waterway_grouped(
                 })
                 .collect::<Vec<Vec<i64>>>();
 
-            let mut src_nids = seen_out_nids.difference(&seen_in_nids).copied().collect::<Vec<i64>>();
-            let mut sink_nids = seen_in_nids.difference(&seen_out_nids).copied().collect::<Vec<i64>>();
-            drop(seen_out_nids);
-            drop(seen_in_nids);
-            sort_dedup!(src_nids);
-            sort_dedup!(sink_nids);
-            (taggroupid, tg, lines, (src_nids, sink_nids))
+            (taggroupid, tg, lines)
         })
 
-        .filter_map(|(taggroupid, tg, lines, src_sink_nids)| {
+        .filter_map(|(taggroupid, tg, lines)| {
             let mut props = serde_json::json!({});
             if tg.stream_level < u64::MAX {
                 props["stream_level"] = tg.stream_level.into();
@@ -2131,7 +2125,7 @@ fn do_waterway_grouped(
                 line.iter()
                 .tuple_windows::<(_, _)>()
                 .par_bridge()
-                .map(|(&p1, &p2)| haversine::haversine_m_fpair(p1, p2))
+                .map(|(&p1, &p2)| distance::distance_m_fpair(p1, p2))
                 .sum::<f64>()
             ).sum::<f64>();
             // Round the upstream to only output 1 decimal place
@@ -2167,7 +2161,7 @@ fn do_waterway_grouped(
                     return None;
                 }
 
-            let length_m = calc_through_path_length(&lines, inter_store, nodeid_pos, &src_sink_nids.0, &src_sink_nids.1);
+            let length_m = calc_through_path_length(&lines, inter_store, nodeid_pos);
 
             if let Some(min_length_m) = min_length_m
                 && length_m < min_length_m {
@@ -2317,32 +2311,50 @@ fn calc_through_path_length(
     lines: &[Vec<i64>],
     inter_store: &inter_store::InterStore,
     nodeid_pos: &impl NodeIdPosition,
-    src_nids: &[i64],
-    sink_nids: &[i64],
 ) -> f64 {
-    let mut g = graph::DirectedGraph::new();
+    let mut g: DirectedGraph<(), ()> = graph::DirectedGraph::new();
     for line in lines {
         for seg in line.windows(2) {
             g.add_edge(seg[0], seg[1]);
         }
     }
 
-    // Rather than doing an A* search from every start point to every other,
-    // it might be better to do a Dijksra flood fill from every start point, and take the
-    // longest...
-    let longest_path_len = src_nids
-        .par_iter()
-        .flat_map(|src_nid| {
-            sink_nids
-                .par_iter()
-                .map(move |sink_nid| (src_nid, sink_nid))
-        })
-        .map(|(src_nid, sink_nid)| {
-            dij::a_star_directed_single(*src_nid, *sink_nid, nodeid_pos, inter_store, &g)
-        })
-        .filter_map(|opt_dist| opt_dist.map(OrderedFloat))
-        .max()
-        .unwrap();
+    let src_nids = g.vertexes_and_num_ins_outs().filter_map(|(nid, num_ins, _num_outs)| if num_ins == 0 { Some(nid) } else { None }).collect::<Vec<i64>>();
+    let mut prev_dist: HashMap<(i64, i64), (i64, f64)> = HashMap::with_capacity(src_nids.len() * g.num_vertexes());
+    let mut frontier = BinaryHeap::new();
+    for src_nid in src_nids {
+        // do a dijkstra flood fill, but only in one direction
+        prev_dist.insert((src_nid, src_nid), (src_nid, 0.));
+
+        frontier.clear();
+        frontier.push((Reverse(OrderedFloat(0.)), src_nid));
+
+        while let Some((Reverse(OrderedFloat(curr_dist)), curr_id)) = frontier.pop() {
+            if curr_dist > prev_dist[&(src_nid, curr_id)].1 {
+                continue;
+            }
+            for neighbour_idx in g.out_neighbours(curr_id) {
+
+                let this_dist = curr_dist + inter_store
+                    .inters_directed(&curr_id, &neighbour_idx)
+                    .map(|nid| nodeid_pos.get(&nid).unwrap())
+                    .tuple_windows::<(_, _)>()
+                    .par_bridge()
+                    .map(|(p1, p2)| distance::distance_m_fpair(p1, p2))
+                    .sum::<f64>();
+
+                let old_value = prev_dist.entry((src_nid, neighbour_idx))
+                    .or_insert((0, f64::INFINITY));
+
+                if this_dist < old_value.1 {
+                    old_value.0 = curr_id;
+                    old_value.1 = this_dist;
+                    frontier.push((Reverse(OrderedFloat(this_dist)), neighbour_idx));
+                }
+            }
+        }
+    }
+    let longest_path_len = prev_dist.values().map(|(_prev, dist)| OrderedFloat(*dist)).max().unwrap();
 
     *longest_path_len
 }

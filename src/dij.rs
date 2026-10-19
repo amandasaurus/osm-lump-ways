@@ -2,7 +2,7 @@
 use super::*;
 use crate::utils::min_max;
 use graph::{DirectedGraph, DirectedGraphTrait, Graph2};
-use haversine::haversine_m_fpair;
+use distance::distance_m_fpair;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use radix_heap::RadixHeapMap;
@@ -97,7 +97,7 @@ pub(crate) fn path_one_to_one<'a>(
     best_dist_prev.insert(start_idx, (OrderedFloat(0.), start_idx));
     frontier.clear();
     frontier.push((
-        OrderedFloat(-haversine_m(*start_pos.0, *start_pos.1, *target_pos.0, *target_pos.1) + 0.),
+        OrderedFloat(-distance_m(*start_pos.0, *start_pos.1, *target_pos.0, *target_pos.1) + 0.),
         OrderedFloat(-0.),
         start_idx,
         start_pos,
@@ -129,7 +129,7 @@ pub(crate) fn path_one_to_one<'a>(
             let edge_len = if let Some(edge_lengths) = edge_lengths {
                 *edge_lengths.get(&min_max(curr_id, *neighbor_idx)).unwrap()
             } else {
-                haversine_m_fpair(
+                distance_m_fpair(
                     (*curr_pos.0, *curr_pos.1),
                     nodeid_pos.get(neighbor_idx).unwrap(),
                 )
@@ -144,7 +144,7 @@ pub(crate) fn path_one_to_one<'a>(
                         //info!("This is a shorter path");
                         *prev_id = curr_id;
                         *path_dist = this_path_dist;
-                        this_luft_dist = OrderedFloat(haversine_m(
+                        this_luft_dist = OrderedFloat(distance_m(
                             curr_pos.0.0,
                             curr_pos.1.0,
                             *target_pos.0,
@@ -165,7 +165,7 @@ pub(crate) fn path_one_to_one<'a>(
                 })
                 .or_insert_with(|| {
                     //info!("Never seen this neighbour before, adding it to frontier");
-                    this_luft_dist = OrderedFloat(haversine_m(
+                    this_luft_dist = OrderedFloat(distance_m(
                         curr_pos.0.0,
                         curr_pos.1.0,
                         *target_pos.0,
@@ -222,7 +222,7 @@ pub fn a_star_directed_single<'a>(
     best_dist_prev.insert(start_idx, (OrderedFloat(0.), start_idx));
     frontier.clear();
     frontier.push((
-        OrderedFloat(-haversine_m(
+        OrderedFloat(-distance_m(
             *start_pos.0,
             *start_pos.1,
             *target_pos.0,
@@ -258,7 +258,7 @@ pub fn a_star_directed_single<'a>(
                 .map(|nid| nodeid_pos.get(&nid).unwrap())
                 .tuple_windows::<(_, _)>()
                 .par_bridge()
-                .map(|(p1, p2)| haversine::haversine_m_fpair(p1, p2))
+                .map(|(p1, p2)| distance::distance_m_fpair(p1, p2))
                 .sum::<f64>();
 
             this_path_dist = curr_path_dist + OrderedFloat(edge_len);
@@ -269,7 +269,7 @@ pub fn a_star_directed_single<'a>(
                         // This is shorter, so update path_dist & prev_id
                         *prev_id = curr_id;
                         *path_dist = this_path_dist;
-                        this_luft_dist = OrderedFloat(haversine_m(
+                        this_luft_dist = OrderedFloat(distance_m(
                             curr_pos.0.0,
                             curr_pos.1.0,
                             *target_pos.0,
@@ -289,7 +289,7 @@ pub fn a_star_directed_single<'a>(
                     }
                 })
                 .or_insert_with(|| {
-                    this_luft_dist = OrderedFloat(haversine_m(
+                    this_luft_dist = OrderedFloat(distance_m(
                         curr_pos.0.0,
                         curr_pos.1.0,
                         *target_pos.0,
