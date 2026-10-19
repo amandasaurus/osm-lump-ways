@@ -201,4 +201,3 @@ impl Ord for WayGroup {
         self.length_m.total_cmp(&other.length_m).reverse()
     }
 }
-
