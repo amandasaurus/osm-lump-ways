@@ -214,7 +214,7 @@ impl Graph2 {
         }
     }
 
-    #[must_use]
+    
     pub fn vertexes(&self) -> impl ExactSizeIterator<Item = &i64> {
         self.edges.keys()
     }

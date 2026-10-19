@@ -862,7 +862,7 @@ fn calc_river_relationship(
         .copied()
         .map(|nid| (flow_type(g, nid, a_id), flow_type(g, nid, b_id)))
         .collect::<Vec<_>>();
-    assert!(!confluences.is_empty());
+    assert_ne!(confluences, [] as [(tag_group::FlowType, tag_group::FlowType); 0]);
 
     let mut possible_res: SmallVec<[(RiverRelationship, u64, u64); 2]> = smallvec![];
 

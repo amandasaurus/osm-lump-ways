@@ -25,8 +25,7 @@ impl std::str::FromStr for MinLengthFilter {
             && let Ok(_) = kmstr.parse::<f64>()
         {
             Err(format!(
-                "The raw suffix `k` is not accepted. Use `km`. i.e. ` --min-length {}km `",
-                kmstr
+                "The raw suffix `k` is not accepted. Use `km`. i.e. ` --min-length {kmstr}km `"
             ))
         } else if let Some(mstr) = s.strip_suffix("m")
             && let Ok(m) = mstr.parse::<f64>()
@@ -57,7 +56,7 @@ impl MinLengthFilter {
         match self {
             Length(l) => *l,
             PercentLongest(perc) => {
-                let longest = lengths.map(|l| OrderedFloat(l)).max().unwrap().into_inner();
+                let longest = lengths.map(OrderedFloat).max().unwrap().into_inner();
                 longest * perc
             }
             PercentTotal(perc) => {
@@ -71,7 +70,7 @@ impl MinLengthFilter {
                 all_lengths.par_sort_by_key(|l| OrderedFloat(-l));
                 let mut cum_total = 0.;
                 let mut min_length = all_lengths[0];
-                for val in all_lengths.iter() {
+                for val in &all_lengths {
                     cum_total += val;
                     if cum_total > desired_total {
                         min_length = *val;

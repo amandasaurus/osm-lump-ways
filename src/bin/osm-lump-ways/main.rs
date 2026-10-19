@@ -538,7 +538,7 @@ fn main() -> Result<()> {
     way_groups.shrink_to_fit();
 
     // FIXME do the only_these_way_groups etc check
-    assert!(args.only_these_way_groups.is_empty());
+    assert_eq!(args.only_these_way_groups, [] as [i64; 0]);
     assert!(only_these_way_groups_divmod.is_none());
 
     if !args.only_these_way_groups_nodeid.is_empty() {
