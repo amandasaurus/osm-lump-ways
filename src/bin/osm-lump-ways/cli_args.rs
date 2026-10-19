@@ -98,14 +98,14 @@ pub struct Args {
     pub incl_unset_group: bool,
 
     /// Only include (in the output) lines which are this length (in metres) or more.
-    #[arg(long, value_name = "NUMBER")]
+    #[arg(long, value_name = "NUMBER", conflicts_with="min_length")]
     pub min_length_m: Option<f64>,
 
     /// Exclude groups which have less than this length. Can accept numbers (metres), or suffixed
     /// with `km`. Special suffx `%longest` is adaptive to the longest group there is.
     /// `--min-length 50%longest` includes the longest group, and any group which is at least as
     /// long as 50% of the length of the longest.
-    #[arg(long, conflicts_with = "min_length_m")]
+    #[arg(long)]
     pub min_length: Option<MinLengthFilter>,
 
     /// Only include (in the output) lines which are this length (in metres) or less.
