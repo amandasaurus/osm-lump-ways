@@ -97,8 +97,8 @@ pub struct Args {
     #[arg(long)]
     pub incl_unset_group: bool,
 
-    /// Only include (in the output) lines which are this length (in metres) or more.
-    #[arg(long, value_name = "NUMBER", conflicts_with = "min_length")]
+    /// Use `--min-length N` instead
+    #[arg(long, value_name = "NUMBER", conflicts_with = "min_length", hide=true)]
     pub min_length_m: Option<f64>,
 
     /// Exclude groups which have less than this length. Can accept numbers (metres), or suffixed
