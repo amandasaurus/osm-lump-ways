@@ -17,6 +17,13 @@ impl std::str::FromStr for MinLengthFilter {
             && let Ok(km) = kmstr.parse::<f64>()
         {
             Ok(MinLengthFilter::Length(km * 1000.))
+        } else if let Some(kmstr) = s.strip_suffix("k")
+            && let Ok(_) = kmstr.parse::<f64>()
+        {
+            Err(format!(
+                "The raw suffix `k` is not accepted. Use `km`. i.e. ` --min-length {}km `",
+                kmstr
+            ))
         } else if let Some(mstr) = s.strip_suffix("m")
             && let Ok(m) = mstr.parse::<f64>()
         {
