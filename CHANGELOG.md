@@ -2,10 +2,14 @@
 
 ## Unreleased
 
+* Internal refactoring for `--min-length` filtering.
+
 ### `osm-lump-ways-down`
 
 * Fix bug with terminal distributories where the order was reversed (example
   found was Ganga river)
+* `--min-lenght N` argument added, which supports all advanced length filtering.
+  `--min-length-m` removed.
 
 ## v3.12.0 (2026-09-18)
 
