@@ -52,11 +52,11 @@ mod longest_source_mouth;
 mod tag_group;
 use tag_group::TagGroupInfo;
 
-use graph::{DirectedGraph, DirectedGraphTrait};
 use distance::distance_m;
+use graph::{DirectedGraph, DirectedGraphTrait};
 use nodeid_position::NodeIdPosition;
-use osm_lump_ways::graph;
 use osm_lump_ways::distance;
+use osm_lump_ways::graph;
 use osm_lump_ways::inter_store;
 use osm_lump_ways::nodeid_position;
 use osm_lump_ways::sorted_slice_store::SortedSliceSet;
@@ -2319,8 +2319,12 @@ fn calc_through_path_length(
         }
     }
 
-    let src_nids = g.vertexes_and_num_ins_outs().filter_map(|(nid, num_ins, _num_outs)| if num_ins == 0 { Some(nid) } else { None }).collect::<Vec<i64>>();
-    let mut prev_dist: HashMap<(i64, i64), (i64, f64)> = HashMap::with_capacity(src_nids.len() * g.num_vertexes());
+    let src_nids = g
+        .vertexes_and_num_ins_outs()
+        .filter_map(|(nid, num_ins, _num_outs)| if num_ins == 0 { Some(nid) } else { None })
+        .collect::<Vec<i64>>();
+    let mut prev_dist: HashMap<(i64, i64), (i64, f64)> =
+        HashMap::with_capacity(src_nids.len() * g.num_vertexes());
     let mut frontier = BinaryHeap::new();
     for src_nid in src_nids {
         // do a dijkstra flood fill, but only in one direction
@@ -2334,16 +2338,17 @@ fn calc_through_path_length(
                 continue;
             }
             for neighbour_idx in g.out_neighbours(curr_id) {
+                let this_dist = curr_dist
+                    + inter_store
+                        .inters_directed(&curr_id, &neighbour_idx)
+                        .map(|nid| nodeid_pos.get(&nid).unwrap())
+                        .tuple_windows::<(_, _)>()
+                        .par_bridge()
+                        .map(|(p1, p2)| distance::distance_m_fpair(p1, p2))
+                        .sum::<f64>();
 
-                let this_dist = curr_dist + inter_store
-                    .inters_directed(&curr_id, &neighbour_idx)
-                    .map(|nid| nodeid_pos.get(&nid).unwrap())
-                    .tuple_windows::<(_, _)>()
-                    .par_bridge()
-                    .map(|(p1, p2)| distance::distance_m_fpair(p1, p2))
-                    .sum::<f64>();
-
-                let old_value = prev_dist.entry((src_nid, neighbour_idx))
+                let old_value = prev_dist
+                    .entry((src_nid, neighbour_idx))
                     .or_insert((0, f64::INFINITY));
 
                 if this_dist < old_value.1 {
@@ -2354,7 +2359,11 @@ fn calc_through_path_length(
             }
         }
     }
-    let longest_path_len = prev_dist.values().map(|(_prev, dist)| OrderedFloat(*dist)).max().unwrap();
+    let longest_path_len = prev_dist
+        .values()
+        .map(|(_prev, dist)| OrderedFloat(*dist))
+        .max()
+        .unwrap();
 
     *longest_path_len
 }

@@ -1,8 +1,8 @@
 #![allow(clippy::type_complexity, dead_code)]
 use super::*;
 use crate::utils::min_max;
-use graph::{DirectedGraph, DirectedGraphTrait, Graph2};
 use distance::distance_m_fpair;
+use graph::{DirectedGraph, DirectedGraphTrait, Graph2};
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use radix_heap::RadixHeapMap;

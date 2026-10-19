@@ -1,5 +1,6 @@
 #![allow(dead_code, unused_imports)]
 use super::*;
+use distance::distance_m_fpair;
 use geo::algorithm::convex_hull::qhull::quick_hull;
 use geo::{
     CoordsIter,
@@ -8,7 +9,6 @@ use geo::{
 };
 use graph::Graph2;
 use graph::UndirectedAdjGraph;
-use distance::distance_m_fpair;
 use inter_store::InterStore;
 use ordered_float::OrderedFloat;
 use sorted_slice_store::SortedSliceSet;
