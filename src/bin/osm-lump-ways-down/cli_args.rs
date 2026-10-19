@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use osm_lump_ways::dij::SplitPathsMethod;
+use osm_lump_ways::min_length::MinLengthFilter;
 use osm_lump_ways::tagfilter;
 
 fn parse_int_human(input: &str) -> Result<usize, String> {
@@ -103,9 +104,12 @@ pub struct Args {
     #[arg(long)]
     pub incl_unset_group: bool,
 
-    /// Only include (in the output) lines which are this length (in metres) or more.
-    #[arg(long, value_name = "NUMBER")]
-    pub min_length_m: Option<f64>,
+    /// Exclude groups which have less than this length. Can accept numbers (metres), or suffixed
+    /// with `km`. Special suffx `%longest` is adaptive to the longest group there is.
+    /// `--min-length 50%longest` includes the longest group, and any group which is at least as
+    /// long as 50% of the length of the longest.
+    #[arg(long)]
+    pub min_length: Option<MinLengthFilter>,
 
     /// Only include (in the output) lines which have a `dist_to_nearer` greater than or equal to
     /// this

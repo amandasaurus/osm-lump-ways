@@ -565,9 +565,8 @@ fn main() -> Result<()> {
         let min_length_m = if let Some(min_length_m) = args.min_length_m {
             min_length_m
         } else if let Some(mlf) = args.min_length {
-			let all_lengths = way_groups.par_iter().map(|wg| wg.length_m);
-			mlf.calc_min_length_m(all_lengths)
-
+            let all_lengths = way_groups.par_iter().map(|wg| wg.length_m);
+            mlf.calc_min_length_m(all_lengths)
         } else {
             unreachable!()
         };

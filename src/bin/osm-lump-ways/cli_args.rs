@@ -98,7 +98,12 @@ pub struct Args {
     pub incl_unset_group: bool,
 
     /// Use `--min-length N` instead
-    #[arg(long, value_name = "NUMBER", conflicts_with = "min_length", hide=true)]
+    #[arg(
+        long,
+        value_name = "NUMBER",
+        conflicts_with = "min_length",
+        hide = true
+    )]
     pub min_length_m: Option<f64>,
 
     /// Exclude groups which have less than this length. Can accept numbers (metres), or suffixed

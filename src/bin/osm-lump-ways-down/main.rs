@@ -42,6 +42,7 @@ use osm_lump_ways::nodeid_wayids;
 use osm_lump_ways::nodeid_wayids::NodeIdWayIds;
 
 use osm_lump_ways::auto_atomic_write_file::AutoAtomicWriteFile;
+use osm_lump_ways::min_length::MinLengthFilter;
 use osm_lump_ways::utils::{round, round_mult};
 
 mod cli_args;
@@ -1314,7 +1315,7 @@ fn main() -> Result<()> {
             &inter_store,
             tag_group_info,
             &tag_group_value,
-            args.min_length_m,
+            args.min_length,
             args.incl_objids,
         )?;
     }
@@ -1981,7 +1982,7 @@ fn do_waterway_grouped(
     inter_store: &inter_store::InterStore,
     tag_group_info: &[TagGroupInfo],
     tag_group_value: &[String],
-    min_length_m: Option<f64>,
+    min_length: Option<MinLengthFilter>,
     incl_objids: bool,
 ) -> Result<()> {
     let started_do_waterway_grouped = Instant::now();
@@ -2008,6 +2009,9 @@ fn do_waterway_grouped(
             "upstream_m": round(&(g.edge_property_unchecked(*seg).upstream_m+extra), 1),
         })
     };
+
+    let min_length_m = min_length
+        .map(|mlf| mlf.calc_min_length_m(tag_group_info.par_iter().map(|tgi| tgi.length_m)));
 
     // Here is the big iterator to generate all the GeoJSON Feature's for this file
     let taggroups_with_geom = tag_group_info.iter()

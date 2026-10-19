@@ -1,6 +1,6 @@
+use ordered_float::OrderedFloat;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::*;
-use ordered_float::OrderedFloat;
 
 #[derive(Clone, Debug, PartialEq, Copy)]
 pub enum MinLengthFilter {
@@ -9,7 +9,6 @@ pub enum MinLengthFilter {
     IncludeTotalPercentage(f64),
     PercentTotal(f64),
 }
-
 
 impl std::str::FromStr for MinLengthFilter {
     type Err = String;
@@ -50,20 +49,15 @@ impl std::str::FromStr for MinLengthFilter {
             Err("Cannot parse".to_string())
         }
     }
-
 }
 
 impl MinLengthFilter {
-	pub fn calc_min_length_m(&self, lengths: impl ParallelIterator<Item=f64>) -> f64 {
-		use MinLengthFilter::*;
-		match self {
-			Length(l) => *l,
+    pub fn calc_min_length_m(&self, lengths: impl ParallelIterator<Item = f64>) -> f64 {
+        use MinLengthFilter::*;
+        match self {
+            Length(l) => *l,
             PercentLongest(perc) => {
-                let longest = lengths
-                    .map(|l| OrderedFloat(l))
-                    .max()
-                    .unwrap()
-                    .into_inner();
+                let longest = lengths.map(|l| OrderedFloat(l)).max().unwrap().into_inner();
                 longest * perc
             }
             PercentTotal(perc) => {
@@ -71,7 +65,7 @@ impl MinLengthFilter {
                 total_length * perc
             }
             IncludeTotalPercentage(perc) => {
-				let mut all_lengths: Vec<f64> = lengths.collect();
+                let mut all_lengths: Vec<f64> = lengths.collect();
                 let total_length = all_lengths.par_iter().sum::<f64>();
                 let desired_total = total_length * perc;
                 all_lengths.par_sort_by_key(|l| OrderedFloat(-l));
@@ -86,7 +80,6 @@ impl MinLengthFilter {
                 }
                 min_length
             }
-
-		}
-	}
+        }
+    }
 }
