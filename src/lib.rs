@@ -22,11 +22,11 @@ pub mod auto_atomic_write_file;
 pub mod btreemapsplitkey;
 pub mod inter_store;
 pub mod kosaraju;
+pub mod min_length;
 pub mod nodeid_wayids;
 pub mod sorted_slice_store;
 pub mod taggrouper;
 pub mod way_id_rel_tags;
-pub mod min_length;
 
 pub mod fileio;
 pub mod formatting;

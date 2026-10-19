@@ -29,6 +29,7 @@ mod cli_args;
 use nodeid_position::NodeIdPosition;
 use osm_lump_ways::dij;
 use osm_lump_ways::haversine::haversine_m_fpair;
+use osm_lump_ways::min_length::MinLengthFilter;
 use osm_lump_ways::nodeid_position;
 use osm_lump_ways::nodeid_wayids;
 use osm_lump_ways::nodeid_wayids::NodeIdWayIds;
@@ -38,7 +39,6 @@ use osm_lump_ways::utils::round;
 use osm_lump_ways::way_group;
 use osm_lump_ways::way_id_rel_tags::WayIdToRelationTags;
 use way_group::WayGroup;
-use osm_lump_ways::min_length::MinLengthFilter;
 
 use fileio::OutputFormat;
 use osm_lump_ways::auto_atomic_write_file::AutoAtomicWriteFile;

@@ -1954,7 +1954,10 @@ fn do_write_upstreams(
     } else if upstream_filename.extension().unwrap() == "csv" {
         write_csv_features_directly(lines, &mut f, fileio::OutputGeometryFormat::WKT)?
     } else {
-        anyhow::bail!("Unsupported output format: {:?}", upstream_filename.extension());
+        anyhow::bail!(
+            "Unsupported output format: {:?}",
+            upstream_filename.extension()
+        );
     };
 
     f.finish()?;

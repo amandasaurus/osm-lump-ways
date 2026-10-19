@@ -3,9 +3,9 @@ use clap_verbosity_flag::Verbosity;
 use std::path::PathBuf;
 
 use osm_lump_ways::dij::SplitPathsMethod;
+use osm_lump_ways::min_length::MinLengthFilter;
 use osm_lump_ways::tagfilter;
 use osm_lump_ways::taggrouper;
-use osm_lump_ways::min_length::MinLengthFilter;
 
 /// Group OSM ways based on shared tags into `GeoJSON` `MultiLineStrings`
 ///
@@ -98,7 +98,7 @@ pub struct Args {
     pub incl_unset_group: bool,
 
     /// Only include (in the output) lines which are this length (in metres) or more.
-    #[arg(long, value_name = "NUMBER", conflicts_with="min_length")]
+    #[arg(long, value_name = "NUMBER", conflicts_with = "min_length")]
     pub min_length_m: Option<f64>,
 
     /// Exclude groups which have less than this length. Can accept numbers (metres), or suffixed
