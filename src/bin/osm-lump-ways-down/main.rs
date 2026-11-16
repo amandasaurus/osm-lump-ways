@@ -800,7 +800,7 @@ fn main() -> Result<()> {
     let orig_num_vertexes = g.num_vertexes();
     let topologically_sorted_nodes = g
         .clone()
-        .into_vertexes_topologically_sorted(&sorting_nodes_bar)
+        .into_vertexes_topologically_sorted(Some(&sorting_nodes_bar))
         .into_boxed_slice();
     sorting_nodes_bar.finish_and_clear();
     info!(

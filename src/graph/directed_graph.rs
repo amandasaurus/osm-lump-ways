@@ -211,7 +211,7 @@ pub trait DirectedGraphTrait<V, E>: Send + Sync + Sized {
         added
     }
 
-    fn into_vertexes_topologically_sorted(self, sorting_nodes_bar: &ProgressBar) -> Vec<i64> {
+    fn into_vertexes_topologically_sorted(self, sorting_nodes_bar: Option<&ProgressBar>) -> Vec<i64> {
         let mut g = self;
         let mut result = Vec::with_capacity(g.num_vertexes());
         let mut frontier: Vec<i64> = Vec::new();
@@ -229,7 +229,9 @@ pub trait DirectedGraphTrait<V, E>: Send + Sync + Sized {
 
             while let Some(v) = frontier.pop() {
                 result.push(v);
-                sorting_nodes_bar.inc(1);
+                if let Some(sorting_nodes_bar) = sorting_nodes_bar {
+					sorting_nodes_bar.inc(1);
+				}
 
                 // have to save to another Vec to prevent lifetimes
                 others.truncate(0);
