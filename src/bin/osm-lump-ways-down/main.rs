@@ -2011,54 +2011,54 @@ fn do_waterway_grouped(
     let min_length_m = min_length
         .map(|mlf| mlf.calc_min_length_m(tag_group_info.par_iter().map(|tgi| tgi.length_m)));
 
+    let output_format = fileio::format_for_filename(output_filename);
+    let mut f = AutoAtomicWriteFile::new(args.overwrite, output_filename)?;
+    let (tx,rx) = std::sync::mpsc::sync_channel(100);
+
+    // write data in a separate thread. We mostly want this so that we can calculate the serde
+    // stuff in parallel.
+    let writing_handle = std::thread::spawn({
+        move || {
+            let total_written =
+                write_geojson_features_directly(rx.iter(), &mut f, &output_format).unwrap();
+            f.finish().unwrap();
+            return total_written;
+        }
+    });
+
     // Here is the big iterator to generate all the GeoJSON Feature's for this file
-    let taggroups_with_geom = tag_group_info.iter()
+    let _taggroups_with_geom = tag_group_info.iter()
         .progress_with(writing_output_bar)
         .enumerate()
+        .par_bridge()
         .map(|(taggroupid, tg)| {
             // For each taggroup, we assemble all the lines that are in the group, by walking
             // upwards from the end segments.
             let taggroupid = taggroupid as u64;
-            let mut seen_out_nids = HashSet::<i64>::new();
-            let mut seen_in_nids = HashSet::<i64>::new();
 
             let mut tg_graph: DirectedGraph<(f64, f64), f64> = DirectedGraph::new();
 
-            let mut incoming_store: SmallVec<[(i64, i64); 2]> = smallvec![];
-            let mut end_segments_to_build_from: SmallVec<[(i64, i64); 5]> = smallvec![];
-            end_segments_to_build_from.extend(tg.end_segments.iter().copied());
+            let mut frontier: SmallVec<[(i64, i64); 5]> = smallvec![];
+            frontier.extend(tg.end_segments.iter().copied());
             assert!(tg.end_segments.par_iter()
                 .all(|seg| g.edge_property_unchecked(*seg).taggroupid == taggroupid));
 
-            while let Some(seg) = end_segments_to_build_from.pop() {
-                let mut seg = seg;
-                loop {
-                    if tg_graph.contains_edge(seg.0, seg.1) {
-                        break;
-                    }
-                    if !tg_graph.contains_vertex(&seg.0) {
-                        tg_graph.add_vertex_w_prop(seg.0, nodeid_pos.get_unchecked(&seg.0));
-                    }
-                    if !tg_graph.contains_vertex(&seg.1) {
-                        tg_graph.add_vertex_w_prop(seg.1, nodeid_pos.get_unchecked(&seg.1));
-                    }
-                    tg_graph.add_edge_w_prop(seg.0, seg.1, g.edge_property_unchecked((seg.0, seg.1)).length_m);
-                    seen_out_nids.insert(seg.0);
-                    seen_in_nids.insert(seg.1);
-                    incoming_store.truncate(0);
-                    incoming_store.extend(
-                        g.in_edges(seg.0).filter(
-                            |seg2| { g.edge_property_unchecked(*seg2).taggroupid == taggroupid },
-                        )
-                    );
-                    if incoming_store.is_empty() {
-                        break;
-                    }
-                    if incoming_store.len() > 1 {
-                        end_segments_to_build_from.extend(incoming_store.drain(1..));
-                    }
-                    seg = incoming_store.pop().unwrap();
+            while let Some(seg) = frontier.pop() {
+                if tg_graph.contains_edge(seg.0, seg.1) {
+                    break;
                 }
+                if !tg_graph.contains_vertex(&seg.0) {
+                    tg_graph.add_vertex_w_prop(seg.0, nodeid_pos.get_unchecked(&seg.0));
+                }
+                if !tg_graph.contains_vertex(&seg.1) {
+                    tg_graph.add_vertex_w_prop(seg.1, nodeid_pos.get_unchecked(&seg.1));
+                }
+                tg_graph.add_edge_w_prop(seg.0, seg.1, g.edge_property_unchecked((seg.0, seg.1)).length_m);
+                frontier.extend(
+                    g.in_edges(seg.0).filter(
+                        |seg2| { g.edge_property_unchecked(*seg2).taggroupid == taggroupid },
+                    )
+                );
             }
 
             (taggroupid, tg, tg_graph)
@@ -2119,7 +2119,6 @@ fn do_waterway_grouped(
             props["tag_group_value"] = tg.tagid.map(|tagid| tag_group_value[tagid as usize].as_str()).into();
             props["internal_groupid"] = taggroupid.into();
             props["min_nid"] = tg.min_nid.into();
-
 
 
             if !tg.extra_tag_values.is_empty() {
@@ -2255,30 +2254,15 @@ fn do_waterway_grouped(
 
 
             Some((props, multilinestrings))
-        });
+        })
+        .for_each(move |(props, multilinestrings)| {
+            //dbg!(&props);
+            tx.send((props, multilinestrings)).unwrap();
+        }) ;
 
-    let mut f = AutoAtomicWriteFile::new(args.overwrite, output_filename)?;
-
-    let num_written = if output_filename.extension().unwrap() == "geojsons"
-        || output_filename.extension().unwrap() == "geojson"
-    {
-        write_geojson_features_directly(
-            taggroups_with_geom,
-            &mut f,
-            &fileio::format_for_filename(output_filename),
-        )?
-    } else if output_filename.extension().unwrap() == "csv" {
-        write_csv_features_directly(
-            taggroups_with_geom,
-            &mut f,
-            fileio::OutputGeometryFormat::GeoJSON,
-        )?
-    } else {
-        anyhow::bail!("Unsupported output format");
-    };
+    let num_written = writing_handle.join().unwrap();
 
     let do_waterway_grouped_duration = started_do_waterway_grouped.elapsed();
-    f.finish()?;
 
     info!(
         "Calculated & wrote {} features to output file {} in {}",
