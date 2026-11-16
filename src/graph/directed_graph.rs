@@ -415,6 +415,58 @@ pub trait DirectedGraphTrait<V, E>: Send + Sync + Sized {
                 == num_vertexes)
     }
 
+    fn pop_simple_line(&mut self) -> Option<Vec<i64>> {
+        if !self
+            .vertexes_and_num_ins_outs()
+            .any(|(_nid, nins, nouts)| nins == 0 && nouts == 1)
+        {
+            return None;
+        }
+
+        let mut src_nids: Vec<i64> = self
+            .vertexes_and_num_ins_outs()
+            .filter_map(|(nid, nins, nouts)| {
+                if nins == 0 && nouts == 1 {
+                    Some(nid)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let mut path = Vec::new();
+        'src_nids: for src_nid in src_nids.into_iter() {
+            path.truncate(0);
+            let mut curr_nid = src_nid;
+            loop {
+                path.push(curr_nid);
+                let nins = self.num_in_neighbours(curr_nid).unwrap();
+                let nouts = self.num_out_neighbours(curr_nid).unwrap();
+                if nins > 1 || nouts > 1 {
+                    path.truncate(0);
+                    break 'src_nids;
+                } else if nouts == 0 {
+                    // last node
+                    break;
+                } else if nouts == 1 {
+                    curr_nid = self.out_neighbours(curr_nid).next().unwrap();
+                } else {
+                    dbg!(nins, nouts);
+                    unreachable!();
+                }
+            }
+        }
+
+        if path.is_empty() {
+            return None;
+        }
+
+        // we have found a path
+        for seg in path.windows(2) {
+            self.remove_edge(&seg[0], &seg[1]);
+        }
+
+        Some(path)
+    }
 }
 
 #[derive(Default, Debug, Clone)]
