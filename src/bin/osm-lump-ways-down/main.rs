@@ -2105,7 +2105,7 @@ fn do_waterway_grouped(
             props["mean_upstream_m"] = round(&(upstream_stats.3.into_inner() / upstream_stats.2 as f64), 1).into();
 
             // Now reorder based on longest segments & calc len of each path.
-            let lines_w_lens = calc_through_path_length_and_reorder(tg_graph, &inter_store, nodeid_pos);
+            let lines_w_lens = calc_through_path_length_and_reorder(tg_graph, inter_store, nodeid_pos);
             let length_m = lines_w_lens[0].0;
             let cum_length_m = lines_w_lens.iter().map(|(len, _points)| len).sum();
             let multilinestrings: Vec<Vec<(f64, f64)>> = lines_w_lens.into_iter().map(|(_len, points)| points).collect();
@@ -2330,7 +2330,7 @@ fn calc_through_path_length_and_reorder(
             resultant_lines.push((len, this_line));
         } else {
             //dbg!("new loop", g.len(), resultant_lines.len());
-            src_nids.truncate(0);
+            src_nids.clear();
             src_nids.extend(g.vertexes_and_num_ins_outs().filter_map(
                 |(nid, num_ins, _num_outs)| if num_ins == 0 { Some(nid) } else { None },
             ));
@@ -2415,7 +2415,7 @@ fn calc_through_path_length_and_reorder(
     }
 
     assert!(
-        resultant_lines.len() > 0,
+        !resultant_lines.is_empty(),
         "There were {:?} lines at the start, and no resultant lines",
         g.len()
     );
