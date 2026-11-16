@@ -2335,104 +2335,135 @@ fn calc_through_path_length_and_reorder(
         // This happens. e.g. a line of 2 nodes, w. different node ids, but same position. Length
         // between them all is zero. This messes up our algorithm. So early exit. Just make
         // something “correct”
-        todo!();
+        return lines
+            .par_iter()
+            .map(|l| (0., l.iter().map(|nid| nodeid_pos.get_unchecked(nid)).collect()))
+            .collect();
     }
 
-    // now we iteratively remove edges from this graph as they are build
-    let mut src_nids = Vec::new();
-    let mut prev_dist: HashMap<(i64, i64), (i64, f64)> = HashMap::new();
-    let mut frontier = BinaryHeap::new();
     let mut resultant_lines = Vec::new();
-    let mut last_num_edges = g.num_edges();
 
-    while !g.is_empty() {
-        dbg!("new loop", g.len(), resultant_lines.len());
-        src_nids.truncate(0);
-        src_nids.extend(
-            g.vertexes_and_num_ins_outs().filter_map(
-                |(nid, num_ins, _num_outs)| if num_ins == 0 { Some(nid) } else { None },
-            ),
-        );
-        dbg!(src_nids.len());
-        sort_dedup!(src_nids);
-        prev_dist.clear();
-        prev_dist.reserve(src_nids.len() * g.num_vertexes());
-
-        // Update the prev_dist's
-        for src_nid in src_nids.iter().copied() {
-            // do a dijkstra flood fill, but only in one direction
-            prev_dist.insert((src_nid, src_nid), (src_nid, 0.));
-
-            frontier.clear();
-            frontier.push((Reverse(OrderedFloat(0.)), src_nid));
-
-            while let Some((Reverse(OrderedFloat(curr_dist)), curr_id)) = frontier.pop() {
-                if curr_dist > prev_dist[&(src_nid, curr_id)].1 {
-                    continue;
-                }
-                for (neighbour_idx, edge_length) in g.out_neighbours_w_prop(curr_id) {
-                    let this_dist = curr_dist + edge_length;
-
-                    let old_value = prev_dist
-                        .entry((src_nid, neighbour_idx))
-                        .or_insert((0, f64::INFINITY));
-
-                    if this_dist < old_value.1 {
-                        old_value.0 = curr_id;
-                        old_value.1 = this_dist;
-                        frontier.push((Reverse(OrderedFloat(this_dist)), neighbour_idx));
-                    }
-                }
+    if g.is_simple_line() {
+        // short cut where it just follows the line along.
+        let src_nid = g.vertexes_and_num_ins_outs().filter(|(_nid, nins, nouts)| *nins == 0 && *nouts == 1).next().unwrap().0;
+        let mut this_line = Vec::with_capacity(g.num_edges());
+        let mut curr_nid = src_nid;
+        loop {
+            this_line.push(curr_nid);
+            if let Some(next) = g.out_neighbours(curr_nid).next() {
+                curr_nid = next;
+            } else {
+                break;
             }
         }
-        prev_dist.retain(|_, (_prev, dist)| *dist > 0.);
-        if prev_dist.is_empty() {
-            // this can happen at the end of calculating everything, and we have nodes on top of
-            // each other. So just stop now.
-            break;
-        }
-        let (&(src_nid, sink_nid), &(prev_nid, len)) = prev_dist
-            .iter()
-            .max_by_key(|((src_nid, sink_nid), (prev_nid, dist))| {
-                (OrderedFloat(*dist), -src_nid, -sink_nid, prev_nid)
-            })
-            .unwrap();
-        dbg!(src_nid, sink_nid);
-        let mut curr_nid: i64 = prev_nid;
-        let mut last = sink_nid;
 
-        let mut this_line: Vec<i64> = Vec::new();
-        if prev_nid == src_nid {
-            this_line.push(src_nid);
-            this_line.push(sink_nid);
-            g.remove_edge(&src_nid, &sink_nid);
-        } else {
-            this_line.push(sink_nid);
-            g.remove_edge(&curr_nid, &sink_nid);
-            while curr_nid != src_nid {
-                this_line.push(curr_nid);
-                g.remove_edge(&curr_nid, &last);
-                last = curr_nid;
-                curr_nid = prev_dist[&(src_nid, curr_nid)].0;
-            }
-            this_line.push(src_nid);
-            g.remove_edge(&src_nid, &curr_nid);
-            this_line.reverse();
-        }
         let this_line = inter_store
             .expand_line_directed(&this_line)
             .map(|nid| nodeid_pos.get(&nid).unwrap())
             .collect::<Vec<(f64, f64)>>();
+        let len = this_line.iter()
+                .tuple_windows::<(_, _)>()
+                .map(|(p1, p2)| distance::distance_m_fpair(*p1, *p2))
+                .sum::<f64>();
         resultant_lines.push((len, this_line));
 
-        // Sanity check
-        assert!(
-            g.num_edges() < last_num_edges,
-            "No edges removed in this step. last={last_num_edges} num_edges={:?} prev_dist={:?}",
-            g.len(),
-            prev_dist
-        );
-        last_num_edges = g.num_edges();
+    } else {
+
+        // now we iteratively remove edges from this graph as they are build
+        let mut src_nids = Vec::new();
+        let mut prev_dist: HashMap<(i64, i64), (i64, f64)> = HashMap::new();
+        let mut frontier = BinaryHeap::new();
+        let mut last_num_edges = g.num_edges();
+
+        while !g.is_empty() {
+            dbg!("new loop", g.len(), resultant_lines.len());
+            src_nids.truncate(0);
+            src_nids.extend(
+                g.vertexes_and_num_ins_outs().filter_map(
+                    |(nid, num_ins, _num_outs)| if num_ins == 0 { Some(nid) } else { None },
+                ),
+            );
+            dbg!(src_nids.len());
+            sort_dedup!(src_nids);
+            prev_dist.clear();
+            prev_dist.reserve(src_nids.len() * g.num_vertexes());
+
+            // Update the prev_dist's
+            for src_nid in src_nids.iter().copied() {
+                // do a dijkstra flood fill, but only in one direction
+                prev_dist.insert((src_nid, src_nid), (src_nid, 0.));
+
+                frontier.clear();
+                frontier.push((Reverse(OrderedFloat(0.)), src_nid));
+
+                while let Some((Reverse(OrderedFloat(curr_dist)), curr_id)) = frontier.pop() {
+                    if curr_dist > prev_dist[&(src_nid, curr_id)].1 {
+                        continue;
+                    }
+                    for (neighbour_idx, edge_length) in g.out_neighbours_w_prop(curr_id) {
+                        let this_dist = curr_dist + edge_length;
+
+                        let old_value = prev_dist
+                            .entry((src_nid, neighbour_idx))
+                            .or_insert((0, f64::INFINITY));
+
+                        if this_dist < old_value.1 {
+                            old_value.0 = curr_id;
+                            old_value.1 = this_dist;
+                            frontier.push((Reverse(OrderedFloat(this_dist)), neighbour_idx));
+                        }
+                    }
+                }
+            }
+            prev_dist.retain(|_, (_prev, dist)| *dist > 0.);
+            if prev_dist.is_empty() {
+                // this can happen at the end of calculating everything, and we have nodes on top of
+                // each other. So just stop now.
+                break;
+            }
+            let (&(src_nid, sink_nid), &(prev_nid, len)) = prev_dist
+                .iter()
+                .max_by_key(|((src_nid, sink_nid), (prev_nid, dist))| {
+                    (OrderedFloat(*dist), -src_nid, -sink_nid, prev_nid)
+                })
+                .unwrap();
+            dbg!(src_nid, sink_nid);
+            let mut curr_nid: i64 = prev_nid;
+            let mut last = sink_nid;
+
+            let mut this_line: Vec<i64> = Vec::new();
+            if prev_nid == src_nid {
+                this_line.push(src_nid);
+                this_line.push(sink_nid);
+                g.remove_edge(&src_nid, &sink_nid);
+            } else {
+                this_line.push(sink_nid);
+                g.remove_edge(&curr_nid, &sink_nid);
+                while curr_nid != src_nid {
+                    this_line.push(curr_nid);
+                    g.remove_edge(&curr_nid, &last);
+                    last = curr_nid;
+                    curr_nid = prev_dist[&(src_nid, curr_nid)].0;
+                }
+                this_line.push(src_nid);
+                g.remove_edge(&src_nid, &curr_nid);
+                this_line.reverse();
+            }
+            let this_line = inter_store
+                .expand_line_directed(&this_line)
+                .map(|nid| nodeid_pos.get(&nid).unwrap())
+                .collect::<Vec<(f64, f64)>>();
+            resultant_lines.push((len, this_line));
+
+            // Sanity check
+            assert!(
+                g.num_edges() < last_num_edges,
+                "No edges removed in this step. last={last_num_edges} num_edges={:?} prev_dist={:?}",
+                g.len(),
+                prev_dist
+            );
+            last_num_edges = g.num_edges();
+        }
     }
 
     assert!(
