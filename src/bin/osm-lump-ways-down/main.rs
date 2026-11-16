@@ -2024,19 +2024,41 @@ fn do_waterway_grouped(
 
             let mut tg_graph: DirectedGraph<(f64, f64), f64> = DirectedGraph::new();
 
-            for (nid1, nid2, eprop) in g.edges_iter_w_prop().filter(|(_nid1, _nid2, eprop)| eprop.taggroupid == taggroupid)
-            {
-                if tg_graph.contains_edge(nid1, nid2) {
-                    break;
-                }
-                if !tg_graph.contains_vertex(&nid1) {
-                    tg_graph.add_vertex_w_prop(nid1, nodeid_pos.get_unchecked(&nid1));
-                }
-                if !tg_graph.contains_vertex(&nid2) {
-                    tg_graph.add_vertex_w_prop(nid2, nodeid_pos.get_unchecked(&nid2));
-                }
-                tg_graph.add_edge_w_prop(nid1, nid2, eprop.length_m);
+            let mut incoming_store: SmallVec<[(i64, i64); 2]> = smallvec![];
+            let mut end_segments_to_build_from: SmallVec<[(i64, i64); 5]> = smallvec![];
+            end_segments_to_build_from.extend(tg.end_segments.iter().copied());
+            assert!(tg.end_segments.par_iter()
+                .all(|seg| g.edge_property_unchecked(*seg).taggroupid == taggroupid));
 
+            while let Some(seg) = end_segments_to_build_from.pop() {
+                let mut seg = seg;
+                loop {
+                    if tg_graph.contains_edge(seg.0, seg.1) {
+                        break;
+                    }
+                    if !tg_graph.contains_vertex(&seg.0) {
+                        tg_graph.add_vertex_w_prop(seg.0, nodeid_pos.get_unchecked(&seg.0));
+                    }
+                    if !tg_graph.contains_vertex(&seg.1) {
+                        tg_graph.add_vertex_w_prop(seg.1, nodeid_pos.get_unchecked(&seg.1));
+                    }
+                    tg_graph.add_edge_w_prop(seg.0, seg.1, g.edge_property_unchecked((seg.0, seg.1)).length_m);
+                    seen_out_nids.insert(seg.0);
+                    seen_in_nids.insert(seg.1);
+                    incoming_store.truncate(0);
+                    incoming_store.extend(
+                        g.in_edges(seg.0).filter(
+                            |seg2| { g.edge_property_unchecked(*seg2).taggroupid == taggroupid },
+                        )
+                    );
+                    if incoming_store.is_empty() {
+                        break;
+                    }
+                    if incoming_store.len() > 1 {
+                        end_segments_to_build_from.extend(incoming_store.drain(1..));
+                    }
+                    seg = incoming_store.pop().unwrap();
+                }
             }
 
             (taggroupid, tg, tg_graph)
