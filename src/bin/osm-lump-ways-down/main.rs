@@ -2042,11 +2042,11 @@ fn do_waterway_grouped(
                     seen_out_nids.insert(seg.0);
                     seen_in_nids.insert(seg.1);
                     incoming_store.truncate(0);
-                    incoming_store.extend(g.in_edges(seg.0).filter(
-                        |seg2| {
-							g.edge_property_unchecked(*seg2).taggroupid == taggroupid
-                        },
-                    ));
+                    incoming_store.extend(
+                        g.in_edges(seg.0).filter(
+                            |seg2| { g.edge_property_unchecked(*seg2).taggroupid == taggroupid },
+                        )
+                    );
                     if incoming_store.is_empty() {
                         break;
                     }
@@ -2085,6 +2085,27 @@ fn do_waterway_grouped(
                 props["stream_level_code"] = tg.stream_level_code.as_ref().into();
             }
 
+            // Expand all the intermediate points
+            // & attach the latlng's to each point.
+            let expanded_lines: Vec<Vec<(i64, (f64, f64))>> = lines.par_iter()
+                .map(|line|
+                    inter_store.expand_line_directed(line)
+                    .map(|nid| (nid, nodeid_pos.get(&nid).unwrap()))
+                    .collect())
+                .collect();
+
+            // Now reorder based on longest segments & calc len of each path.
+            let lines_w_lens = calc_through_path_length_and_reorder(&expanded_lines);
+            let length_m = lines_w_lens[0].0;
+            let cum_length_m = lines_w_lens.iter().map(|(len, _points)| len).sum();
+            let multilinestrings: Vec<Vec<(f64, f64)>> = lines_w_lens.into_iter().map(|(_len, points)| points).collect();
+
+            if min_length_m.is_some_and(|min_length_m| length_m < min_length_m) {
+                return None;
+            }
+            props["length_m"] = round(&length_m, 1).into();
+            props["cum_length_m"] = round(&cum_length_m, 1).into();
+
             props["tag_group_value"] = tg.tagid.map(|tagid| tag_group_value[tagid as usize].as_str()).into();
             props["internal_groupid"] = taggroupid.into();
             props["min_nid"] = tg.min_nid.into();
@@ -2109,25 +2130,6 @@ fn do_waterway_grouped(
             props["max_upstream_m"] = round(&upstream_stats.1.into_inner(), 1).into();
             props["mean_upstream_m"] = round(&(upstream_stats.3.into_inner() / upstream_stats.2 as f64), 1).into();
 
-            let multilinestrings: Vec<_> = lines
-                .par_iter()
-                .map(|line| {
-                    inter_store
-                        .expand_line_directed(line)
-                        .map(|nid| nodeid_pos.get(&nid).unwrap_or_else(|_| panic!("TagGroupInfo {tg:?}")))
-                        .collect::<Vec<_>>()
-                })
-                .collect();
-
-            let cum_length_m = multilinestrings.par_iter().map(|line|
-                line.iter()
-                .tuple_windows::<(_, _)>()
-                .par_bridge()
-                .map(|(&p1, &p2)| distance::distance_m_fpair(p1, p2))
-                .sum::<f64>()
-            ).sum::<f64>();
-            // Round the upstream to only output 1 decimal place
-            props["cum_length_m"] = round(&cum_length_m, 1).into();
 
             if !tg.extra_tag_values.is_empty() {
                 let mut extra_tag_values = serde_json::json!({});
@@ -2159,13 +2161,6 @@ fn do_waterway_grouped(
                     return None;
                 }
 
-            let length_m = calc_through_path_length(&lines, inter_store, nodeid_pos);
-
-            if let Some(min_length_m) = min_length_m
-                && length_m < min_length_m {
-                    return None;
-                }
-            props["length_m"] = round(&length_m, 1).into();
 
             drop(lines);
 
@@ -2313,65 +2308,136 @@ fn do_waterway_grouped(
     Ok(())
 }
 
-fn calc_through_path_length(
-    lines: &[Vec<i64>],
-    inter_store: &inter_store::InterStore,
-    nodeid_pos: &impl NodeIdPosition,
-) -> f64 {
-    let mut g: DirectedGraph<(), ()> = graph::DirectedGraph::new();
-    for line in lines {
-        for seg in line.windows(2) {
-            g.add_edge(seg[0], seg[1]);
+fn calc_through_path_length_and_reorder(
+    lines: &Vec<Vec<(i64, (f64, f64))>>,
+) -> Vec<(f64, Vec<(f64, f64)>)> {
+    if lines.is_empty() {
+        return Vec::new();
+    }
+    // we make a new graph with just the options
+    // edge property is the length
+    // vertex property is the latlng
+    let mut g: DirectedGraph<(f64, f64), f64> = graph::DirectedGraph::new();
+    for line in lines.iter() {
+        for (nid, pos) in line.iter() {
+            g.add_vertex_w_prop(*nid, *pos);
         }
     }
+    for line in lines.iter() {
+        for seg in line.windows(2) {
+            assert_ne!(seg[0].0, seg[1].0);
+            g.add_edge_w_prop(
+                seg[0].0,
+                seg[1].0,
+                distance::distance_m_fpair(seg[0].1, seg[1].1),
+            )
+        }
+    }
+    if g.edges_iter_w_prop().all(|(_nid1, _nid2, len)| *len == 0.) {
+        // This happens. e.g. a line of 2 nodes, w. different node ids, but same position. Length
+        // between them all is zero. This messes up our algorithm. So early exit. Just make
+        // something “correct”
+        return lines
+            .iter()
+            .map(|l| (0., l.iter().map(|(_nid, pos)| *pos).collect()))
+            .collect();
+    }
 
-    let src_nids = g
-        .vertexes_and_num_ins_outs()
-        .filter_map(|(nid, num_ins, _num_outs)| if num_ins == 0 { Some(nid) } else { None })
-        .collect::<Vec<i64>>();
-    let mut prev_dist: HashMap<(i64, i64), (i64, f64)> =
-        HashMap::with_capacity(src_nids.len() * g.num_vertexes());
+    // now we iteratively remove edges from this graph as they are build
+    let mut src_nids = Vec::new();
+    let mut prev_dist: HashMap<(i64, i64), (i64, f64)> = HashMap::new();
     let mut frontier = BinaryHeap::new();
-    for src_nid in src_nids {
-        // do a dijkstra flood fill, but only in one direction
-        prev_dist.insert((src_nid, src_nid), (src_nid, 0.));
+    let mut resultant_lines = Vec::new();
+    let mut last_num_edges = g.num_edges();
 
-        frontier.clear();
-        frontier.push((Reverse(OrderedFloat(0.)), src_nid));
+    while !g.is_empty() {
+        src_nids.truncate(0);
+        src_nids.extend(
+            g.vertexes_and_num_ins_outs().filter_map(
+                |(nid, num_ins, _num_outs)| if num_ins == 0 { Some(nid) } else { None },
+            ),
+        );
+        prev_dist.clear();
+        prev_dist.reserve(src_nids.len() * g.num_vertexes());
 
-        while let Some((Reverse(OrderedFloat(curr_dist)), curr_id)) = frontier.pop() {
-            if curr_dist > prev_dist[&(src_nid, curr_id)].1 {
-                continue;
-            }
-            for neighbour_idx in g.out_neighbours(curr_id) {
-                let this_dist = curr_dist
-                    + inter_store
-                        .inters_directed(&curr_id, &neighbour_idx)
-                        .map(|nid| nodeid_pos.get(&nid).unwrap())
-                        .tuple_windows::<(_, _)>()
-                        .par_bridge()
-                        .map(|(p1, p2)| distance::distance_m_fpair(p1, p2))
-                        .sum::<f64>();
+        // Update the prev_dist's
+        for src_nid in src_nids.drain(..) {
+            // do a dijkstra flood fill, but only in one direction
+            prev_dist.insert((src_nid, src_nid), (src_nid, 0.));
 
-                let old_value = prev_dist
-                    .entry((src_nid, neighbour_idx))
-                    .or_insert((0, f64::INFINITY));
+            frontier.clear();
+            frontier.push((Reverse(OrderedFloat(0.)), src_nid));
 
-                if this_dist < old_value.1 {
-                    old_value.0 = curr_id;
-                    old_value.1 = this_dist;
-                    frontier.push((Reverse(OrderedFloat(this_dist)), neighbour_idx));
+            while let Some((Reverse(OrderedFloat(curr_dist)), curr_id)) = frontier.pop() {
+                if curr_dist > prev_dist[&(src_nid, curr_id)].1 {
+                    continue;
+                }
+                for (neighbour_idx, edge_length) in g.out_neighbours_w_prop(curr_id) {
+                    let this_dist = curr_dist + edge_length;
+
+                    let old_value = prev_dist
+                        .entry((src_nid, neighbour_idx))
+                        .or_insert((0, f64::INFINITY));
+
+                    if this_dist < old_value.1 {
+                        old_value.0 = curr_id;
+                        old_value.1 = this_dist;
+                        frontier.push((Reverse(OrderedFloat(this_dist)), neighbour_idx));
+                    }
                 }
             }
         }
-    }
-    let longest_path_len = prev_dist
-        .values()
-        .map(|(_prev, dist)| OrderedFloat(*dist))
-        .max()
-        .unwrap();
+        prev_dist.retain(|_, (_prev, dist)| *dist > 0.);
+        if prev_dist.is_empty() {
+            // this can happen at the end of calculating everything, and we have nodes on top of
+            // each other. So just stop now.
+            break;
+        }
+        let (&(src_nid, sink_nid), &(prev_nid, len)) = prev_dist
+            .iter()
+            .max_by_key(|((src_nid, sink_nid), (prev_nid, dist))| {
+                (OrderedFloat(*dist), -src_nid, -sink_nid, prev_nid)
+            })
+            .unwrap();
+        let mut curr_nid: i64 = prev_nid;
+        let mut last = sink_nid;
 
-    *longest_path_len
+        let mut this_line: Vec<(f64, f64)> = Vec::new();
+        if prev_nid == src_nid {
+            this_line.push(*g.vertex_property_unchecked(&src_nid));
+            this_line.push(*g.vertex_property_unchecked(&sink_nid));
+            g.remove_edge(&src_nid, &sink_nid);
+        } else {
+            this_line.push(*g.vertex_property_unchecked(&sink_nid));
+            g.remove_edge(&curr_nid, &sink_nid);
+            while curr_nid != src_nid {
+                this_line.push(*g.vertex_property_unchecked(&curr_nid));
+                g.remove_edge(&curr_nid, &last);
+                last = curr_nid;
+                curr_nid = prev_dist[&(src_nid, curr_nid)].0;
+            }
+            this_line.push(*g.vertex_property_unchecked(&src_nid));
+            g.remove_edge(&src_nid, &curr_nid);
+            this_line.reverse();
+        }
+        resultant_lines.push((len, this_line));
+
+        // Sanity check
+        assert!(
+            g.num_edges() < last_num_edges,
+            "No edges removed in this step. last={last_num_edges} num_edges={:?} prev_dist={:?}",
+            g.len(),
+            prev_dist
+        );
+        last_num_edges = g.num_edges();
+    }
+
+    assert!(
+        resultant_lines.len() > 0,
+        "There were {} lines at the start, and no resultant lines",
+        lines.len()
+    );
+    resultant_lines
 }
 
 #[allow(dead_code)]
