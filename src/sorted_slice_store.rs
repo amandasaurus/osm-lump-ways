@@ -47,7 +47,6 @@ where
         self.data.is_empty()
     }
 
-    
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &(K, V)> {
         self.data.iter()
     }
@@ -57,12 +56,11 @@ where
     pub fn par_iter_mut(&mut self) -> impl IndexedParallelIterator<Item = &mut (K, V)> {
         self.data.par_iter_mut()
     }
-    
+
     pub fn keys(&self) -> impl ExactSizeIterator<Item = &K> {
         self.data.iter().map(|(k, _)| k)
     }
 
-    
     pub fn values(&self) -> impl ExactSizeIterator<Item = &V> {
         self.data.iter().map(|(_, v)| v)
     }
