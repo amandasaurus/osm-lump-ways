@@ -453,8 +453,7 @@ fn main() -> Result<()> {
         .into_iter()
         .par_bridge()
         .filter(|(nid, _pos)| nids_we_need.contains(nid))
-        .map(|(nid, pos)| (nid, (pos.1.inner(), pos.0.inner()))) // WTF do I have lat & lon
-        // mixed up??
+        .map(|(nid, pos)| (nid, (pos.0.inner(), pos.1.inner())))
         .for_each_with(nodeid_pos.clone(), |nodeid_pos, (nid, pos)| {
             setting_node_pos.inc(1);
             nodeid_pos.lock().unwrap().insert_i32(nid, pos);
