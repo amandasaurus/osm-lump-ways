@@ -52,9 +52,3 @@ impl Write for AutoAtomicWriteFile {
         }
     }
 }
-
-impl Drop for AutoAtomicWriteFile {
-    fn drop(&mut self) {
-        self.finish_keep().ok();
-    }
-}
