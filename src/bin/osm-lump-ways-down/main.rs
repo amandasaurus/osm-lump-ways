@@ -2090,9 +2090,12 @@ fn do_waterway_grouped(
             let expanded_lines: Vec<Vec<(i64, (f64, f64))>> = lines.par_iter()
                 .map(|line|
                     inter_store.expand_line_directed(line)
+                    .par_bridge()
                     .map(|nid| (nid, nodeid_pos.get(&nid).unwrap()))
                     .collect())
                 .collect();
+
+            dbg!(expanded_lines.len(), tg.tagid.map(|tagid| tag_group_value[tagid as usize].as_str()));
 
             // Now reorder based on longest segments & calc len of each path.
             let lines_w_lens = calc_through_path_length_and_reorder(&expanded_lines);
@@ -2314,6 +2317,7 @@ fn calc_through_path_length_and_reorder(
     if lines.is_empty() {
         return Vec::new();
     }
+    dbg!(lines.len(), lines.iter().map(|l| l.len()).sum::<usize>());
     // we make a new graph with just the options
     // edge property is the length
     // vertex property is the latlng
@@ -2333,12 +2337,12 @@ fn calc_through_path_length_and_reorder(
             )
         }
     }
-    if g.edges_iter_w_prop().all(|(_nid1, _nid2, len)| *len == 0.) {
+    if g.edges_par_iter_w_prop().all(|(_nid1, _nid2, len)| *len == 0.) {
         // This happens. e.g. a line of 2 nodes, w. different node ids, but same position. Length
         // between them all is zero. This messes up our algorithm. So early exit. Just make
         // something “correct”
         return lines
-            .iter()
+            .par_iter()
             .map(|l| (0., l.iter().map(|(_nid, pos)| *pos).collect()))
             .collect();
     }
@@ -2351,17 +2355,20 @@ fn calc_through_path_length_and_reorder(
     let mut last_num_edges = g.num_edges();
 
     while !g.is_empty() {
+        dbg!("new loop", g.len(), resultant_lines.len());
         src_nids.truncate(0);
         src_nids.extend(
             g.vertexes_and_num_ins_outs().filter_map(
                 |(nid, num_ins, _num_outs)| if num_ins == 0 { Some(nid) } else { None },
             ),
         );
+        dbg!(src_nids.len());
+        sort_dedup!(src_nids);
         prev_dist.clear();
         prev_dist.reserve(src_nids.len() * g.num_vertexes());
 
         // Update the prev_dist's
-        for src_nid in src_nids.drain(..) {
+        for src_nid in src_nids.iter().copied() {
             // do a dijkstra flood fill, but only in one direction
             prev_dist.insert((src_nid, src_nid), (src_nid, 0.));
 
@@ -2369,7 +2376,7 @@ fn calc_through_path_length_and_reorder(
             frontier.push((Reverse(OrderedFloat(0.)), src_nid));
 
             while let Some((Reverse(OrderedFloat(curr_dist)), curr_id)) = frontier.pop() {
-                if curr_dist > prev_dist[&(src_nid, curr_id)].1 {
+            if curr_dist > prev_dist[&(src_nid, curr_id)].1 {
                     continue;
                 }
                 for (neighbour_idx, edge_length) in g.out_neighbours_w_prop(curr_id) {
@@ -2399,6 +2406,7 @@ fn calc_through_path_length_and_reorder(
                 (OrderedFloat(*dist), -src_nid, -sink_nid, prev_nid)
             })
             .unwrap();
+        dbg!(src_nid, sink_nid);
         let mut curr_nid: i64 = prev_nid;
         let mut last = sink_nid;
 
@@ -2420,6 +2428,7 @@ fn calc_through_path_length_and_reorder(
             g.remove_edge(&src_nid, &curr_nid);
             this_line.reverse();
         }
+        dbg!(len, this_line.len());
         resultant_lines.push((len, this_line));
 
         // Sanity check
