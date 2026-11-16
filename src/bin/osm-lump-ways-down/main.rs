@@ -2301,7 +2301,7 @@ fn do_waterway_grouped(
         "Calculated & wrote {} features to output file {} in {}",
         num_written.to_formatted_string(&Locale::en),
         output_filename.display(),
-        formatting::format_duration(do_waterway_grouped_duration),
+        formatting::format_duration_human(&do_waterway_grouped_duration),
     );
 
     Ok(())

@@ -569,7 +569,7 @@ pub fn calc_tag_group(
     info!("The stream level code string has been calculated for every group");
     info!(
         "Finished calculating all tag groups in {}",
-        formatting::format_duration(started_calc.elapsed()),
+        formatting::format_duration_human(&started_calc.elapsed()),
     );
 
     calc_all_confluence_distances(&mut tag_group_info, g);
