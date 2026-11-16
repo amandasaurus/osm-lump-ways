@@ -2419,6 +2419,8 @@ fn calc_through_path_length_and_reorder(
         "There were {:?} lines at the start, and no resultant lines",
         g.len()
     );
+
+    resultant_lines.par_sort_by_key(|(len, _coords)| Reverse(OrderedFloat(*len)));
     resultant_lines
 }
 
