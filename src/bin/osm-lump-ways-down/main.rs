@@ -2295,12 +2295,20 @@ fn do_waterway_grouped(
 
     let do_waterway_grouped_duration = started_do_waterway_grouped.elapsed();
     f.finish()?;
+
     info!(
         "Calculated & wrote {} features to output file {} in {}",
         num_written.to_formatted_string(&Locale::en),
         output_filename.display(),
         formatting::format_duration_human(&do_waterway_grouped_duration),
     );
+    if num_written == 0 {
+        warn!(
+            "Wrote 0 features to output file {}. Is your min length ({:?}) too high?",
+            output_filename.display(),
+            min_length_m,
+        );
+    }
 
     Ok(())
 }
