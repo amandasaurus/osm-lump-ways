@@ -2336,6 +2336,7 @@ fn calc_through_path_length_and_reorder(
             ));
             prev_dist.clear();
             prev_dist.reserve(src_nids.len() * g.num_vertexes());
+            let mut max_so_far = (f64::NEG_INFINITY, (0, 0));
 
             // Update the prev_dist's
             for src_nid in src_nids.iter().copied() {
@@ -2359,23 +2360,17 @@ fn calc_through_path_length_and_reorder(
                         if this_dist < old_value.1 {
                             old_value.0 = curr_id;
                             old_value.1 = this_dist;
+                            if this_dist > max_so_far.0 {
+                                max_so_far.0 = this_dist;
+                                max_so_far.1 = (src_nid, neighbour_idx);
+                            }
                             frontier.push((Reverse(OrderedFloat(this_dist)), neighbour_idx));
                         }
                     }
                 }
             }
-            prev_dist.retain(|_, (_prev, dist)| *dist > 0.);
-            if prev_dist.is_empty() {
-                // this can happen at the end of calculating everything, and we have nodes on top of
-                // each other. So just stop now.
-                break;
-            }
-            let (&(src_nid, sink_nid), &(prev_nid, len)) = prev_dist
-                .iter()
-                .max_by_key(|((src_nid, sink_nid), (prev_nid, dist))| {
-                    (OrderedFloat(*dist), -src_nid, -sink_nid, prev_nid)
-                })
-                .unwrap();
+            let (src_nid, sink_nid) = max_so_far.1;
+            let (prev_nid, len) = prev_dist[&max_so_far.1];
             let mut curr_nid: i64 = prev_nid;
             let mut last = sink_nid;
 
