@@ -182,7 +182,7 @@ fn write_multilinestring_coords(f: &mut impl Write, coords: &[Vec<(f64, f64)>]) 
             if j != 0 {
                 f.write_all(b",")?;
             }
-            write!(f, "[{:.6}, {:.6}]", j_coords.0, j_coords.1)?;
+            write!(f, "[{:.6}, {:.6}]", j_coords.1, j_coords.0)?;
         }
         f.write_all(b"]")?;
     }
@@ -192,7 +192,7 @@ fn write_multilinestring_coords(f: &mut impl Write, coords: &[Vec<(f64, f64)>]) 
 
 fn write_point_coords(f: &mut impl Write, coords: &(f64, f64)) -> Result<()> {
     f.write_all(b"[")?;
-    write!(f, "{:.6}, {:.6}", coords.0, coords.1)?;
+    write!(f, "{:.6}, {:.6}", coords.1, coords.0)?;
     f.write_all(b"]")?;
     Ok(())
 }
@@ -206,7 +206,7 @@ fn write_linestring_coords(
         if j != 0 {
             f.write_all(b",")?;
         }
-        write!(f, "[{:.6}, {:.6}]", j_coords.0, j_coords.1)?;
+        write!(f, "[{:.6}, {:.6}]", j_coords.1, j_coords.0)?;
     }
     f.write_all(b"]")?;
     Ok(())
