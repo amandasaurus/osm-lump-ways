@@ -3,6 +3,8 @@
 ## Unreleased
 
 * Internal refactoring for `--min-length` filtering.
+* Change distance calculation to use geodesic not just haversine
+* Fix possible bug in distances caused by lat/lon mix up.
 
 ### `osm-lump-ways-down`
 
