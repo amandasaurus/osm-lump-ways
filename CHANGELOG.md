@@ -2,9 +2,9 @@
 
 ## Unreleased
 
-* Internal refactoring for `--min-length` filtering.
-* Change distance calculation to use geodesic not just haversine
 * Fix possible bug in distances caused by lat/lon mix up.
+* Internal refactoring for `--min-length` filtering
+* Change distance calculation to use geodesic not just haversine
 
 ### `osm-lump-ways-down`
 
@@ -12,6 +12,7 @@
   found was Ganga river)
 * `--min-lenght N` argument added, which supports all advanced length filtering.
   `--min-length-m` removed.
+* Grouped Waterways: Refactor how length & cumulative length are calculated, rearrange output geometry
 
 ## v3.12.0 (2026-09-18)
 
