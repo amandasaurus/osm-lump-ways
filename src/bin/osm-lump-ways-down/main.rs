@@ -2019,9 +2019,10 @@ fn do_waterway_grouped(
             // For each taggroup, we assemble all the lines that are in the group, by walking
             // upwards from the end segments.
             let taggroupid = taggroupid as u64;
-            let mut lines: Vec<Vec<(i64, i64)>> = vec![];
             let mut seen_out_nids = HashSet::<i64>::new();
             let mut seen_in_nids = HashSet::<i64>::new();
+
+            let mut tg_graph: DirectedGraph<(f64, f64), f64> = DirectedGraph::new();
 
             let mut incoming_store: SmallVec<[(i64, i64); 2]> = smallvec![];
             let mut end_segments_to_build_from: SmallVec<[(i64, i64); 5]> = smallvec![];
@@ -2030,15 +2031,18 @@ fn do_waterway_grouped(
                 .all(|seg| g.edge_property_unchecked(*seg).taggroupid == taggroupid));
 
             while let Some(seg) = end_segments_to_build_from.pop() {
-                let mut line = Vec::new();
                 let mut seg = seg;
                 loop {
-                    if lines.par_iter()
-                        .any(|line| line.par_iter().any(|&other_seg| seg == other_seg))
-                    {
+                    if tg_graph.contains_edge(seg.0, seg.1) {
                         break;
                     }
-                    line.push(seg);
+                    if !tg_graph.contains_vertex(&seg.0) {
+                        tg_graph.add_vertex_w_prop(seg.0, nodeid_pos.get_unchecked(&seg.0));
+                    }
+                    if !tg_graph.contains_vertex(&seg.1) {
+                        tg_graph.add_vertex_w_prop(seg.1, nodeid_pos.get_unchecked(&seg.1));
+                    }
+                    tg_graph.add_edge_w_prop(seg.0, seg.1, g.edge_property_unchecked((seg.0, seg.1)).length_m);
                     seen_out_nids.insert(seg.0);
                     seen_in_nids.insert(seg.1);
                     incoming_store.truncate(0);
@@ -2055,26 +2059,11 @@ fn do_waterway_grouped(
                     }
                     seg = incoming_store.pop().unwrap();
                 }
-                if !line.is_empty() {
-                    line.reverse();
-                    lines.push(line);
-                }
             }
 
-            let lines = lines.into_par_iter()
-                .map(|line| {
-                    let mut new_line = Vec::with_capacity(line.len() + 2);
-                    new_line.push(line[0].0);
-                    new_line.extend(line.into_iter().map(|seg| seg.1));
-                    new_line.shrink_to_fit();
-                    new_line
-                })
-                .collect::<Vec<Vec<i64>>>();
-
-            (taggroupid, tg, lines)
+            (taggroupid, tg, tg_graph)
         })
-
-        .filter_map(|(taggroupid, tg, lines)| {
+        .filter_map(|(taggroupid, tg, tg_graph)| {
             let mut props = serde_json::json!({});
             if tg.stream_level < u64::MAX {
                 props["stream_level"] = tg.stream_level.into();
@@ -2085,27 +2074,11 @@ fn do_waterway_grouped(
                 props["stream_level_code"] = tg.stream_level_code.as_ref().into();
             }
 
-            // Now reorder based on longest segments & calc len of each path.
-            let lines_w_lens = calc_through_path_length_and_reorder(&lines, &inter_store, nodeid_pos);
-            let length_m = lines_w_lens[0].0;
-            let cum_length_m = lines_w_lens.iter().map(|(len, _points)| len).sum();
-            let multilinestrings: Vec<Vec<(f64, f64)>> = lines_w_lens.into_iter().map(|(_len, points)| points).collect();
-
-            if min_length_m.is_some_and(|min_length_m| length_m < min_length_m) {
-                return None;
-            }
-            props["length_m"] = round(&length_m, 1).into();
-            props["cum_length_m"] = round(&cum_length_m, 1).into();
-
-            props["tag_group_value"] = tg.tagid.map(|tagid| tag_group_value[tagid as usize].as_str()).into();
-            props["internal_groupid"] = taggroupid.into();
-            props["min_nid"] = tg.min_nid.into();
-
             // There's probably other things to do, like the p90
             // Get all the edges of this line
             let upstream_stats: (OrderedFloat<f64>, OrderedFloat<f64>, usize, OrderedFloat<f64>) =
-                lines.iter().flat_map(|line| line.iter().tuple_windows::<(_,_)>())
-                .map(|(nid1, nid2)| OrderedFloat(g.edge_property_unchecked((*nid1, *nid2)).upstream_m))
+                tg_graph.edges_iter()
+                .map(|(nid1, nid2)| OrderedFloat(g.edge_property_unchecked((nid1, nid2)).upstream_m))
                 .map(|nid_upstream| (nid_upstream, nid_upstream, 1usize, nid_upstream))
                 .fold(Default::default(),
                     |mut acc, nid_upstream| {
@@ -2120,6 +2093,23 @@ fn do_waterway_grouped(
             props["min_upstream_m"] = round(&upstream_stats.0.into_inner(), 1).into();
             props["max_upstream_m"] = round(&upstream_stats.1.into_inner(), 1).into();
             props["mean_upstream_m"] = round(&(upstream_stats.3.into_inner() / upstream_stats.2 as f64), 1).into();
+
+            // Now reorder based on longest segments & calc len of each path.
+            let lines_w_lens = calc_through_path_length_and_reorder(tg_graph, &inter_store, nodeid_pos);
+            let length_m = lines_w_lens[0].0;
+            let cum_length_m = lines_w_lens.iter().map(|(len, _points)| len).sum();
+            let multilinestrings: Vec<Vec<(f64, f64)>> = lines_w_lens.into_iter().map(|(_len, points)| points).collect();
+
+            if min_length_m.is_some_and(|min_length_m| length_m < min_length_m) {
+                return None;
+            }
+            props["length_m"] = round(&length_m, 1).into();
+            props["cum_length_m"] = round(&cum_length_m, 1).into();
+
+            props["tag_group_value"] = tg.tagid.map(|tagid| tag_group_value[tagid as usize].as_str()).into();
+            props["internal_groupid"] = taggroupid.into();
+            props["min_nid"] = tg.min_nid.into();
+
 
 
             if !tg.extra_tag_values.is_empty() {
@@ -2152,8 +2142,6 @@ fn do_waterway_grouped(
                     return None;
                 }
 
-
-            drop(lines);
 
             props["side_channels"] = tg.side_channels.iter().copied().collect::<Vec<_>>().into();
 
@@ -2300,91 +2288,42 @@ fn do_waterway_grouped(
 }
 
 fn calc_through_path_length_and_reorder(
-    lines: &Vec<Vec<i64>>,
+    mut g: DirectedGraph<(f64, f64), f64>,
     inter_store: &inter_store::InterStore,
     nodeid_pos: &impl NodeIdPosition,
 ) -> Vec<(f64, Vec<(f64, f64)>)> {
-    if lines.is_empty() {
+    if g.is_empty() {
         return Vec::new();
-    }
-    dbg!(lines.len(), lines.iter().map(|l| l.len()).sum::<usize>());
-    // we make a new graph with just the options
-    // edge property is the length
-    // vertex property is the latlng
-    let mut g: DirectedGraph<(f64, f64), f64> = graph::DirectedGraph::new();
-    for line in lines.iter() {
-        for nid in line.iter() {
-            g.add_vertex_w_prop(*nid, nodeid_pos.get(nid).unwrap());
-        }
-    }
-    for line in lines.iter() {
-        for seg in line.windows(2) {
-            let dist = inter_store
-                .expand_directed(seg[0], seg[1])
-                .map(|nid| nodeid_pos.get(&nid).unwrap())
-                .tuple_windows::<(_, _)>()
-                .par_bridge()
-                .map(|(p1, p2)| distance::distance_m_fpair(p1, p2))
-                .sum::<f64>();
-            g.add_edge_w_prop(seg[0], seg[1], dist)
-        }
-    }
-    if g.edges_par_iter_w_prop()
-        .all(|(_nid1, _nid2, len)| *len == 0.)
-    {
-        // This happens. e.g. a line of 2 nodes, w. different node ids, but same position. Length
-        // between them all is zero. This messes up our algorithm. So early exit. Just make
-        // something “correct”
-        return lines
-            .par_iter()
-            .map(|l| (0., l.iter().map(|nid| nodeid_pos.get_unchecked(nid)).collect()))
-            .collect();
     }
 
     let mut resultant_lines = Vec::new();
 
-    if g.is_simple_line() {
-        // short cut where it just follows the line along.
-        let src_nid = g.vertexes_and_num_ins_outs().filter(|(_nid, nins, nouts)| *nins == 0 && *nouts == 1).next().unwrap().0;
-        let mut this_line = Vec::with_capacity(g.num_edges());
-        let mut curr_nid = src_nid;
-        loop {
-            this_line.push(curr_nid);
-            if let Some(next) = g.out_neighbours(curr_nid).next() {
-                curr_nid = next;
-            } else {
-                break;
-            }
-        }
+    // now we iteratively remove edges from this graph as they are build
+    let mut src_nids = Vec::new();
+    let mut prev_dist: HashMap<(i64, i64), (i64, f64)> = HashMap::new();
+    let mut frontier = BinaryHeap::new();
+    let mut last_num_edges = g.num_edges();
 
-        let this_line = inter_store
-            .expand_line_directed(&this_line)
-            .map(|nid| nodeid_pos.get(&nid).unwrap())
-            .collect::<Vec<(f64, f64)>>();
-        let len = this_line.iter()
+    while !g.is_empty() {
+        if let Some(this_line) = g.pop_simple_line() {
+            // short cut where it just follows the line along.
+
+            let this_line = inter_store
+                .expand_line_directed(&this_line)
+                .map(|nid| nodeid_pos.get(&nid).unwrap())
+                .collect::<Vec<(f64, f64)>>();
+            let len = this_line
+                .iter()
                 .tuple_windows::<(_, _)>()
                 .map(|(p1, p2)| distance::distance_m_fpair(*p1, *p2))
                 .sum::<f64>();
-        resultant_lines.push((len, this_line));
-
-    } else {
-
-        // now we iteratively remove edges from this graph as they are build
-        let mut src_nids = Vec::new();
-        let mut prev_dist: HashMap<(i64, i64), (i64, f64)> = HashMap::new();
-        let mut frontier = BinaryHeap::new();
-        let mut last_num_edges = g.num_edges();
-
-        while !g.is_empty() {
-            dbg!("new loop", g.len(), resultant_lines.len());
+            resultant_lines.push((len, this_line));
+        } else {
+            //dbg!("new loop", g.len(), resultant_lines.len());
             src_nids.truncate(0);
-            src_nids.extend(
-                g.vertexes_and_num_ins_outs().filter_map(
-                    |(nid, num_ins, _num_outs)| if num_ins == 0 { Some(nid) } else { None },
-                ),
-            );
-            dbg!(src_nids.len());
-            sort_dedup!(src_nids);
+            src_nids.extend(g.vertexes_and_num_ins_outs().filter_map(
+                |(nid, num_ins, _num_outs)| if num_ins == 0 { Some(nid) } else { None },
+            ));
             prev_dist.clear();
             prev_dist.reserve(src_nids.len() * g.num_vertexes());
 
@@ -2427,7 +2366,6 @@ fn calc_through_path_length_and_reorder(
                     (OrderedFloat(*dist), -src_nid, -sink_nid, prev_nid)
                 })
                 .unwrap();
-            dbg!(src_nid, sink_nid);
             let mut curr_nid: i64 = prev_nid;
             let mut last = sink_nid;
 
@@ -2454,22 +2392,22 @@ fn calc_through_path_length_and_reorder(
                 .map(|nid| nodeid_pos.get(&nid).unwrap())
                 .collect::<Vec<(f64, f64)>>();
             resultant_lines.push((len, this_line));
-
-            // Sanity check
-            assert!(
-                g.num_edges() < last_num_edges,
-                "No edges removed in this step. last={last_num_edges} num_edges={:?} prev_dist={:?}",
-                g.len(),
-                prev_dist
-            );
-            last_num_edges = g.num_edges();
         }
+
+        // Sanity check
+        assert!(
+            g.num_edges() < last_num_edges,
+            "No edges removed in this step. last={last_num_edges} num_edges={:?} prev_dist={:?}",
+            g.len(),
+            prev_dist
+        );
+        last_num_edges = g.num_edges();
     }
 
     assert!(
         resultant_lines.len() > 0,
-        "There were {} lines at the start, and no resultant lines",
-        lines.len()
+        "There were {:?} lines at the start, and no resultant lines",
+        g.len()
     );
     resultant_lines
 }
