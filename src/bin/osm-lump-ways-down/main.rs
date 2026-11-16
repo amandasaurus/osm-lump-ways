@@ -650,9 +650,8 @@ fn main() -> Result<()> {
             .par_iter()
             .map(|cycle| {
                 let coords = node_group_to_lines(cycle.as_slice(), &nodeid_pos);
-                // WTF do I have lat & lng mixed up??
                 let mut these_boundaries =
-                    boundaries.ids(LatLon::new(coords[0][0].1, coords[0][0].0)?);
+                    boundaries.ids(LatLon::new(coords[0][0].0, coords[0][0].1)?);
                 these_boundaries.sort_unstable_by_key(|s| -(s.len() as isize));
                 if these_boundaries.is_empty() {
                     these_boundaries.push("unknown_area");
@@ -1415,8 +1414,7 @@ fn read_node_positions(
         .into_iter()
         .par_bridge()
         .filter(|(nid, _pos)| wanted_nodeid_func(*nid))
-        .map(|(nid, pos)| (nid, (pos.1.inner(), pos.0.inner()))) // WTF do I have lat & lon
-        // mixed up??
+        .map(|(nid, pos)| (nid, (pos.0.inner(), pos.1.inner())))
         .for_each_with(nodeid_pos.clone(), |nodeid_pos, (nid, pos)| {
             assert!(nid > 0, "This file has a node < 0. negative ids are not supported in this tool Use osmium sort & osmium renumber to convert this file and run again.");
             setting_node_pos.inc(1);
