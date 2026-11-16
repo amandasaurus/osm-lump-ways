@@ -211,7 +211,10 @@ pub trait DirectedGraphTrait<V, E>: Send + Sync + Sized {
         added
     }
 
-    fn into_vertexes_topologically_sorted(self, sorting_nodes_bar: Option<&ProgressBar>) -> Vec<i64> {
+    fn into_vertexes_topologically_sorted(
+        self,
+        sorting_nodes_bar: Option<&ProgressBar>,
+    ) -> Vec<i64> {
         let mut g = self;
         let mut result = Vec::with_capacity(g.num_vertexes());
         let mut frontier: Vec<i64> = Vec::new();
@@ -230,8 +233,8 @@ pub trait DirectedGraphTrait<V, E>: Send + Sync + Sized {
             while let Some(v) = frontier.pop() {
                 result.push(v);
                 if let Some(sorting_nodes_bar) = sorting_nodes_bar {
-					sorting_nodes_bar.inc(1);
-				}
+                    sorting_nodes_bar.inc(1);
+                }
 
                 // have to save to another Vec to prevent lifetimes
                 others.truncate(0);
@@ -378,28 +381,39 @@ pub trait DirectedGraphTrait<V, E>: Send + Sync + Sized {
     where
         E: 'a;
 
-	/// Returns true iff there is exactly 1 vertex in this graph which has only 1 outgoing edge,
-	/// 1 vertex with 1 incoming edge, and every other vertex has 1 in and 1 out edge.
-	/// i.e. is this graph essentially just one straight line?
-	fn is_simple_line(&self) -> bool
-	{
-		let mut num_vertexes = 0;
-		let mut num_vertexes_w_1_out = 0;
-		let mut num_vertexes_w_1_in = 0;
-		let mut num_vertexes_w_1_in_1_out = 0;
-		let mut num_vertexes_w_others = 0;
-		for (_v, nins, nouts) in self.vertexes_and_num_ins_outs() {
-			num_vertexes += 1;
-			match (nins, nouts) {
-				(1, 0) => { num_vertexes_w_1_in += 1; },
-				(0, 1) => { num_vertexes_w_1_out += 1; },
-				(1, 1) => { num_vertexes_w_1_in_1_out += 1; },
-				_ => { num_vertexes_w_others += 1; },
-			}
-		}
+    /// Returns true iff there is exactly 1 vertex in this graph which has only 1 outgoing edge,
+    /// 1 vertex with 1 incoming edge, and every other vertex has 1 in and 1 out edge.
+    /// i.e. is this graph essentially just one straight line?
+    fn is_simple_line(&self) -> bool {
+        let mut num_vertexes = 0;
+        let mut num_vertexes_w_1_out = 0;
+        let mut num_vertexes_w_1_in = 0;
+        let mut num_vertexes_w_1_in_1_out = 0;
+        let mut num_vertexes_w_others = 0;
+        for (_v, nins, nouts) in self.vertexes_and_num_ins_outs() {
+            num_vertexes += 1;
+            match (nins, nouts) {
+                (1, 0) => {
+                    num_vertexes_w_1_in += 1;
+                }
+                (0, 1) => {
+                    num_vertexes_w_1_out += 1;
+                }
+                (1, 1) => {
+                    num_vertexes_w_1_in_1_out += 1;
+                }
+                _ => {
+                    num_vertexes_w_others += 1;
+                }
+            }
+        }
 
-		num_vertexes_w_1_in == 1 && num_vertexes_w_1_out == 1 && num_vertexes_w_others == 0 && (num_vertexes_w_1_in_1_out + num_vertexes_w_1_in + num_vertexes_w_1_out == num_vertexes)
-	}
+        num_vertexes_w_1_in == 1
+            && num_vertexes_w_1_out == 1
+            && num_vertexes_w_others == 0
+            && (num_vertexes_w_1_in_1_out + num_vertexes_w_1_in + num_vertexes_w_1_out
+                == num_vertexes)
+    }
 
 }
 
