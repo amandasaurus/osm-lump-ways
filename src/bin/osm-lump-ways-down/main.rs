@@ -2085,20 +2085,8 @@ fn do_waterway_grouped(
                 props["stream_level_code"] = tg.stream_level_code.as_ref().into();
             }
 
-            // Expand all the intermediate points
-            // & attach the latlng's to each point.
-            let expanded_lines: Vec<Vec<(i64, (f64, f64))>> = lines.par_iter()
-                .map(|line|
-                    inter_store.expand_line_directed(line)
-                    .par_bridge()
-                    .map(|nid| (nid, nodeid_pos.get(&nid).unwrap()))
-                    .collect())
-                .collect();
-
-            dbg!(expanded_lines.len(), tg.tagid.map(|tagid| tag_group_value[tagid as usize].as_str()));
-
             // Now reorder based on longest segments & calc len of each path.
-            let lines_w_lens = calc_through_path_length_and_reorder(&expanded_lines);
+            let lines_w_lens = calc_through_path_length_and_reorder(&lines, &inter_store, nodeid_pos);
             let length_m = lines_w_lens[0].0;
             let cum_length_m = lines_w_lens.iter().map(|(len, _points)| len).sum();
             let multilinestrings: Vec<Vec<(f64, f64)>> = lines_w_lens.into_iter().map(|(_len, points)| points).collect();
@@ -2312,7 +2300,9 @@ fn do_waterway_grouped(
 }
 
 fn calc_through_path_length_and_reorder(
-    lines: &Vec<Vec<(i64, (f64, f64))>>,
+    lines: &Vec<Vec<i64>>,
+    inter_store: &inter_store::InterStore,
+    nodeid_pos: &impl NodeIdPosition,
 ) -> Vec<(f64, Vec<(f64, f64)>)> {
     if lines.is_empty() {
         return Vec::new();
@@ -2323,28 +2313,29 @@ fn calc_through_path_length_and_reorder(
     // vertex property is the latlng
     let mut g: DirectedGraph<(f64, f64), f64> = graph::DirectedGraph::new();
     for line in lines.iter() {
-        for (nid, pos) in line.iter() {
-            g.add_vertex_w_prop(*nid, *pos);
+        for nid in line.iter() {
+            g.add_vertex_w_prop(*nid, nodeid_pos.get(nid).unwrap());
         }
     }
     for line in lines.iter() {
         for seg in line.windows(2) {
-            assert_ne!(seg[0].0, seg[1].0);
-            g.add_edge_w_prop(
-                seg[0].0,
-                seg[1].0,
-                distance::distance_m_fpair(seg[0].1, seg[1].1),
-            )
+            let dist = inter_store
+                .expand_directed(seg[0], seg[1])
+                .map(|nid| nodeid_pos.get(&nid).unwrap())
+                .tuple_windows::<(_, _)>()
+                .par_bridge()
+                .map(|(p1, p2)| distance::distance_m_fpair(p1, p2))
+                .sum::<f64>();
+            g.add_edge_w_prop(seg[0], seg[1], dist)
         }
     }
-    if g.edges_par_iter_w_prop().all(|(_nid1, _nid2, len)| *len == 0.) {
+    if g.edges_par_iter_w_prop()
+        .all(|(_nid1, _nid2, len)| *len == 0.)
+    {
         // This happens. e.g. a line of 2 nodes, w. different node ids, but same position. Length
         // between them all is zero. This messes up our algorithm. So early exit. Just make
         // something “correct”
-        return lines
-            .par_iter()
-            .map(|l| (0., l.iter().map(|(_nid, pos)| *pos).collect()))
-            .collect();
+        todo!();
     }
 
     // now we iteratively remove edges from this graph as they are build
@@ -2376,7 +2367,7 @@ fn calc_through_path_length_and_reorder(
             frontier.push((Reverse(OrderedFloat(0.)), src_nid));
 
             while let Some((Reverse(OrderedFloat(curr_dist)), curr_id)) = frontier.pop() {
-            if curr_dist > prev_dist[&(src_nid, curr_id)].1 {
+                if curr_dist > prev_dist[&(src_nid, curr_id)].1 {
                     continue;
                 }
                 for (neighbour_idx, edge_length) in g.out_neighbours_w_prop(curr_id) {
@@ -2410,25 +2401,28 @@ fn calc_through_path_length_and_reorder(
         let mut curr_nid: i64 = prev_nid;
         let mut last = sink_nid;
 
-        let mut this_line: Vec<(f64, f64)> = Vec::new();
+        let mut this_line: Vec<i64> = Vec::new();
         if prev_nid == src_nid {
-            this_line.push(*g.vertex_property_unchecked(&src_nid));
-            this_line.push(*g.vertex_property_unchecked(&sink_nid));
+            this_line.push(src_nid);
+            this_line.push(sink_nid);
             g.remove_edge(&src_nid, &sink_nid);
         } else {
-            this_line.push(*g.vertex_property_unchecked(&sink_nid));
+            this_line.push(sink_nid);
             g.remove_edge(&curr_nid, &sink_nid);
             while curr_nid != src_nid {
-                this_line.push(*g.vertex_property_unchecked(&curr_nid));
+                this_line.push(curr_nid);
                 g.remove_edge(&curr_nid, &last);
                 last = curr_nid;
                 curr_nid = prev_dist[&(src_nid, curr_nid)].0;
             }
-            this_line.push(*g.vertex_property_unchecked(&src_nid));
+            this_line.push(src_nid);
             g.remove_edge(&src_nid, &curr_nid);
             this_line.reverse();
         }
-        dbg!(len, this_line.len());
+        let this_line = inter_store
+            .expand_line_directed(&this_line)
+            .map(|nid| nodeid_pos.get(&nid).unwrap())
+            .collect::<Vec<(f64, f64)>>();
         resultant_lines.push((len, this_line));
 
         // Sanity check
