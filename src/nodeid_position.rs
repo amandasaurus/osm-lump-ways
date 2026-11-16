@@ -57,8 +57,15 @@ pub trait NodeIdPosition: std::fmt::Debug + std::marker::Send + std::marker::Syn
     }
 
     fn get_unchecked(&self, node_id: &i64) -> (f64, f64) {
-		self.get(node_id).with_context(|| format!("Unabled to get the position for nid {node_id}. We have {} in the store.", self.len())).unwrap()
-	}
+        self.get(node_id)
+            .with_context(|| {
+                format!(
+                    "Unabled to get the position for nid {node_id}. We have {} in the store.",
+                    self.len()
+                )
+            })
+            .unwrap()
+    }
 
     /// Number of nodes inside
     fn len(&self) -> usize;
