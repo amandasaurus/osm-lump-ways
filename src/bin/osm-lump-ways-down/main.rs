@@ -2027,10 +2027,13 @@ fn do_waterway_grouped(
     });
 
     // Here is the big iterator to generate all the GeoJSON Feature's for this file
-    let _taggroups_with_geom = tag_group_info.iter()
-        .progress_with(writing_output_bar)
+    tag_group_info.par_iter()
         .enumerate()
-        .par_bridge()
+        .inspect(|_| { writing_output_bar.inc(1); })
+        .filter(|(_taggroupid, tg)| {
+            // shortcut.
+            (tg.length_m > 0.) && min_length_m.is_none_or(|min_length_m| tg.length_m > min_length_m)
+        })
         .map(|(taggroupid, tg)| {
             // For each taggroup, we assemble all the lines that are in the group, by walking
             // upwards from the end segments.
@@ -2062,16 +2065,6 @@ fn do_waterway_grouped(
             }
 
             (taggroupid, tg, tg_graph)
-        })
-        .filter(|(_taggroupid, _tg, tg_graph)| {
-            // shortcut.
-            // If the sum of the lengths of all the edges in this tg_graph is below the
-            // min_length_m, then we know we don't need this tg_graph.
-            // Some will could still be excluded later.
-            let length_m = tg_graph.edges_par_iter_w_prop().map(|(_nid1, _nid2, length_m)| length_m).sum::<f64>();
-            // Weird graphs with overlapping nodes, resulting in all zero length edges?
-            // remove them
-            (length_m > 0.) || min_length_m.is_none_or(|min_length_m| length_m > min_length_m)
         })
         .filter_map(|(taggroupid, tg, tg_graph)| {
             let mut props = serde_json::json!({});
@@ -2145,17 +2138,10 @@ fn do_waterway_grouped(
 					.collect::<Vec<_>>().into();
 			}
 
-            if let Some(min_length_m) = min_length_m
-                && cum_length_m < min_length_m {
-                    // this will definitely be to small
-                    return None;
-                }
-
-
             props["side_channels"] = tg.side_channels.iter().copied().collect::<Vec<_>>().into();
 
             props["branching_distributaries"] = tg.branching_distributaries
-                .iter()
+                .par_iter()
                 .map(|dist_tg_idx| (dist_tg_idx, &tag_group_info[*dist_tg_idx as usize]))
                 .map(|(dist_tg_idx, dist_tg)| {
                     let confluences = tg.confluences
@@ -2176,7 +2162,7 @@ fn do_waterway_grouped(
             })
             .collect::<Vec<_>>().into();
             props["terminal_distributaries"] = tg.terminal_distributaries
-                .iter()
+                .par_iter()
                 .map(|dist_tg_idx| (dist_tg_idx, &tag_group_info[*dist_tg_idx as usize]))
                 .map(|(dist_tg_idx, dist_tg)| {
                     let confluences = tg.confluences
@@ -2196,14 +2182,14 @@ fn do_waterway_grouped(
                     })
             })
             .collect::<Vec<_>>().into();
-            props["branching_distributaries"].as_array_mut().unwrap().sort_by_key(|e| OrderedFloat(-e["outflow_m"].as_f64().unwrap()));
-            props["terminal_distributaries"].as_array_mut().unwrap().sort_by_key(|e| OrderedFloat(-e["outflow_m"].as_f64().unwrap()));
-            props["distributaries_sea"] = tg.sinks.iter()
-                .flat_map(|&nid| g.in_edges(nid))
+            props["branching_distributaries"].as_array_mut().unwrap().par_sort_by_key(|e| OrderedFloat(-e["outflow_m"].as_f64().unwrap()));
+            props["terminal_distributaries"].as_array_mut().unwrap().par_sort_by_key(|e| OrderedFloat(-e["outflow_m"].as_f64().unwrap()));
+            props["distributaries_sea"] = tg.sinks.par_iter()
+                .flat_map_iter(|&nid| g.in_edges(nid))
                 .filter(|seg| g.edge_property_unchecked(*seg).taggroupid == taggroupid)
                 .map(|seg| seg_to_distrib_json(&seg, seg.1, true))
             .collect::<Vec<_>>().into();
-            props["distributaries_sea"].as_array_mut().unwrap().sort_by_key(|e| OrderedFloat(-e["upstream_m"].as_f64().unwrap()));
+            props["distributaries_sea"].as_array_mut().unwrap().par_sort_by_key(|e| OrderedFloat(-e["upstream_m"].as_f64().unwrap()));
 
             props["tributaries"] = tg.tributaries
                 .par_iter()
@@ -2211,8 +2197,8 @@ fn do_waterway_grouped(
                 //.filter(|(_trib_tg_idx, trib_tg)| trib_tg.tagid.map_or(false, |t| tag_group_value[t as usize] == "Ballylow Brook"))
                 .map(|(trib_tg_idx, trib_tg)| {
                 let confluences = tg.confluences
-                    .iter().filter(|nid| trib_tg.confluences.contains(nid))
-                    .flat_map(|&nid| g.edges(nid))
+                    .par_iter().filter(|nid| trib_tg.confluences.contains(nid))
+                    .flat_map_iter(|&nid| g.edges(nid))
                     .filter(|seg| g.edge_property_unchecked(*seg).taggroupid == *trib_tg_idx)
                     .map(|seg| seg_to_distrib_json(&seg, seg.1, true))
                     .collect::<Vec<_>>();
@@ -2225,15 +2211,15 @@ fn do_waterway_grouped(
                     "inflow_m": confluences.iter().map(|c| c["upstream_m"].as_f64().unwrap()).sum::<f64>(),
                 })
             }).collect::<Vec<_>>().into();
-            props["tributaries"].as_array_mut().unwrap().sort_by_key(|e| OrderedFloat(-e["inflow_m"].as_f64().unwrap()));
+            props["tributaries"].as_array_mut().unwrap().par_sort_by_key(|e| OrderedFloat(-e["inflow_m"].as_f64().unwrap()));
 
             props["parent_rivers"] = tg.parent_rivers
                 .par_iter()
                 .map(|parent_tg_idx| {
                     let parent_tg = &tag_group_info[*parent_tg_idx as usize];
                     let confluences = tg.confluences
-                        .iter().filter(|nid| parent_tg.confluences.contains(nid))
-                        .flat_map(|&nid| g.edges(nid))
+                        .par_iter().filter(|nid| parent_tg.confluences.contains(nid))
+                        .flat_map_iter(|&nid| g.edges(nid))
                         .filter(|seg| g.edge_property_unchecked(*seg).taggroupid == taggroupid)
                         .map(|seg| seg_to_distrib_json(&seg, seg.0, false))
                         .collect::<Vec<_>>();
@@ -2256,19 +2242,16 @@ fn do_waterway_grouped(
             Some((props, multilinestrings))
         })
         .for_each(move |(props, multilinestrings)| {
-            //dbg!(&props);
             tx.send((props, multilinestrings)).unwrap();
-        }) ;
+        });
 
     let num_written = writing_handle.join().unwrap();
-
-    let do_waterway_grouped_duration = started_do_waterway_grouped.elapsed();
 
     info!(
         "Calculated & wrote {} features to output file {} in {}",
         num_written.to_formatted_string(&Locale::en),
         output_filename.display(),
-        formatting::format_duration_human(&do_waterway_grouped_duration),
+        formatting::format_duration_human(&started_do_waterway_grouped.elapsed()),
     );
     if num_written == 0 {
         warn!(
