@@ -2063,6 +2063,16 @@ fn do_waterway_grouped(
 
             (taggroupid, tg, tg_graph)
         })
+        .filter(|(_taggroupid, _tg, tg_graph)| {
+            // shortcut.
+            // If the sum of the lengths of all the edges in this tg_graph is below the
+            // min_length_m, then we know we don't need this tg_graph.
+            // Some will could still be excluded later.
+            let length_m = tg_graph.edges_par_iter_w_prop().map(|(_nid1, _nid2, length_m)| length_m).sum::<f64>();
+            // Weird graphs with overlapping nodes, resulting in all zero length edges?
+            // remove them
+            (length_m > 0.) || min_length_m.is_none_or(|min_length_m| length_m > min_length_m)
+        })
         .filter_map(|(taggroupid, tg, tg_graph)| {
             let mut props = serde_json::json!({});
             if tg.stream_level < u64::MAX {
