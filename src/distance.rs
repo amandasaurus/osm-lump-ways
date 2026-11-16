@@ -1,10 +1,12 @@
+#![allow(warnings)]
 use geo::Point;
-use geo::{Distance, Geodesic};
+use geo::{Distance, Geodesic, Haversine};
 use ordered_float::OrderedFloat;
 
 #[must_use]
 pub fn distance_m(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
-    let dist = Geodesic.distance(Point::new(lon1, lat1), Point::new(lon2, lat2));
+    let dist = Haversine.distance(Point::new(lon1, lat1), Point::new(lon2, lat2));
+    //let dist = Geodesic.distance(Point::new(lon1, lat1), Point::new(lon2, lat2));
     // Sanity check
     assert!(
         !dist.is_nan() && !dist.is_infinite(),
