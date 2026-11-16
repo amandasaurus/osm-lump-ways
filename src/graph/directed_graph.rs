@@ -377,6 +377,30 @@ pub trait DirectedGraphTrait<V, E>: Send + Sync + Sized {
     ) -> impl ParallelIterator<Item = ((i64, i64), &'a mut E)>
     where
         E: 'a;
+
+	/// Returns true iff there is exactly 1 vertex in this graph which has only 1 outgoing edge,
+	/// 1 vertex with 1 incoming edge, and every other vertex has 1 in and 1 out edge.
+	/// i.e. is this graph essentially just one straight line?
+	fn is_simple_line(&self) -> bool
+	{
+		let mut num_vertexes = 0;
+		let mut num_vertexes_w_1_out = 0;
+		let mut num_vertexes_w_1_in = 0;
+		let mut num_vertexes_w_1_in_1_out = 0;
+		let mut num_vertexes_w_others = 0;
+		for (_v, nins, nouts) in self.vertexes_and_num_ins_outs() {
+			num_vertexes += 1;
+			match (nins, nouts) {
+				(1, 0) => { num_vertexes_w_1_in += 1; },
+				(0, 1) => { num_vertexes_w_1_out += 1; },
+				(1, 1) => { num_vertexes_w_1_in_1_out += 1; },
+				_ => { num_vertexes_w_others += 1; },
+			}
+		}
+
+		num_vertexes_w_1_in == 1 && num_vertexes_w_1_out == 1 && num_vertexes_w_others == 0 && (num_vertexes_w_1_in_1_out + num_vertexes_w_1_in + num_vertexes_w_1_out == num_vertexes)
+	}
+
 }
 
 #[derive(Default, Debug, Clone)]
