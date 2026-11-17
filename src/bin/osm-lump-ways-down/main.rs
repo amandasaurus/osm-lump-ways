@@ -2013,7 +2013,7 @@ fn do_waterway_grouped(
 
     let output_format = fileio::format_for_filename(output_filename);
     let mut f = AutoAtomicWriteFile::new(args.overwrite, output_filename)?;
-    let (tx,rx) = std::sync::mpsc::sync_channel(100);
+    let (tx, rx) = std::sync::mpsc::sync_channel(100);
 
     // write data in a separate thread. We mostly want this so that we can calculate the serde
     // stuff in parallel.
