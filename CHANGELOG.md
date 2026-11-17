@@ -5,6 +5,7 @@
 * Fix possible bug in distances caused by lat/lon mix up.
 * Internal refactoring for `--min-length` filtering
 * Change distance calculation to use geodesic not just haversine
+* Fix bug in Betweenness Centrality code introduced by a dependency upgrade.
 
 ### `osm-lump-ways-down`
 

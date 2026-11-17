@@ -11,7 +11,7 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use utils::min_max;
 
-use kiddo::{KdTree, MutableKdTree, SquaredEuclidean};
+use kiddo::{KdTree, SquaredEuclidean};
 
 use itertools::Itertools;
 use smallvec::smallvec;
@@ -505,14 +505,26 @@ impl Graph2 {
         // Need to quickly check existing nodes, so keep as a hashmap
         let mut new_nodes = HashSet::with_capacity(num);
 
-        let mut kdtree: MutableKdTree<f64, 2> = KdTree::default();
+        // The MutableKdTree has all of these defaults, but the item type is u32. OSM Node IDs are
+        // 64bit for many years. This is most of the MutableKdTree type defintion, but with i64
+        // instead of u32.
+        // in kiddo < 6, the default was u64.
+        let mut kdtree: KdTree<
+            f64,
+            i64,
+            kiddo::stem_strategies::eytzinger::Eytzinger,
+            kiddo::leaf_strategies::VecOfArrays<f64, i64, 2, 32>,
+            2,
+            32,
+        > = KdTree::default();
         let mut rng = &mut rand::rng();
 
         let first = *all_nodes.choose(&mut rng).unwrap();
         let pos = nodeid_pos.get_arr(&first).unwrap();
-        new_nodes.insert(first);
+        //dbg!(&first, &pos);
+        //new_nodes.insert(first);
         kdtree
-            .add(&pos, first.try_into().unwrap())
+            .add(&pos, first)
             .expect("Unable to add first node to the KD Tree");
 
         // Buffer of possible nodes for each iteration.
@@ -526,7 +538,7 @@ impl Graph2 {
                 possible_nodes.extend(
                     all_nodes
                         .sample(&mut rng, k - possible_nodes.len() + 1)
-                        .filter(|nid| !new_nodes.contains(nid))
+                        .filter(|nid| !new_nodes.contains(*nid))
                         .map(|nid| {
                             let pos = nodeid_pos.get_arr(nid).unwrap();
                             let dist = kdtree
@@ -547,7 +559,7 @@ impl Graph2 {
 
             // save it
             kdtree
-                .add(&pos, nid.try_into().unwrap())
+                .add(&pos, nid.try_into().expect("Unable to convert nid"))
                 .expect("Unable to add new node to the KDTree");
             new_nodes.insert(nid);
         }
